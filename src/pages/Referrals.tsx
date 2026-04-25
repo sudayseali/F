@@ -1,6 +1,34 @@
-import { Copy, Users, Gift, Share2 } from "lucide-react";
+import { Copy, Users, Gift, Share2, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { useTelegram } from "../contexts/TelegramContext";
 
 export function Referrals() {
+  const { user } = useTelegram();
+  const [copied, setCopied] = useState(false);
+
+  // Generate real referral link based on user's Telegram ID
+  const refCode = user?.id ? `ref_${user.id}` : "ref_12345";
+  const refLink = `https://t.me/TaskMasterBot?start=${refCode}`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(refLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const shareToTelegram = () => {
+    const text = "Join me on TaskMaster and earn money completing simple tasks!";
+    const url = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`;
+    
+    // Use Telegram WebApp API if available, otherwise fallback to web link
+    if ((window as any).Telegram?.WebApp?.openTelegramLink) {
+      (window as any).Telegram.WebApp.openTelegramLink(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header>
@@ -19,15 +47,27 @@ export function Referrals() {
             Get 10% of all earnings from users who sign up using your referral link.
           </p>
           
-          <div className="w-full bg-black/20 p-1.5 rounded-xl flex items-center backdrop-blur-sm">
-            <div className="flex-1 overflow-x-auto scrollbar-hide px-3 py-2">
-              <p className="text-sm font-mono text-white/90 whitespace-nowrap">
-                https://t.me/TaskMasterBot?start=ref12345
-              </p>
+          <div className="w-full space-y-3">
+            <div className="w-full bg-black/20 p-1.5 rounded-xl flex items-center backdrop-blur-sm border border-white/10">
+              <div className="flex-1 overflow-x-auto scrollbar-hide px-3 py-2 text-left">
+                <p className="text-sm font-mono text-white/90 whitespace-nowrap">
+                  {refLink}
+                </p>
+              </div>
+              <button 
+                onClick={copyToClipboard}
+                className="bg-white text-indigo-600 px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center hover:bg-indigo-50 transition-all shadow-sm ml-2 shrink-0 active:scale-95"
+              >
+                {copied ? <CheckCircle2 className="w-4 h-4 mr-1.5 text-green-500" /> : <Copy className="w-4 h-4 mr-1.5" />}
+                {copied ? "Copied!" : "Copy"}
+              </button>
             </div>
-            <button className="bg-white text-indigo-600 px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center hover:bg-indigo-50 transition-colors shadow-sm ml-2 shrink-0">
-              <Copy className="w-4 h-4 mr-1.5" />
-              Copy
+            <button 
+              onClick={shareToTelegram}
+              className="w-full bg-blue-500 hover:bg-blue-400 text-white rounded-xl py-3 font-bold text-sm flex items-center justify-center transition-colors shadow-sm"
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              Share on Telegram
             </button>
           </div>
         </div>

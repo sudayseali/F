@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, Image as ImageIcon, X } from "lucide-react";
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 
 export function TaskDetails() {
   const { id } = useParams();

@@ -1,107 +1,237 @@
-import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History, ArrowLeft, ChevronRight, Loader2, CheckCircle2 } from "lucide-react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+type ViewType = 'main' | 'withdraw' | 'deposit';
+type PaymentMethod = 'payeer' | 'usdt' | 'trx' | null;
 
 export function Wallet() {
+  const [view, setView] = useState<ViewType>('main');
+  const [method, setMethod] = useState<PaymentMethod>(null);
+  const [amount, setAmount] = useState('');
+  const [address, setAddress] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const handleAction = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setSuccessMsg(view === 'deposit' ? 'Deposit request submitted successfully' : 'Withdrawal pending approval');
+      setTimeout(() => {
+        setSuccessMsg('');
+        setView('main');
+        setMethod(null);
+        setAmount('');
+        setAddress('');
+      }, 3000);
+    }, 1500);
+  };
+
+  const selectMethod = (m: PaymentMethod) => setMethod(m);
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-gray-900">Wallet</h1>
-        <p className="text-gray-500 text-sm">Manage your earnings and withdrawals.</p>
-      </header>
+      <AnimatePresence mode="wait">
+        {view === 'main' && (
+          <motion.div 
+            key="main"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-6"
+          >
+            <header>
+              <h1 className="text-2xl font-bold text-gray-900">Wallet</h1>
+              <p className="text-gray-500 text-sm">Manage your earnings and withdrawals.</p>
+            </header>
 
-      {/* Main Balance */}
-      <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
-        <div className="relative z-10">
-          <p className="text-gray-400 text-sm font-medium mb-1">Total Balance</p>
-          <div className="flex items-end space-x-2 mb-6">
-            <h2 className="text-5xl font-bold tracking-tight">$45.50</h2>
-            <span className="text-gray-400 font-medium pb-1.5">USD</span>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-3">
-            <button className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center transition-colors">
-              <ArrowDownLeft className="w-4 h-4 mr-1.5" />
-              Withdraw
-            </button>
-            <button className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center transition-colors">
-              <ArrowUpRight className="w-4 h-4 mr-1.5" />
-              Deposit
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Withdrawal Methods */}
-      <div>
-         <h3 className="text-lg font-semibold text-gray-900 mb-4">Withdrawal Methods</h3>
-         <div className="grid gap-3">
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <span className="text-red-500 font-bold text-xl leading-none">TRX</span>
+            {/* Main Balance */}
+            <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
+              <div className="relative z-10">
+                <p className="text-gray-400 text-sm font-medium mb-1">Total Balance</p>
+                <div className="flex items-end space-x-2 mb-6">
+                  <h2 className="text-5xl font-bold tracking-tight">$45.50</h2>
+                  <span className="text-gray-400 font-medium pb-1.5">USD</span>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">Tron (TRX)</h4>
-                  <p className="text-xs text-gray-500">Min. withdrawal $2.00</p>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    onClick={() => { setView('withdraw'); setMethod(null); }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center transition-colors active:scale-95"
+                  >
+                    <ArrowDownLeft className="w-4 h-4 mr-1.5" />
+                    Withdraw
+                  </button>
+                  <button 
+                    onClick={() => { setView('deposit'); setMethod(null); }}
+                    className="bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center transition-colors active:scale-95"
+                  >
+                    <ArrowUpRight className="w-4 h-4 mr-1.5" />
+                    Deposit
+                  </button>
                 </div>
               </div>
-              <ShieldCheck className="w-5 h-5 text-gray-300" />
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors">
-              <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-bold text-xl leading-none">$</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">EVC Plus</h4>
-                  <p className="text-xs text-gray-500">Min. withdrawal $0.50</p>
-                </div>
+            {/* Transaction History */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <History className="w-5 h-5 mr-2 text-gray-400" />
+                  Transactions
+                </h3>
               </div>
-              <ShieldCheck className="w-5 h-5 text-gray-300" />
+              
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-2">
+                  {[
+                    { type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", date: "Today, 14:30", isPositive: true },
+                    { type: 'withdraw', title: "Withdrawal", desc: "TRX Transfer", amount: "-$10.00", date: "Yesterday, 09:15", isPositive: false },
+                    { type: 'reward', title: "Referral Bonus", desc: "From user @alice", amount: "+$0.15", date: "Yesterday, 08:00", isPositive: true },
+                  ].map((tx, i) => (
+                    <div key={i} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-50 hover:bg-gray-50 transition-colors rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                          {tx.isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-sm">{tx.title}</h4>
+                          <p className="text-xs text-gray-500 line-clamp-1">{tx.desc}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold text-sm ${tx.isPositive ? 'text-green-600' : 'text-gray-900'}`}>{tx.amount}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{tx.date}</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
-         </div>
-      </div>
+          </motion.div>
+        )}
 
-      {/* Transaction History */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-            <History className="w-5 h-5 mr-2 text-gray-400" />
-            Transactions
-          </h3>
-          <button className="text-blue-600 text-sm font-medium flex items-center">
-            All <ChevronRight className="w-4 h-4 ml-0.5" />
-          </button>
-        </div>
-        
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-2">
-            {[
-              { type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", date: "Today, 14:30", isPositive: true },
-              { type: 'withdraw', title: "Withdrawal", desc: "TRX Transfer", amount: "-$10.00", date: "Yesterday, 09:15", isPositive: false },
-              { type: 'reward', title: "Referral Bonus", desc: "From user @alice", amount: "+$0.15", date: "Yesterday, 08:00", isPositive: true },
-            ].map((tx, i) => (
-              <div key={i} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-50">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                    {tx.isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 text-sm">{tx.title}</h4>
-                    <p className="text-xs text-gray-500 line-clamp-1">{tx.desc}</p>
+        {view !== 'main' && (
+          <motion.div 
+            key="action"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-6"
+          >
+            <header className="flex items-center space-x-3">
+              <button onClick={() => setView('main')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <h1 className="text-2xl font-bold text-gray-900 capitalize">{view} Funds</h1>
+            </header>
+
+            {successMsg ? (
+               <div className="bg-green-50 border border-green-200 rounded-2xl p-8 flex flex-col items-center text-center">
+                 <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-4">
+                   <CheckCircle2 className="w-8 h-8" />
+                 </div>
+                 <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
+                 <p className="text-gray-600 text-sm">{successMsg}</p>
+               </div>
+            ) : (
+              // Method Selection
+              <form onSubmit={handleAction} className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 mb-3 ml-1 uppercase tracking-wider">Select Method</h3>
+                  <div className="grid gap-3">
+                    <div onClick={() => selectMethod('usdt')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'usdt' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">₮</div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">USDT (TRC20)</h4>
+                          <p className="text-xs text-gray-500">Tether USD • Fee $1.00</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'usdt' ? 'border-blue-600' : 'border-gray-300'}`}>
+                        {method === 'usdt' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      </div>
+                    </div>
+
+                    <div onClick={() => selectMethod('trx')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'trx' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-500 font-bold">T</div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">Tron (TRX)</h4>
+                          <p className="text-xs text-gray-500">TRON Network • Free</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'trx' ? 'border-blue-600' : 'border-gray-300'}`}>
+                        {method === 'trx' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      </div>
+                    </div>
+
+                    <div onClick={() => selectMethod('payeer')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'payeer' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold text-xl">P</div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900">Payeer</h4>
+                          <p className="text-xs text-gray-500">Instant • Fee 0.5%</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'payeer' ? 'border-blue-600' : 'border-gray-300'}`}>
+                        {method === 'payeer' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`font-bold text-sm ${tx.isPositive ? 'text-green-600' : 'text-gray-900'}`}>{tx.amount}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">{tx.date}</p>
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
+
+                {method && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }} 
+                    animate={{ opacity: 1, height: 'auto' }} 
+                    className="space-y-4"
+                  >
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Amount (USD)</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                        min="1"
+                        step="0.01"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-lg"
+                      />
+                    </div>
+                    
+                    {view === 'withdraw' && (
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                          {method === 'payeer' ? 'Payeer Account (e.g., P1000000)' : 'Wallet Address'}
+                        </label>
+                        <input 
+                          type="text" 
+                          required
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder={method === 'payeer' ? 'P...' : 'T...'}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                        />
+                      </div>
+                    )}
+
+                    <button 
+                      type="submit" 
+                      disabled={isProcessing || !amount || (view === 'withdraw' && !address)}
+                      className="w-full py-4 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-sm transition-colors mt-2 disabled:opacity-70 flex items-center justify-center active:scale-95"
+                    >
+                      {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : `${view === 'withdraw' ? 'Submit Withdrawal' : 'Proceed to Payment'}`}
+                    </button>
+                  </motion.div>
+                )}
+              </form>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-
-// Ensure ChevronRight is imported locally if defined above, or import from lucide-react.
-import { ChevronRight } from "lucide-react";
