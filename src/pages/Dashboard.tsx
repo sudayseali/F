@@ -1,11 +1,15 @@
 import { ArrowUpRight, TrendingUp, CheckCircle, Clock } from "lucide-react";
+import { useTelegram } from "../contexts/TelegramContext";
 
 export function Dashboard() {
+  const { user } = useTelegram();
+  const displayName = user?.first_name || user?.username || 'User';
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm">Welcome back, here's your overview.</p>
+        <p className="text-gray-500 text-sm">Welcome back {displayName}, here's your overview.</p>
       </header>
 
       {/* Balance Card */}

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, CheckSquare, Wallet, Users, Settings } from "lucide-react";
 import { cn } from "../lib/utils";
+import { useTelegram } from "../contexts/TelegramContext";
 
 const navItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
@@ -11,6 +12,9 @@ const navItems = [
 
 export function Navigation() {
   const location = useLocation();
+  const { user } = useTelegram();
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'User';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <>
@@ -71,12 +75,14 @@ export function Navigation() {
 
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center space-x-3 p-4 rounded-xl bg-gray-50">
-            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
-              JD
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold uppercase">
+              {initial}
             </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-900">John Doe</p>
-              <p className="text-xs text-gray-500">@johndoe</p>
+            <div className="overflow-hidden">
+              <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+              <p className="text-xs text-gray-500 truncate">
+                {user?.username ? `@${user.username}` : `ID: ${user?.id}`}
+              </p>
             </div>
           </div>
         </div>
