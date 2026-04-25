@@ -11,6 +11,7 @@ import { TaskDetails } from "./pages/TaskDetails";
 import { CreateTask } from "./pages/CreateTask";
 import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
+import { Admin } from "./pages/Admin";
 import { TelegramProvider } from "./contexts/TelegramContext";
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="tasks/:id" element={<TaskDetails />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="referrals" element={<Referrals />} />
+            <Route path="admin" element={<Admin />} />
           </Route>
         </Routes>
       </Router>

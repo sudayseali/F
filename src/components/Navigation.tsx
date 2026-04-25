@@ -1,9 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Wallet, Users, Settings, PlusSquare } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Wallet, Users, Settings, PlusSquare, Shield } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 
-const navItems = [
+const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
   { label: "Tasks", icon: CheckSquare, path: "/tasks" },
   { label: "Create Task", icon: PlusSquare, path: "/tasks/create" },
@@ -16,6 +16,11 @@ export function Navigation() {
   const { user } = useTelegram();
   const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'User';
   const initial = displayName.charAt(0).toUpperCase();
+
+  const navItems = [...baseNavItems];
+  if (user?.id === 5806129562 || user?.id === 123456789) {
+    navItems.push({ label: "Admin", icon: Shield, path: "/admin" });
+  }
 
   return (
     <>
