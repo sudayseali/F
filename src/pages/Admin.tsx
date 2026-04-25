@@ -3,7 +3,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { Shield, Users, CheckSquare, ArrowDownLeft, ArrowUpRight, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type TabType = 'overview' | 'tasks' | 'submissions' | 'withdrawals' | 'deposits';
+type TabType = 'overview' | 'tasks' | 'submissions' | 'disputes' | 'withdrawals' | 'deposits';
 
 export function Admin() {
   const { user } = useTelegram();
@@ -42,7 +42,7 @@ export function Admin() {
 
       {/* Tabs */}
       <div className="flex overflow-x-auto scrollbar-hide space-x-2 pb-2">
-        {(['overview', 'tasks', 'submissions', 'withdrawals', 'deposits'] as TabType[]).map((tab) => (
+        {(['overview', 'tasks', 'submissions', 'disputes', 'withdrawals', 'deposits'] as TabType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -137,8 +137,8 @@ export function Admin() {
           {activeTab === 'submissions' && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-100 bg-gray-50">
-                <h3 className="font-semibold text-gray-900">Task Submissions</h3>
-                <p className="text-xs text-gray-500">Verify user proofs before distributing rewards.</p>
+                <h3 className="font-semibold text-gray-900">Task Submissions (System Flags)</h3>
+                <p className="text-xs text-gray-500">Verify user proofs that the AI flagged for manual admin review.</p>
               </div>
               <div className="divide-y divide-gray-100">
                 {[1, 2, 3].map((id) => (
@@ -159,6 +159,51 @@ export function Admin() {
                       </button>
                       <button onClick={() => handleAction(id, 'Submission', 'reject')} className="flex items-center px-3 py-1.5 bg-red-100 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-200">
                         Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'disputes' && (
+            <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden border-2">
+              <div className="p-4 border-b border-gray-100 bg-red-50">
+                <h3 className="font-bold text-red-800 flex items-center">
+                  <AlertTriangle className="w-5 h-5 mr-2" />
+                  Active Disputes
+                </h3>
+                <p className="text-xs text-red-600 ml-7">Advertisers rejected these, but workers claimed they did the work.</p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {[1].map((id) => (
+                  <div key={id} className="p-4 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="flex space-x-4">
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
+                        <img src="https://placehold.co/100x100?text=Proof" alt="Proof" className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-bold text-gray-900 text-sm">Task: Sign up for Newsletter</h4>
+                          <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded-full">DISPUTED</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Advertiser: <span className="font-semibold text-gray-800">@bad_adv</span> (Rejected)</p>
+                        <p className="text-xs text-gray-500">Worker: <span className="font-semibold text-gray-800">@honest_worker</span> (Appealed)</p>
+                        <div className="mt-2 text-sm bg-gray-50 p-2 rounded-lg border border-gray-200">
+                          <strong>Worker's Proof:</strong> worker_email@test.com
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2 shrink-0 w-full md:w-auto">
+                      <button onClick={() => handleAction(id, 'Dispute', 'approve')} className="flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 shadow-sm">
+                        Force Approve (Pay Worker)
+                      </button>
+                      <button onClick={() => handleAction(id, 'Dispute', 'reject')} className="flex items-center justify-center px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 shadow-sm">
+                        Keep Rejected (Ban Worker)
+                      </button>
+                      <button onClick={() => handleAction(id, 'Dispute', 'reject')} className="flex items-center justify-center px-4 py-2 border-2 border-red-500 text-red-600 text-sm font-bold rounded-lg hover:bg-red-50">
+                        Ban Advertiser
                       </button>
                     </div>
                   </div>

@@ -83,7 +83,7 @@ export function Dashboard() {
             {[
               { title: "Subscribe to Crypto Channel", reward: "+$0.50", status: "Approved", color: "text-green-600", bg: "bg-green-50" },
               { title: "Like & Comment on TikTok", reward: "+$0.20", status: "Pending", color: "text-orange-600", bg: "bg-orange-50" },
-              { title: "Sign up for Newsletter", reward: "+$1.00", status: "Approved", color: "text-green-600", bg: "bg-green-50" },
+              { title: "Sign up for Newsletter", reward: "+$1.00", status: "Rejected", color: "text-red-600", bg: "bg-red-50" },
             ].map((task, i) => (
               <motion.div 
                 key={i} 
@@ -94,9 +94,16 @@ export function Dashboard() {
               >
                 <div>
                   <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
-                  <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${task.bg} ${task.color}`}>
-                    {task.status}
-                  </span>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider ${task.bg} ${task.color}`}>
+                      {task.status}
+                    </span>
+                    {task.status === "Rejected" && (
+                      <button className="text-[10px] font-bold text-red-600 underline hover:text-red-700 uppercase tracking-wider" onClick={() => alert("Dispute filed for admin review!")}>
+                        Appeal / Dispute
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <span className="font-bold text-gray-900">{task.reward}</span>
               </motion.div>
