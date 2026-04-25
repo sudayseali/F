@@ -8,6 +8,7 @@ import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { Tasks } from "./pages/Tasks";
 import { TaskDetails } from "./pages/TaskDetails";
+import { CreateTask } from "./pages/CreateTask";
 import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
 import { TelegramProvider } from "./contexts/TelegramContext";
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="tasks" element={<Tasks />} />
+            <Route path="tasks/create" element={<CreateTask />} />
             <Route path="tasks/:id" element={<TaskDetails />} />
             <Route path="wallet" element={<Wallet />} />
             <Route path="referrals" element={<Referrals />} />
@@ -29,3 +31,4 @@ export default function App() {
     </TelegramProvider>
   );
 }
+
