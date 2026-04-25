@@ -1,0 +1,6 @@
+{
+  "name": "Micro Task Platform",
+  "description": "Telegram Mini App and Web Dashboard for micro-tasks with a Supabase backend",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
