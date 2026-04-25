@@ -10,7 +10,7 @@ export function Admin() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   // Hardcoded Admin ID constraint
-  if (user?.id !== 5806129562 && user?.id !== 123456789) {
+  if (user?.id !== 5806129562) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Shield className="w-16 h-16 text-red-500 mb-4" />

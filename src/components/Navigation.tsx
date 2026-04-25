@@ -1,26 +1,24 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Wallet, Users, Settings, PlusSquare, Shield, Megaphone, History } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Wallet, User as UserIcon, Shield, Megaphone } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
-  { label: "Tasks", icon: CheckSquare, path: "/tasks" },
-  { label: "History", icon: History, path: "/tasks/history" },
-  { label: "Create Task", icon: PlusSquare, path: "/tasks/create" },
-  { label: "My Campaigns", icon: Megaphone, path: "/campaigns" },
+  { label: "Earn", icon: CheckSquare, path: "/tasks" },
+  { label: "Promote", icon: Megaphone, path: "/campaigns" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
-  { label: "Referrals", icon: Users, path: "/referrals" },
+  { label: "Profile", icon: UserIcon, path: "/profile" },
 ];
 
 export function Navigation() {
   const location = useLocation();
   const { user } = useTelegram();
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : 'User';
+  const displayName = user?.first_name ? `${user?.first_name} ${user?.last_name || ''}`.trim() : 'User';
   const initial = displayName.charAt(0).toUpperCase();
 
   const navItems = [...baseNavItems];
-  if (user?.id === 5806129562 || user?.id === 123456789) {
+  if (user?.id === 5806129562) {
     navItems.push({ label: "Admin", icon: Shield, path: "/admin" });
   }
 

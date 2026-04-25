@@ -15,6 +15,7 @@ import { Admin } from "./pages/Admin";
 import { MyCampaigns } from "./pages/MyCampaigns";
 import { ReviewSubmissions } from "./pages/ReviewSubmissions";
 import { MyTasks } from "./pages/MyTasks";
+import { Profile } from "./pages/Profile";
 import { TelegramProvider } from "./contexts/TelegramContext";
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="campaigns" element={<MyCampaigns />} />
             <Route path="campaigns/:id/review" element={<ReviewSubmissions />} />
             <Route path="wallet" element={<Wallet />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="referrals" element={<Referrals />} />
             <Route path="admin" element={<Admin />} />
           </Route>
