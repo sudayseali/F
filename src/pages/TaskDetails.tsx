@@ -1,14 +1,54 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, Image as ImageIcon, X } from "lucide-react";
+import { useState, useRef } from "react";
 
 export function TaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Please upload a valid image file (JPG, PNG, etc).');
+      return;
+    }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      setError('Image size must be less than 5MB.');
+      return;
+    }
+
+    setFile(selectedFile);
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(objectUrl);
+  };
+
+  const removeImage = () => {
+    setFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!file) {
+      setError('Please upload a screenshot proof.');
+      return;
+    }
+    setError(null);
     setStatus('submitting');
     setTimeout(() => {
       setStatus('success');
@@ -89,6 +129,13 @@ export function TaskDetails() {
             <form onSubmit={handleSubmit} className="space-y-4 bg-white p-5 rounded-2xl border border-gray-200">
               <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">Submit Proof</h3>
               
+              {error && (
+                <div className="bg-red-50 text-red-600 px-3 py-2 text-sm rounded-lg border border-red-100 flex items-start">
+                  <ShieldAlert className="w-4 h-4 mr-1.5 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Your Telegram Username</label>
                 <input 
@@ -101,10 +148,37 @@ export function TaskDetails() {
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Screenshot Proof</label>
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-blue-300 transition-colors cursor-pointer group">
-                  <Upload className="w-6 h-6 mb-2 group-hover:text-blue-500 transition-colors" />
-                  <span className="text-xs font-medium group-hover:text-blue-500 transition-colors">Tap to upload image</span>
-                </div>
+                
+                <input 
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                  className="hidden"
+                  id="screenshot-upload"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+                
+                {previewUrl ? (
+                  <div className="relative border border-gray-200 rounded-xl overflow-hidden bg-gray-50 aspect-video flex items-center justify-center">
+                    <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
+                    <button 
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label 
+                    htmlFor="screenshot-upload"
+                    className="border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-blue-300 hover:text-blue-500 transition-colors cursor-pointer group"
+                  >
+                    <Upload className="w-8 h-8 mb-3" />
+                    <span className="text-sm font-medium mb-1 group-hover:text-blue-600">Tap to upload image</span>
+                    <span className="text-xs text-gray-400">PNG, JPG, WEBP up to 5MB</span>
+                  </label>
+                )}
               </div>
 
               <div className="flex items-start space-x-2 pt-2">
