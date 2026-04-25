@@ -14,6 +14,7 @@ import { Referrals } from "./pages/Referrals";
 import { Admin } from "./pages/Admin";
 import { MyCampaigns } from "./pages/MyCampaigns";
 import { ReviewSubmissions } from "./pages/ReviewSubmissions";
+import { MyTasks } from "./pages/MyTasks";
 import { TelegramProvider } from "./contexts/TelegramContext";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="tasks" element={<Tasks />} />
+            <Route path="tasks/history" element={<MyTasks />} />
             <Route path="tasks/create" element={<CreateTask />} />
             <Route path="tasks/:id" element={<TaskDetails />} />
             <Route path="campaigns" element={<MyCampaigns />} />

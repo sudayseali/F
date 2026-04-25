@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Wallet, Users, Settings, PlusSquare, Shield, Megaphone } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Wallet, Users, Settings, PlusSquare, Shield, Megaphone, History } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
   { label: "Tasks", icon: CheckSquare, path: "/tasks" },
+  { label: "History", icon: History, path: "/tasks/history" },
   { label: "Create Task", icon: PlusSquare, path: "/tasks/create" },
   { label: "My Campaigns", icon: Megaphone, path: "/campaigns" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
