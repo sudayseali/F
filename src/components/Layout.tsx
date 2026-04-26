@@ -3,7 +3,7 @@ import { Navigation } from "./Navigation";
 
 export function Layout() {
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="min-h-screen bg-[#0b0c10] font-sans text-gray-300">
       <Navigation />
       
       <main className="md:ml-64 pb-20 md:pb-0 min-h-screen">
