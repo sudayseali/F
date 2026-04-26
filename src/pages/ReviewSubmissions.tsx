@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, MessageSquareX } from "lucide-react";
 
 export function ReviewSubmissions() {
   const { id } = useParams();
@@ -12,9 +12,15 @@ export function ReviewSubmissions() {
     { id: 102, user: "@crypto_fan", proofText: "@crypto_fan", proofImg: "https://placehold.co/600x400?text=Invalid+Proof", status: "pending", date: "1 hour ago" },
   ]);
 
-  const handleReview = (subId: number, action: 'approved' | 'rejected') => {
+  const [rejectingId, setRejectingId] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const handleReview = (subId: number, action: 'approved' | 'rejected', _reason?: string) => {
     setSubmissions(prev => prev.filter(sub => sub.id !== subId));
-    // In real app, call Supabase edge function to update status and handle funds
+    if (action === 'rejected') {
+      setRejectingId(null);
+      setRejectReason("");
+    }
   };
 
   return (
@@ -61,22 +67,61 @@ export function ReviewSubmissions() {
                   <img src={sub.proofImg} alt="Proof" className="max-w-full max-h-full object-contain" />
                 </div>
               </div>
-              <div className="p-4 border-t border-gray-100 flex space-x-3 bg-gray-50">
-                <button 
-                  onClick={() => handleReview(sub.id, 'approved')}
-                  className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center transition-colors"
-                >
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Approve (Pay Worker)
-                </button>
-                <button 
-                  onClick={() => handleReview(sub.id, 'rejected')}
-                  className="flex-1 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold flex items-center justify-center transition-colors"
-                >
-                  <XCircle className="w-5 h-5 mr-2" />
-                  Reject (Invalid)
-                </button>
-              </div>
+              
+              {rejectingId === sub.id ? (
+                <div className="p-4 border-t border-gray-100 bg-red-50 space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-1 flex items-center">
+                      <MessageSquareX className="w-4 h-4 mr-1.5 text-red-600" />
+                      Reason for Rejection
+                    </label>
+                    <textarea 
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Explain why this submission is invalid. This will be shown to the worker..."
+                      className="w-full px-3 py-2 rounded-xl border border-red-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all text-sm resize-none"
+                      rows={3}
+                      autoFocus
+                    ></textarea>
+                  </div>
+                  <div className="flex space-x-3">
+                    <button 
+                      onClick={() => handleReview(sub.id, 'rejected', rejectReason)}
+                      disabled={!rejectReason.trim()}
+                      className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <XCircle className="w-5 h-5 mr-2" />
+                      Confirm Rejection
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setRejectingId(null);
+                        setRejectReason("");
+                      }}
+                      className="flex-1 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-bold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 border-t border-gray-100 flex space-x-3 bg-gray-50">
+                  <button 
+                    onClick={() => handleReview(sub.id, 'approved')}
+                    className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center transition-colors"
+                  >
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Approve (Pay Worker)
+                  </button>
+                  <button 
+                    onClick={() => setRejectingId(sub.id)}
+                    className="flex-1 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold flex items-center justify-center transition-colors"
+                  >
+                    <XCircle className="w-5 h-5 mr-2" />
+                    Reject (Invalid)
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
