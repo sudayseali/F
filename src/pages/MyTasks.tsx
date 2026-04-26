@@ -1,115 +1,141 @@
 import React, { useState } from "react";
-import { CheckCircle, Clock, XCircle, History, AlertTriangle } from "lucide-react";
+import { Search, ChevronDown, Pin, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
-type StatusType = 'all' | 'pending' | 'approved' | 'rejected';
+const JOBS = [
+  { id: 1, category: "Other", title: "YouTube channel: SUBSCRIBE+ Comment+ like", pay: "$0.05", location: "All", completedOn: "Apr 19 2026", pending: 0, available: 200, total: 200, percentage: "100.0%", status: "Approved" },
+  { id: 2, category: "SEO & Web Traffic", title: "Youtube Search + 1 Min Watch", pay: "$0.07", location: "All", completedOn: "Apr 19 2026", pending: 8, available: 495, total: 495, percentage: "100.0%", status: "Approved" },
+  { id: 3, category: "Social Media", title: "github star", pay: "$0.25", location: "All", completedOn: "Apr 14 2026", pending: 0, available: 100, total: 100, percentage: "100.0%", status: "Approved" },
+  { id: 4, category: "Offer/Sign up", title: "Simple Sign Up only", pay: "$0.05", location: "All", completedOn: "Apr 14 2026", pending: 131, available: 496, total: 590, percentage: "84.07%", status: "Approved" },
+  { id: 5, category: "Social Media", title: "github star", pay: "$0.20", location: "All", completedOn: "Apr 12 2026", pending: 0, available: 150, total: 150, percentage: "100.0%", status: "Approved" },
+  { id: 6, category: "Social Media", title: "A nice comment and a subscription to the channel! youtube", pay: "$0.05", location: "All", completedOn: "Apr 10 2026", pending: 0, available: 175, total: 175, percentage: "100.0%", status: "Approved" },
+  { id: 7, category: "Social Media", title: "github star", pay: "$0.20", location: "All", completedOn: "Apr 10 2026", pending: 0, available: 155, total: 380, percentage: "40.79%", status: "Approved" },
+  { id: 8, category: "Questions, Answers & Comments", title: "Leave a short positive hemilin.nl (5★) review about an online casino on Trustpilot.", pay: "$0.25", location: "All", completedOn: "Apr 11 2026", pending: 0, available: 0, total: 25, percentage: "0.0%", status: "Rejected" },
+  { id: 9, category: "Social Media", title: "Twitter (X): Follow an account", pay: "$0.05", location: "All", completedOn: "Apr 09 2026", pending: 0, available: 110, total: 110, percentage: "100.0%", status: "Approved" },
+];
 
 export function MyTasks() {
-  const [filter, setFilter] = useState<StatusType>('all');
-
-  // Mock data for user's task history
-  const submissions = [
-    { id: 1, title: "Join Telegram Crypto Group", reward: 0.15, status: "pending", date: "2 hours ago" },
-    { id: 2, title: "Subscribe to Crypto Channel", reward: 0.50, status: "approved", date: "1 day ago" },
-    { id: 3, title: "Sign up for Newsletter", reward: 1.00, status: "rejected", date: "2 days ago" },
-    { id: 4, title: "Follow Twitter Account", reward: 0.10, status: "approved", date: "3 days ago" },
-  ];
-
-  const filteredSubmissions = filter === 'all' 
-    ? submissions 
-    : submissions.filter(s => s.status === filter);
-
-  const handleDispute = (id: number) => {
-    alert(`Dispute filed for task #${id}. An admin will review it shortly.`);
-  };
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("All");
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-gray-900">Task History</h1>
-        <p className="text-gray-500 text-sm">Track the status of your submitted tasks.</p>
+    <div className="bg-[#0b0c10] min-h-screen text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold text-white mb-2">Your Completed Jobs</h1>
       </header>
 
-      {/* Filters */}
-      <div className="flex space-x-2 overflow-x-auto scrollbar-hide pb-2 border-b border-gray-100">
-        {(['all', 'pending', 'approved', 'rejected'] as StatusType[]).map((f) => (
+      {/* Tabs */}
+      <div className="flex space-x-6 border-b border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
+        {[
+          { id: "All", count: 20 },
+          { id: "Social Media", count: 14 },
+          { id: "App Install", count: 0 },
+          { id: "Survey", count: 0 },
+        ].map((tab) => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize whitespace-nowrap transition-colors ${
-              filter === f 
-                ? 'bg-gray-900 text-white shadow-sm' 
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-3 text-sm font-semibold whitespace-nowrap border-b-2 flex items-center transition-colors ${
+              activeTab === tab.id
+                ? "border-amber-500 text-white"
+                : "border-transparent text-gray-400 hover:text-gray-200"
             }`}
           >
-            {f}
+            {tab.id} <span className="ml-2 bg-amber-500 text-amber-950 px-1.5 py-0.5 rounded text-[10px]">{tab.count}</span>
           </button>
         ))}
       </div>
 
-      {/* Submissions List */}
-      <div className="space-y-3">
-        {filteredSubmissions.length === 0 ? (
-          <div className="text-center py-10">
-            <History className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No submissions found in this category.</p>
+      {/* Filters */}
+      <div className="space-y-3 mb-6">
+        <input 
+          type="text" 
+          placeholder="Start date" 
+          className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+        />
+        <input 
+          type="text" 
+          placeholder="End date" 
+          className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+        />
+        <div className="relative">
+          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-white uppercase tracking-wider">Status</label>
+          <select className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 appearance-none text-white">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          <input 
+            type="text" 
+            placeholder="Search titles and descriptions..." 
+            className="w-full bg-transparent border border-gray-800 rounded-lg pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+          />
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="overflow-x-auto -mx-4 sm:mx-0 pb-4">
+        <div className="min-w-[800px] border-t border-gray-800 px-4 sm:px-0">
+          {/* Table Header */}
+          <div className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 border-b border-gray-800 text-[11px] font-bold text-gray-400 capitalize tracking-wider">
+            <div>Category</div>
+            <div>Job Title</div>
+            <div>Pay</div>
+            <div>Location</div>
+            <div>Completed On</div>
+            <div className="text-center">Pending Approval</div>
+            <div className="text-right">Availability</div>
+            <div className="text-right">Approval Status</div>
           </div>
-        ) : (
-          filteredSubmissions.map((sub, i) => (
-            <motion.div 
-              key={sub.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-            >
-              <div className="flex items-start space-x-3">
-                <div className={`mt-1 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  sub.status === 'approved' ? 'bg-green-100 text-green-600' :
-                  sub.status === 'rejected' ? 'bg-red-100 text-red-600' :
-                  'bg-orange-100 text-orange-600'
-                }`}>
-                  {sub.status === 'approved' && <CheckCircle className="w-4 h-4" />}
-                  {sub.status === 'rejected' && <XCircle className="w-4 h-4" />}
-                  {sub.status === 'pending' && <Clock className="w-4 h-4" />}
+
+          {/* Table Body */}
+          <div className="divide-y divide-gray-800/60">
+            {JOBS.map((job) => (
+              <div 
+                key={job.id} 
+                className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 items-center hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="text-xs text-gray-300 font-medium break-words leading-tight pr-2">{job.category}</div>
+                <div className="text-[13px] text-gray-200 font-medium leading-snug">
+                  {job.title}
                 </div>
-                <div>
-                  <h4 className="font-bold text-gray-900 text-sm">{sub.title}</h4>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                      sub.status === 'approved' ? 'bg-green-100 text-green-700' :
-                      sub.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>
-                      {sub.status}
+                <div className="text-[13px] font-bold text-white">{job.pay}</div>
+                <div className="text-[13px] text-gray-300">{job.location}</div>
+                <div className="text-xs text-gray-300 font-medium">
+                  {job.completedOn}
+                </div>
+                <div className="text-[13px] text-gray-300 text-center font-medium">{job.pending}</div>
+                <div className="text-xs text-right whitespace-nowrap flex flex-col justify-center items-end">
+                  <div className="text-gray-300 font-medium">{job.available} / {job.total}</div>
+                  <div className="text-amber-500 font-bold">{job.percentage}</div>
+                </div>
+                <div className="flex justify-end">
+                  {job.status === "Approved" ? (
+                    <span className="border border-[#14532d] text-[#4ade80] bg-[#052e16] px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider">
+                      Approved
                     </span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-500">{sub.date}</span>
-                  </div>
+                  ) : job.status === "Rejected" ? (
+                    <span className="border border-[#7f1d1d] text-[#f87171] bg-[#450a0a] px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider">
+                      Rejected
+                    </span>
+                  ) : (
+                    <span className="border border-[#78350f] text-[#fbbf24] bg-[#422006] px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider">
+                      Pending
+                    </span>
+                  )}
                 </div>
               </div>
-              
-              <div className="flex items-center justify-between sm:flex-col sm:items-end sm:justify-center">
-                <span className={`font-bold text-lg ${
-                  sub.status === 'approved' ? 'text-green-600' : 'text-gray-900'
-                }`}>
-                  ${sub.reward.toFixed(2)}
-                </span>
-                
-                {sub.status === 'rejected' && (
-                  <button 
-                    onClick={() => handleDispute(sub.id)}
-                    className="flex items-center text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 px-2 py-1 rounded inline-flex uppercase tracking-wider transition-colors mt-1"
-                  >
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Appeal / Dispute
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          ))
-        )}
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
