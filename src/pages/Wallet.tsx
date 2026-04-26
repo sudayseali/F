@@ -1,9 +1,16 @@
-import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History, ArrowLeft, ChevronRight, Loader2, CheckCircle2 } from "lucide-react";
-import React, { useState } from "react";
+import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Filter } from "lucide-react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type ViewType = 'main' | 'withdraw' | 'deposit';
 type PaymentMethod = 'payeer' | 'usdt' | 'trx' | null;
+
+const MOCK_TRANSACTIONS = [
+  { id: 1, type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", displayDate: "Today, 14:30", dateISO: new Date().toISOString(), isPositive: true },
+  { id: 2, type: 'withdrawal', title: "Withdrawal", desc: "TRX Transfer", amount: "-$10.00", displayDate: "Yesterday, 09:15", dateISO: new Date(Date.now() - 86400000).toISOString(), isPositive: false },
+  { id: 3, type: 'referral_bonus', title: "Referral Bonus", desc: "From user @alice", amount: "+$0.15", displayDate: "Yesterday, 08:00", dateISO: new Date(Date.now() - 86400000).toISOString(), isPositive: true },
+  { id: 4, type: 'deposit', title: "Deposit", desc: "USDT Top Up", amount: "+$20.00", displayDate: "Last Week", dateISO: new Date(Date.now() - 7 * 86400000).toISOString(), isPositive: true },
+];
 
 export function Wallet() {
   const [view, setView] = useState<ViewType>('main');
@@ -12,6 +19,35 @@ export function Wallet() {
   const [address, setAddress] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Filtering states
+  const [txTypeFilter, setTxTypeFilter] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  const filteredTransactions = useMemo(() => {
+    return MOCK_TRANSACTIONS.filter(tx => {
+      if (txTypeFilter !== 'all' && tx.type !== txTypeFilter) return false;
+      
+      const txDate = new Date(tx.dateISO);
+      txDate.setHours(0, 0, 0, 0); // normalize for comparison
+
+      if (startDate) {
+        const sDate = new Date(startDate);
+        sDate.setHours(0, 0, 0, 0);
+        if (txDate < sDate) return false;
+      }
+      
+      if (endDate) {
+        const eDate = new Date(endDate);
+        eDate.setHours(0, 0, 0, 0);
+        // If they pick an end date, we should include that day
+        if (txDate > eDate) return false;
+      }
+
+      return true;
+    });
+  }, [txTypeFilter, startDate, endDate]);
 
   const handleAction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,21 +113,60 @@ export function Wallet() {
             </div>
 
             {/* Transaction History */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center">
                   <History className="w-5 h-5 mr-2 text-gray-400" />
                   Transactions
                 </h3>
               </div>
+
+              {/* Filters */}
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-end">
+                <div className="w-full md:w-auto flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Type</label>
+                  <select
+                    value={txTypeFilter}
+                    onChange={(e) => setTxTypeFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  >
+                    <option value="all">All</option>
+                    <option value="reward">Task Reward</option>
+                    <option value="withdrawal">Withdrawal</option>
+                    <option value="deposit">Deposit</option>
+                    <option value="referral_bonus">Referral Bonus</option>
+                  </select>
+                </div>
+                
+                <div className="w-full md:w-auto flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="w-full md:w-auto flex-1">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">End Date</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                </div>
+              </div>
               
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-2">
-                  {[
-                    { type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", date: "Today, 14:30", isPositive: true },
-                    { type: 'withdraw', title: "Withdrawal", desc: "TRX Transfer", amount: "-$10.00", date: "Yesterday, 09:15", isPositive: false },
-                    { type: 'reward', title: "Referral Bonus", desc: "From user @alice", amount: "+$0.15", date: "Yesterday, 08:00", isPositive: true },
-                  ].map((tx, i) => (
-                    <div key={i} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-50 hover:bg-gray-50 transition-colors rounded-xl">
+                {filteredTransactions.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 text-sm">
+                    No transactions found for the selected filters.
+                  </div>
+                ) : (
+                  filteredTransactions.map((tx) => (
+                    <div key={tx.id} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-50 hover:bg-gray-50 transition-colors rounded-xl">
                       <div className="flex items-center space-x-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.isPositive ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
                           {tx.isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
@@ -103,10 +178,11 @@ export function Wallet() {
                       </div>
                       <div className="text-right">
                         <p className={`font-bold text-sm ${tx.isPositive ? 'text-green-600' : 'text-gray-900'}`}>{tx.amount}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{tx.date}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{tx.displayDate}</p>
                       </div>
                     </div>
-                  ))}
+                  ))
+                )}
               </div>
             </div>
           </motion.div>
