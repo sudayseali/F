@@ -79,17 +79,17 @@ export function Wallet() {
             className="space-y-6"
           >
             <header>
-              <h1 className="text-2xl font-bold text-white">Wallet</h1>
-              <p className="text-gray-400 text-sm">Manage your earnings and withdrawals.</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallet</h1>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Manage your earnings and withdrawals.</p>
             </header>
 
             {/* Main Balance */}
-            <div className="bg-[#111218] rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-gray-800">
+            <div className="bg-white dark:bg-[#111218] rounded-3xl p-6 text-gray-900 dark:text-white shadow-xl relative overflow-hidden border border-gray-200 dark:border-gray-800">
               <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500 rounded-full blur-3xl opacity-[0.05]"></div>
               <div className="relative z-10">
-                <p className="text-gray-400 text-sm font-semibold mb-1 uppercase tracking-wider">Total Balance</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm font-semibold mb-1 uppercase tracking-wider">Total Balance</p>
                 <div className="flex items-end space-x-2 mb-6">
-                  <h2 className="text-5xl font-bold tracking-tight text-white">$45.50</h2>
+                  <h2 className="text-5xl font-bold tracking-tight text-gray-900 dark:text-white">$45.50</h2>
                   <span className="text-gray-500 font-bold pb-1.5">USD</span>
                 </div>
                 
@@ -103,7 +103,7 @@ export function Wallet() {
                   </button>
                   <button 
                     onClick={() => { setView('deposit'); setMethod(null); }}
-                    className="bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center transition-colors border border-white/10 active:scale-95"
+                    className="bg-white/5 hover:bg-white/10 text-gray-900 dark:text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center transition-colors border border-white/10 active:scale-95"
                   >
                     <ArrowUpRight className="w-4 h-4 mr-1.5" />
                     Deposit
@@ -115,20 +115,20 @@ export function Wallet() {
             {/* Transaction History */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
                   <History className="w-5 h-5 mr-2 text-amber-500" />
                   Transactions
                 </h3>
               </div>
 
               {/* Filters */}
-              <div className="bg-[#111218] border border-gray-800 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-end">
+              <div className="bg-white dark:bg-[#111218] border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full md:w-auto flex-1">
-                  <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Type</label>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Type</label>
                   <select
                     value={txTypeFilter}
                     onChange={(e) => setTxTypeFilter(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0b0c10] border border-gray-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 appearance-none"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 appearance-none"
                   >
                     <option value="all">All</option>
                     <option value="reward">Task Reward</option>
@@ -139,40 +139,40 @@ export function Wallet() {
                 </div>
                 
                 <div className="w-full md:w-auto flex-1">
-                  <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">Start Date</label>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Start Date</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0b0c10] border border-gray-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
                   />
                 </div>
 
                 <div className="w-full md:w-auto flex-1">
-                  <label className="block text-[10px] font-bold text-gray-400 mb-1.5 uppercase tracking-wider">End Date</label>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">End Date</label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0b0c10] border border-gray-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
                   />
                 </div>
               </div>
               
-              <div className="bg-[#111218] rounded-2xl border border-gray-800 shadow-sm overflow-hidden p-2">
+              <div className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden p-2">
                 {filteredTransactions.length === 0 ? (
                   <div className="p-6 text-center text-gray-500 text-sm font-medium">
                     No transactions found for the selected filters.
                   </div>
                 ) : (
                   filteredTransactions.map((tx) => (
-                    <div key={tx.id} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-800/60 hover:bg-white/[0.02] transition-colors rounded-xl">
+                    <div key={tx.id} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-800/60 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors rounded-xl">
                       <div className="flex items-center space-x-3">
                         <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${tx.isPositive ? 'bg-[#052e16] text-[#4ade80] border-[#14532d]' : 'bg-[#450a0a] text-[#f87171] border-[#7f1d1d]'}`}>
                           {tx.isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
                         </div>
                         <div>
-                          <h4 className="font-semibold text-gray-200 text-sm">{tx.title}</h4>
+                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{tx.title}</h4>
                           <p className="text-xs text-gray-500 line-clamp-1">{tx.desc}</p>
                         </div>
                       </div>
@@ -297,7 +297,7 @@ export function Wallet() {
                     <button 
                       type="submit" 
                       disabled={isProcessing || !amount || (view === 'withdraw' && !address)}
-                      className="w-full py-4 bg-gray-900 hover:bg-black text-white rounded-xl font-bold shadow-sm transition-colors mt-2 disabled:opacity-70 flex items-center justify-center active:scale-95"
+                      className="w-full py-4 bg-gray-900 hover:bg-black text-gray-900 dark:text-white rounded-xl font-bold shadow-sm transition-colors mt-2 disabled:opacity-70 flex items-center justify-center active:scale-95"
                     >
                       {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : `${view === 'withdraw' ? 'Submit Withdrawal' : 'Proceed to Payment'}`}
                     </button>

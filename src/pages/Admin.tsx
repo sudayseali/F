@@ -31,7 +31,7 @@ export function Admin() {
       className="space-y-6"
     >
       <header className="flex items-center space-x-3 border-b border-gray-200 pb-4">
-        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-white">
+        <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center text-gray-900 dark:text-white">
           <Shield className="w-6 h-6" />
         </div>
         <div>
@@ -46,11 +46,7 @@ export function Admin() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap capitalize transition-colors ${
-              activeTab === tab 
-                ? 'bg-gray-900 text-white shadow-md' 
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap capitalize transition-colors ${ activeTab === tab ? 'bg-gray-900 text-gray-900 dark:text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50' }`}
           >
             {tab}
           </button>
@@ -154,7 +150,7 @@ export function Admin() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      <button onClick={() => handleAction(id, 'Submission', 'approve')} className="flex items-center px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700">
+                      <button onClick={() => handleAction(id, 'Submission', 'approve')} className="flex items-center px-3 py-1.5 bg-green-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg hover:bg-green-700">
                         Approve
                       </button>
                       <button onClick={() => handleAction(id, 'Submission', 'reject')} className="flex items-center px-3 py-1.5 bg-red-100 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-200">
@@ -196,10 +192,10 @@ export function Admin() {
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2 shrink-0 w-full md:w-auto">
-                      <button onClick={() => handleAction(id, 'Dispute', 'approve')} className="flex items-center justify-center px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 shadow-sm">
+                      <button onClick={() => handleAction(id, 'Dispute', 'approve')} className="flex items-center justify-center px-4 py-2 bg-green-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg hover:bg-green-700 shadow-sm">
                         Force Approve (Pay Worker)
                       </button>
-                      <button onClick={() => handleAction(id, 'Dispute', 'reject')} className="flex items-center justify-center px-4 py-2 bg-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-900 shadow-sm">
+                      <button onClick={() => handleAction(id, 'Dispute', 'reject')} className="flex items-center justify-center px-4 py-2 bg-gray-800 text-gray-900 dark:text-white text-sm font-semibold rounded-lg hover:bg-gray-900 shadow-sm">
                         Keep Rejected (Ban Worker)
                       </button>
                       <button onClick={() => handleAction(id, 'Dispute', 'reject')} className="flex items-center justify-center px-4 py-2 border-2 border-red-500 text-red-600 text-sm font-bold rounded-lg hover:bg-red-50">
@@ -230,7 +226,7 @@ export function Admin() {
                       <p className="text-sm text-gray-500 mt-1">User: @earner{id} • Wallet: T{id}abc...xyz</p>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      <button onClick={() => handleAction(id, 'Withdrawal', 'approve')} className="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700">
+                      <button onClick={() => handleAction(id, 'Withdrawal', 'approve')} className="px-3 py-1.5 bg-green-600 text-gray-900 dark:text-white text-sm font-semibold rounded-lg hover:bg-green-700">
                         Mark Paid
                       </button>
                       <button onClick={() => handleAction(id, 'Withdrawal', 'reject')} className="px-3 py-1.5 bg-red-100 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-200">

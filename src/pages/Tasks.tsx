@@ -64,17 +64,17 @@ export function Tasks() {
   }, []);
 
   return (
-    <div className="bg-[#0b0c10] min-h-screen text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
+    <div className="bg-gray-50 dark:bg-[#0b0c10] min-h-screen text-gray-700 dark:text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">Explore Available Jobs:</h1>
-        <p className="text-sm text-gray-400">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Explore Available Jobs:</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           We've detected that you're located in countries.SO. Only jobs that are available in countries.SO are shown
           <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-gray-500 text-[9px] ml-1 opacity-70">i</span>
         </p>
       </header>
 
       {/* Tabs */}
-      <div className="flex space-x-6 border-b border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
+      <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
         {[
           { id: "All", count: JOBS.length },
           { id: "Social Media", count: JOBS.filter(j => j.category === "Social Media").length },
@@ -87,11 +87,7 @@ export function Tasks() {
               setActiveTab(tab.id);
               if (tab.id !== "All") setCategoryFilter("all"); // Reset distinct category filter if tab is used
             }}
-            className={`pb-3 text-sm font-semibold whitespace-nowrap border-b-2 flex items-center transition-colors ${
-              activeTab === tab.id
-                ? "border-amber-500 text-white"
-                : "border-transparent text-gray-400 hover:text-gray-200"
-            }`}
+            className={`pb-3 text-sm font-semibold whitespace-nowrap border-b-2 flex items-center transition-colors ${ activeTab === tab.id ? "border-amber-500 text-white" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-200" }`}
           >
             {tab.id} <span className="ml-2 bg-amber-500 text-amber-950 px-1.5 py-0.5 rounded text-[10px]">{tab.count}</span>
           </button>
@@ -101,29 +97,29 @@ export function Tasks() {
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="relative">
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Start Date</label>
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Date</label>
           <input 
             type="date" 
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-white [color-scheme:dark]"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-gray-900 dark:text-white [color-scheme:dark]"
           />
         </div>
         <div className="relative">
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">End Date</label>
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">End Date</label>
           <input 
             type="date" 
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-white [color-scheme:dark]"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-gray-900 dark:text-white [color-scheme:dark]"
           />
         </div>
         <div className="relative">
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</label>
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</label>
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-white lg:min-w-[120px]"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-gray-900 dark:text-white lg:min-w-[120px]"
           >
             <option value="all">All</option>
             <option value="active">Active</option>
@@ -134,11 +130,11 @@ export function Tasks() {
         </div>
         <div className="relative hidden lg:block">
           {/* We only show category filter if activeTab is "All" or if we want to allow cross filtering, but let's just make it available */}
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Category</label>
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</label>
           <select 
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-white lg:min-w-[120px]"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-gray-900 dark:text-white lg:min-w-[120px]"
           >
             <option value="all">All</option>
             {categories.map(c => (
@@ -148,24 +144,24 @@ export function Tasks() {
           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
         </div>
         <div className="relative md:col-span-2 lg:col-span-1">
-          <label className="absolute -top-2 left-3 z-10 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Search</label>
+          <label className="absolute -top-2 left-3 z-10 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Search</label>
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none z-10" />
           <input 
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search..." 
-            className="w-full bg-transparent border border-gray-800 rounded-lg pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-white placeholder:text-gray-600 relative z-0"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-amber-500 text-gray-900 dark:text-white placeholder:text-gray-600 relative z-0"
           />
         </div>
       </div>
 
       <div className="lg:hidden mb-6 relative">
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Category</label>
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</label>
           <select 
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-white"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-amber-500 appearance-none text-gray-900 dark:text-white"
           >
             <option value="all">All</option>
             {categories.map(c => (
@@ -175,65 +171,66 @@ export function Tasks() {
           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
       </div>
 
-      {/* Data Table */}
-      <div className="overflow-x-auto -mx-4 sm:mx-0 pb-4">
-        <div className="min-w-[800px] border-t border-gray-800 px-4 sm:px-0">
-          {/* Table Header */}
-          <div className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 py-4 border-b border-gray-800 text-[11px] font-bold text-gray-400 capitalize tracking-wider">
-            <div>Category</div>
-            <div>Job Title</div>
-            <div>Pay</div>
-            <div>Location</div>
-            <div>Time to Complete</div>
-            <div className="text-center">Pending Approval</div>
-            <div className="text-right">Availability</div>
-            <div className="text-right flex items-center justify-end">Status</div>
-          </div>
-
-          {/* Table Body */}
-          <div className="divide-y divide-gray-800/60">
-            {filteredJobs.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 text-sm">
-                No jobs found matching your filters.
+      {/* Tasks Grid */}
+      {filteredJobs.length === 0 ? (
+        <div className="text-center py-16 bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">No jobs found matching your filters.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
+          {filteredJobs.map((job, index) => (
+            <motion.div 
+              key={job.id} 
+              onClick={() => navigate(`/tasks/${job.id}`)}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="bg-white dark:bg-[#111218] border border-gray-200 dark:border-gray-800 rounded-2xl p-5 cursor-pointer shadow-sm hover:shadow-md dark:shadow-none dark:hover:shadow-[0_4px_20px_rgba(245,158,11,0.05)] dark:hover:border-amber-500/30 transition-all group flex flex-col"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest bg-gray-100 dark:bg-white/[0.03] px-2 py-1 rounded-md">{job.category}</span>
+                <span className={`border px-2.5 py-0.5 rounded-full text-[10px] font-bold capitalize tracking-wide ${ job.status === 'active' ? 'border-emerald-200 dark:border-[#14532d] text-emerald-700 dark:text-[#4ade80] bg-emerald-50 dark:bg-[#052e16]' : job.status === 'completed' ? 'border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30' : job.status === 'canceled' ? 'border-red-200 dark:border-red-900 text-red-700 dark:text-red-500 bg-red-50 dark:bg-red-950/30' : '' }`}>
+                  {job.status}
+                </span>
               </div>
-            ) : (
-              filteredJobs.map((job) => (
-                <div 
-                  key={job.id} 
-                  onClick={() => navigate(`/tasks/${job.id}`)}
-                  className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1.5fr_1fr_1fr_1fr] gap-4 py-4 items-center hover:bg-white/[0.02] cursor-pointer transition-colors group"
-                >
-                  <div className="text-xs text-gray-300 font-medium break-words leading-tight pr-2">{job.category}</div>
-                  <div className="text-[13px] text-gray-200 font-medium flex items-start truncate leading-snug">
-                    {job.pinned && <Pin className="w-3 h-3 text-amber-500 mr-1.5 mt-0.5 shrink-0 fill-amber-500" />}
-                    <span className="group-hover:text-amber-500 transition-colors line-clamp-2">{job.title}</span>
+              
+              <div className="flex items-start mb-4 flex-1">
+                {job.pinned && <Pin className="w-4 h-4 text-amber-500 mr-2 mt-0.5 shrink-0 fill-amber-500" />}
+                <h3 className="text-[15px] font-bold text-gray-900 dark:text-white leading-snug group-hover:text-amber-500 transition-colors line-clamp-2">{job.title}</h3>
+              </div>
+              
+              <div className="mt-auto">
+                <div className="flex justify-between items-center bg-gray-50 dark:bg-[#0b0c10] p-3 rounded-xl border border-gray-100 dark:border-gray-800/50 mb-4 group-hover:border-amber-500/20 transition-colors">
+                  <div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium mb-0.5 uppercase tracking-wide">Reward</p>
+                    <p className="text-lg font-black text-amber-600 dark:text-amber-500 leading-none">{job.pay}</p>
                   </div>
-                  <div className="text-[13px] font-bold text-white">{job.pay}</div>
-                  <div className="text-[13px] text-gray-300">{job.location}</div>
-                  <div className="text-xs text-gray-300">
-                    <div className="mb-0.5 font-medium">{job.timeToComplete}</div>
-                    <div className="text-[#a46d3e] text-[10px]">Created <br/>{job.created}</div>
-                  </div>
-                  <div className="text-[13px] text-gray-300 text-center font-medium">{job.pending}</div>
-                  <div className="text-xs text-right whitespace-nowrap flex flex-col justify-center items-end">
-                    <div className="text-gray-300 font-medium">{job.available} / {job.total}</div>
-                    <div className="text-amber-500 font-bold">{job.percentage}</div>
-                  </div>
-                  <div className="flex justify-end">
-                    <span className={`border px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider ${
-                      job.status === 'active' ? 'border-[#14532d] text-[#4ade80] bg-[#052e16]' :
-                      job.status === 'completed' ? 'border-blue-900 text-blue-400 bg-blue-950/30' :
-                      job.status === 'canceled' ? 'border-red-900 text-red-500 bg-red-950/30' : ''
-                    }`}>
-                      {job.status}
-                    </span>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium mb-0.5 uppercase tracking-wide">Time</p>
+                    <p className="text-[13px] font-bold text-gray-700 dark:text-gray-300 leading-none flex items-center justify-end"><CheckCircle2 className="w-3.5 h-3.5 mr-1 text-gray-400 dark:text-gray-500"/> {job.timeToComplete}</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                
+                <div className="flex justify-between items-end">
+                  <div className="flex flex-col flex-1 mr-4">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-[11px] text-gray-600 dark:text-gray-400 font-medium">Available</span>
+                      <span className="text-[11px] font-bold text-gray-900 dark:text-white">{job.available} <span className="text-gray-400 dark:text-gray-500 font-normal">/ {job.total}</span></span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: job.percentage }}></div>
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-gray-400 dark:text-gray-500 font-medium text-right shrink-0">
+                    Created <br/>{job.created}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }

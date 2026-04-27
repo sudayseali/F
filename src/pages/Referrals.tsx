@@ -37,10 +37,10 @@ export function Referrals() {
       </header>
 
       {/* Hero Card */}
-      <div className="bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg text-center relative overflow-hidden">
+      <div className="bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-2xl p-6 text-gray-900 dark:text-white shadow-lg text-center relative overflow-hidden">
         <div className="relative z-10 flex flex-col items-center">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
-            <Gift className="w-8 h-8 text-white" />
+            <Gift className="w-8 h-8 text-gray-900 dark:text-white" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Earn 10% for Life!</h2>
           <p className="text-indigo-100 text-sm max-w-xs mx-auto mb-6">
@@ -64,7 +64,7 @@ export function Referrals() {
             </div>
             <button 
               onClick={shareToTelegram}
-              className="w-full bg-blue-500 hover:bg-blue-400 text-white rounded-xl py-3 font-bold text-sm flex items-center justify-center transition-colors shadow-sm"
+              className="w-full bg-blue-500 hover:bg-blue-400 text-gray-900 dark:text-white rounded-xl py-3 font-bold text-sm flex items-center justify-center transition-colors shadow-sm"
             >
               <Share2 className="w-4 h-4 mr-2" />
               Share on Telegram

@@ -20,13 +20,13 @@ export function MyTasks() {
   const [activeTab, setActiveTab] = useState("All");
 
   return (
-    <div className="bg-[#0b0c10] min-h-screen text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
+    <div className="bg-gray-50 dark:bg-[#0b0c10] min-h-screen text-gray-700 dark:text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">Your Completed Jobs</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your Completed Jobs</h1>
       </header>
 
       {/* Tabs */}
-      <div className="flex space-x-6 border-b border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
+      <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
         {[
           { id: "All", count: 20 },
           { id: "Social Media", count: 14 },
@@ -36,11 +36,7 @@ export function MyTasks() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-3 text-sm font-semibold whitespace-nowrap border-b-2 flex items-center transition-colors ${
-              activeTab === tab.id
-                ? "border-amber-500 text-white"
-                : "border-transparent text-gray-400 hover:text-gray-200"
-            }`}
+            className={`pb-3 text-sm font-semibold whitespace-nowrap border-b-2 flex items-center transition-colors ${ activeTab === tab.id ? "border-amber-500 text-white" : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-200" }`}
           >
             {tab.id} <span className="ml-2 bg-amber-500 text-amber-950 px-1.5 py-0.5 rounded text-[10px]">{tab.count}</span>
           </button>
@@ -52,16 +48,16 @@ export function MyTasks() {
         <input 
           type="text" 
           placeholder="Start date" 
-          className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+          className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-600"
         />
         <input 
           type="text" 
           placeholder="End date" 
-          className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+          className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-600"
         />
         <div className="relative">
-          <label className="absolute -top-2 left-3 bg-[#0b0c10] px-1 text-[10px] font-semibold text-white uppercase tracking-wider">Status</label>
-          <select className="w-full bg-transparent border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 appearance-none text-white">
+          <label className="absolute -top-2 left-3 bg-gray-50 dark:bg-[#0b0c10] px-1 text-[10px] font-semibold text-gray-900 dark:text-white uppercase tracking-wider">Status</label>
+          <select className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-gray-600 appearance-none text-gray-900 dark:text-white">
             <option value="all">All</option>
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
@@ -74,16 +70,16 @@ export function MyTasks() {
           <input 
             type="text" 
             placeholder="Search titles and descriptions..." 
-            className="w-full bg-transparent border border-gray-800 rounded-lg pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-white placeholder:text-gray-600"
+            className="w-full bg-transparent border border-gray-200 dark:border-gray-800 rounded-lg pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-600"
           />
         </div>
       </div>
 
       {/* Data Table */}
       <div className="overflow-x-auto -mx-4 sm:mx-0 pb-4">
-        <div className="min-w-[800px] border-t border-gray-800 px-4 sm:px-0">
+        <div className="min-w-[800px] border-t border-gray-200 dark:border-gray-800 px-4 sm:px-0">
           {/* Table Header */}
-          <div className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 border-b border-gray-800 text-[11px] font-bold text-gray-400 capitalize tracking-wider">
+          <div className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 border-b border-gray-200 dark:border-gray-800 text-[11px] font-bold text-gray-500 dark:text-gray-400 capitalize tracking-wider">
             <div>Category</div>
             <div>Job Title</div>
             <div>Pay</div>
@@ -99,20 +95,20 @@ export function MyTasks() {
             {JOBS.map((job) => (
               <div 
                 key={job.id} 
-                className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 items-center hover:bg-white/[0.02] transition-colors"
+                className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 items-center hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
               >
-                <div className="text-xs text-gray-300 font-medium break-words leading-tight pr-2">{job.category}</div>
-                <div className="text-[13px] text-gray-200 font-medium leading-snug">
+                <div className="text-xs text-gray-700 dark:text-gray-300 font-medium break-words leading-tight pr-2">{job.category}</div>
+                <div className="text-[13px] text-gray-800 dark:text-gray-200 font-medium leading-snug">
                   {job.title}
                 </div>
-                <div className="text-[13px] font-bold text-white">{job.pay}</div>
-                <div className="text-[13px] text-gray-300">{job.location}</div>
-                <div className="text-xs text-gray-300 font-medium">
+                <div className="text-[13px] font-bold text-gray-900 dark:text-white">{job.pay}</div>
+                <div className="text-[13px] text-gray-700 dark:text-gray-300">{job.location}</div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 font-medium">
                   {job.completedOn}
                 </div>
-                <div className="text-[13px] text-gray-300 text-center font-medium">{job.pending}</div>
+                <div className="text-[13px] text-gray-700 dark:text-gray-300 text-center font-medium">{job.pending}</div>
                 <div className="text-xs text-right whitespace-nowrap flex flex-col justify-center items-end">
-                  <div className="text-gray-300 font-medium">{job.available} / {job.total}</div>
+                  <div className="text-gray-700 dark:text-gray-300 font-medium">{job.available} / {job.total}</div>
                   <div className="text-amber-500 font-bold">{job.percentage}</div>
                 </div>
                 <div className="flex justify-end">
