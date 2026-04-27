@@ -1,15 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Megaphone, Users, Clock, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTelegram } from "../contexts/TelegramContext";
+import { supabase } from "../lib/supabase";
 
 export function MyCampaigns() {
   const navigate = useNavigate();
+  const { user } = useTelegram();
 
-  // Mock data for advertiser's campaigns
-  const campaigns = [
-    { id: 1, title: "Join Telegram Crypto Group", reward: 0.15, slots: 500, filled: 450, pending: 12, status: "active" },
-    { id: 2, title: "Follow Twitter Account", reward: 0.10, slots: 1000, filled: 1000, pending: 0, status: "completed" },
-  ];
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCampaigns() {
+      if (!user?.uuid) return;
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*, submissions(status)')
+          .eq('advertiser_id', user.uuid)
+          .order('created_at', { ascending: false });
+
+        if (data) {
+          const mapped = data.map(camp => {
+            const pending = camp.submissions?.filter((s:any) => s.status === 'pending').length || 0;
+            return {
+              id: camp.id,
+              title: camp.title,
+              reward: camp.reward,
+              slots: camp.max_completions,
+              filled: camp.current_completions,
+              pending: pending,
+              status: camp.status
+            };
+          });
+          setCampaigns(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching campaigns:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchCampaigns();
+  }, [user?.uuid]);
 
   return (
     <div className="space-y-6">
@@ -24,55 +58,58 @@ export function MyCampaigns() {
       </header>
 
       <div className="grid gap-4">
-        {campaigns.map(camp => (
-          <div key={camp.id} className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-5 hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{camp.title}</h3>
-                <div className="flex items-center space-x-3 mt-1.5">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${camp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-800 text-gray-400'}`}>
-                    {camp.status}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Reward: ${camp.reward}</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => navigate(`/campaigns/${camp.id}/review`)}
-                className="flex items-center space-x-1 px-3 py-1.5 bg-amber-500/10 text-amber-400 rounded-lg text-sm font-semibold hover:bg-amber-500/20 transition-colors"
-              >
-                <span>Review</span>
-                {camp.pending > 0 && <span className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] ml-1">{camp.pending}</span>}
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 border-t border-gray-200 dark:border-gray-800 pt-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Slots Filled</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">{camp.filled} / {camp.slots}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Pending Review</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">{camp.pending} users</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        {campaigns.length === 0 && (
+        {loading ? (
+          <div className="text-center py-10 text-gray-500">Loading campaigns...</div>
+        ) : campaigns.length === 0 ? (
           <div className="text-center py-10">
             <Megaphone className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 dark:text-gray-400">You haven't created any campaigns yet.</p>
           </div>
+        ) : (
+          campaigns.map(camp => (
+            <div key={camp.id} className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-5 hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{camp.title}</h3>
+                  <div className="flex items-center space-x-3 mt-1.5">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${camp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-800 text-gray-400'}`}>
+                      {camp.status}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Reward: ${camp.reward}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => navigate(`/tasks/${camp.id}/review`)}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-amber-500/10 text-amber-400 rounded-lg text-sm font-semibold hover:bg-amber-500/20 transition-colors"
+                >
+                  <span>Review</span>
+                  {camp.pending > 0 && <span className="w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] ml-1">{camp.pending}</span>}
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-gray-200 dark:border-gray-800 pt-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Slots Filled</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{camp.filled} / {camp.slots}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Pending Review</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{camp.pending} users</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

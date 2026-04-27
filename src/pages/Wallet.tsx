@@ -1,35 +1,59 @@
 import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Filter } from "lucide-react";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTelegram } from "../contexts/TelegramContext";
+import { supabase } from "../lib/supabase";
 
 type ViewType = 'main' | 'withdraw' | 'deposit';
 type PaymentMethod = 'payeer' | 'usdt' | 'trx' | 'ton' | null;
 
-const MOCK_TRANSACTIONS = [
-  { id: 1, type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", displayDate: "Today, 14:30", dateISO: new Date().toISOString(), isPositive: true },
-  { id: 2, type: 'withdrawal', title: "Withdrawal", desc: "TRX Transfer", amount: "-$10.00", displayDate: "Yesterday, 09:15", dateISO: new Date(Date.now() - 86400000).toISOString(), isPositive: false },
-  { id: 3, type: 'referral_bonus', title: "Referral Bonus", desc: "From user @alice", amount: "+$0.15", displayDate: "Yesterday, 08:00", dateISO: new Date(Date.now() - 86400000).toISOString(), isPositive: true },
-  { id: 4, type: 'deposit', title: "Deposit", desc: "USDT Top Up", amount: "+$20.00", displayDate: "Last Week", dateISO: new Date(Date.now() - 7 * 86400000).toISOString(), isPositive: true },
-];
-
 export function Wallet() {
+  const { user } = useTelegram();
+  const balance = user?.balance || 0;
+
   const [view, setView] = useState<ViewType>('main');
   const [method, setMethod] = useState<PaymentMethod>(null);
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filtering states
   const [txTypeFilter, setTxTypeFilter] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  useEffect(() => {
+    async function fetchTransactions() {
+      if (!user?.uuid) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.uuid)
+          .order('created_at', { ascending: false });
+          
+        if (data) {
+          setTransactions(data);
+        }
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTransactions();
+  }, [user?.uuid]);
+
   const filteredTransactions = useMemo(() => {
-    return MOCK_TRANSACTIONS.filter(tx => {
+    return transactions.filter(tx => {
       if (txTypeFilter !== 'all' && tx.type !== txTypeFilter) return false;
       
-      const txDate = new Date(tx.dateISO);
+      const txDate = new Date(tx.created_at);
       txDate.setHours(0, 0, 0, 0); // normalize for comparison
 
       if (startDate) {
@@ -47,14 +71,31 @@ export function Wallet() {
 
       return true;
     });
-  }, [txTypeFilter, startDate, endDate]);
+  }, [transactions, txTypeFilter, startDate, endDate]);
 
-  const handleAction = (e: React.FormEvent) => {
+  const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.uuid) return;
+
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      if (view === 'deposit') {
+        const res = await supabase.functions.invoke('deposit', {
+          body: { amount: parseFloat(amount), method, address }
+        });
+        if (res.error) throw new Error(res.error.message || 'Deposit failed');
+        setSuccessMsg('Deposit request submitted successfully');
+      } else if (view === 'withdraw') {
+        const res = await supabase.functions.invoke('withdraw', {
+          body: { amount: parseFloat(amount), method, address }
+        });
+        if (res.error) throw new Error(res.error.message || 'Withdrawal failed');
+        setSuccessMsg('Withdrawal request submitted successfully');
+      }
+    } catch(err: any) {
+      alert(err.message || 'An error occurred');
+    } finally {
       setIsProcessing(false);
-      setSuccessMsg(view === 'deposit' ? 'Deposit request submitted successfully' : 'Withdrawal pending approval');
       setTimeout(() => {
         setSuccessMsg('');
         setView('main');
@@ -62,7 +103,7 @@ export function Wallet() {
         setAmount('');
         setAddress('');
       }, 3000);
-    }, 1500);
+    }
   };
 
   const selectMethod = (m: PaymentMethod) => setMethod(m);
@@ -89,7 +130,7 @@ export function Wallet() {
               <div className="relative z-10">
                 <p className="text-gray-500 dark:text-gray-400 text-sm font-semibold mb-1 uppercase tracking-wider">Total Balance</p>
                 <div className="flex items-end space-x-2 mb-6">
-                  <h2 className="text-5xl font-bold tracking-tight text-gray-900 dark:text-white">$45.50</h2>
+                  <h2 className="text-5xl font-bold tracking-tight text-gray-900 dark:text-white">${balance.toFixed(2)}</h2>
                   <span className="text-gray-500 font-bold pb-1.5">USD</span>
                 </div>
                 
@@ -134,7 +175,6 @@ export function Wallet() {
                     <option value="reward">Task Reward</option>
                     <option value="withdrawal">Withdrawal</option>
                     <option value="deposit">Deposit</option>
-                    <option value="referral_bonus">Referral Bonus</option>
                   </select>
                 </div>
                 
@@ -144,7 +184,7 @@ export function Wallet() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:light] dark:[color-scheme:dark]"
                   />
                 </div>
 
@@ -154,34 +194,41 @@ export function Wallet() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:dark]"
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-[#0b0c10] border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-amber-500 [color-scheme:light] dark:[color-scheme:dark]"
                   />
                 </div>
               </div>
               
               <div className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden p-2">
-                {filteredTransactions.length === 0 ? (
+                {loading ? (
+                  <div className="p-6 text-center text-gray-500 text-sm font-medium">Loading transactions...</div>
+                ) : filteredTransactions.length === 0 ? (
                   <div className="p-6 text-center text-gray-500 text-sm font-medium">
                     No transactions found for the selected filters.
                   </div>
                 ) : (
-                  filteredTransactions.map((tx) => (
-                    <div key={tx.id} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-800/60 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors rounded-xl">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${tx.isPositive ? 'bg-[#052e16] text-[#4ade80] border-[#14532d]' : 'bg-[#450a0a] text-[#f87171] border-[#7f1d1d]'}`}>
-                          {tx.isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                  filteredTransactions.map((tx) => {
+                    const isPositive = ['reward', 'deposit', 'refund'].includes(tx.type);
+                    return (
+                      <div key={tx.id} className="p-3 flex items-center justify-between border-b last:border-0 border-gray-800/60 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors rounded-xl">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-10 h-10 rounded-full border flex items-center justify-center ${isPositive ? 'bg-[#052e16] text-[#4ade80] border-[#14532d]' : 'bg-[#450a0a] text-[#f87171] border-[#7f1d1d]'}`}>
+                            {isPositive ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-gray-800 dark:text-gray-200 text-sm capitalize">{tx.type}</h4>
+                            <p className="text-xs text-gray-500 line-clamp-1">{tx.status}</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{tx.title}</h4>
-                          <p className="text-xs text-gray-500 line-clamp-1">{tx.desc}</p>
+                        <div className="text-right">
+                          <p className={`font-bold text-sm ${isPositive ? 'text-[#4ade80]' : 'text-gray-200'}`}>
+                            {isPositive ? '+' : '-'}${Number(tx.amount).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{new Date(tx.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-bold text-sm ${tx.isPositive ? 'text-[#4ade80]' : 'text-gray-200'}`}>{tx.amount}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">{tx.displayDate}</p>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>

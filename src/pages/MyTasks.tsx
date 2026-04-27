@@ -1,23 +1,60 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search, ChevronDown, Pin, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-
-const JOBS = [
-  { id: 1, category: "Other", title: "YouTube channel: SUBSCRIBE+ Comment+ like", pay: "$0.05", location: "All", completedOn: "Apr 19 2026", pending: 0, available: 200, total: 200, percentage: "100.0%", status: "Approved" },
-  { id: 2, category: "SEO & Web Traffic", title: "Youtube Search + 1 Min Watch", pay: "$0.07", location: "All", completedOn: "Apr 19 2026", pending: 8, available: 495, total: 495, percentage: "100.0%", status: "Approved" },
-  { id: 3, category: "Social Media", title: "github star", pay: "$0.25", location: "All", completedOn: "Apr 14 2026", pending: 0, available: 100, total: 100, percentage: "100.0%", status: "Approved" },
-  { id: 4, category: "Offer/Sign up", title: "Simple Sign Up only", pay: "$0.05", location: "All", completedOn: "Apr 14 2026", pending: 131, available: 496, total: 590, percentage: "84.07%", status: "Approved" },
-  { id: 5, category: "Social Media", title: "github star", pay: "$0.20", location: "All", completedOn: "Apr 12 2026", pending: 0, available: 150, total: 150, percentage: "100.0%", status: "Approved" },
-  { id: 6, category: "Social Media", title: "A nice comment and a subscription to the channel! youtube", pay: "$0.05", location: "All", completedOn: "Apr 10 2026", pending: 0, available: 175, total: 175, percentage: "100.0%", status: "Approved" },
-  { id: 7, category: "Social Media", title: "github star", pay: "$0.20", location: "All", completedOn: "Apr 10 2026", pending: 0, available: 155, total: 380, percentage: "40.79%", status: "Approved" },
-  { id: 8, category: "Questions, Answers & Comments", title: "Leave a short positive hemilin.nl (5★) review about an online casino on Trustpilot.", pay: "$0.25", location: "All", completedOn: "Apr 11 2026", pending: 0, available: 0, total: 25, percentage: "0.0%", status: "Rejected" },
-  { id: 9, category: "Social Media", title: "Twitter (X): Follow an account", pay: "$0.05", location: "All", completedOn: "Apr 09 2026", pending: 0, available: 110, total: 110, percentage: "100.0%", status: "Approved" },
-];
+import { useTelegram } from "../contexts/TelegramContext";
+import { supabase } from "../lib/supabase";
 
 export function MyTasks() {
   const navigate = useNavigate();
+  const { user } = useTelegram();
   const [activeTab, setActiveTab] = useState("All");
+
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSubmissions() {
+      if (!user?.uuid) return;
+      try {
+        const { data, error } = await supabase
+          .from('submissions')
+          .select('*, tasks(*)')
+          .eq('worker_id', user.uuid)
+          .order('created_at', { ascending: false });
+
+        if (data) {
+          const mapped = data.map(sub => {
+            const t = sub.tasks;
+            return {
+              id: sub.id,
+              category: "Other", // Add category to tasks later
+              title: t?.title || "Unknown Task",
+              pay: `$${Number(t?.reward || 0).toFixed(2)}`,
+              location: "All",
+              completedOn: new Date(sub.created_at).toLocaleDateString(),
+              pending: t?.current_completions || 0,
+              available: t ? (t.max_completions - t.current_completions) : 0,
+              total: t?.max_completions || 0,
+              percentage: t ? `${Math.round((t.current_completions / t.max_completions) * 100)}%` : "0%",
+              status: sub.status
+            };
+          });
+          setSubmissions(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching submissions:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSubmissions();
+  }, [user?.uuid]);
+
+  // Derived tabs counts based on submissions if category was real, but for now we'll do simple filter:
+  const filteredSubmissions = submissions.filter(s => {
+    if (activeTab !== "All" && s.category !== activeTab) return false;
+    return true;
+  });
 
   return (
     <div className="bg-gray-50 dark:bg-[#0b0c10] min-h-screen text-gray-700 dark:text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
@@ -28,10 +65,9 @@ export function MyTasks() {
       {/* Tabs */}
       <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
         {[
-          { id: "All", count: 20 },
-          { id: "Social Media", count: 14 },
-          { id: "App Install", count: 0 },
-          { id: "Survey", count: 0 },
+          { id: "All", count: submissions.length },
+          { id: "Social Media", count: submissions.filter(s => s.category === "Social Media").length },
+          { id: "Other", count: submissions.filter(s => s.category === "Other").length },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -43,7 +79,7 @@ export function MyTasks() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters (Mock front-end) */}
       <div className="space-y-3 mb-6">
         <input 
           type="text" 
@@ -85,14 +121,18 @@ export function MyTasks() {
             <div>Pay</div>
             <div>Location</div>
             <div>Completed On</div>
-            <div className="text-center">Pending Approval</div>
+            <div className="text-center">Pending</div>
             <div className="text-right">Availability</div>
             <div className="text-right">Approval Status</div>
           </div>
 
           {/* Table Body */}
           <div className="divide-y divide-gray-800/60">
-            {JOBS.map((job) => (
+            {loading ? (
+               <div className="py-8 text-center text-gray-500 text-sm">Loading your submissions...</div>
+            ) : filteredSubmissions.length === 0 ? (
+               <div className="py-8 text-center text-gray-500 text-sm">No submissions found.</div>
+            ) : filteredSubmissions.map((job) => (
               <div 
                 key={job.id} 
                 className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 items-center hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
@@ -112,11 +152,11 @@ export function MyTasks() {
                   <div className="text-amber-500 font-bold">{job.percentage}</div>
                 </div>
                 <div className="flex justify-end">
-                  {job.status === "Approved" ? (
+                  {job.status === "approved" ? (
                     <span className="border border-[#14532d] text-[#4ade80] bg-[#052e16] px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider">
                       Approved
                     </span>
-                  ) : job.status === "Rejected" ? (
+                  ) : job.status === "rejected" ? (
                     <span className="border border-[#7f1d1d] text-[#f87171] bg-[#450a0a] px-2 py-0.5 rounded text-[10px] font-bold capitalize tracking-wider">
                       Rejected
                     </span>
@@ -134,4 +174,5 @@ export function MyTasks() {
     </div>
   );
 }
+
 

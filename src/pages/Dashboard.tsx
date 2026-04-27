@@ -47,14 +47,13 @@ export function Dashboard() {
           .from('submissions')
           .select('*, tasks(title, reward)')
           .eq('worker_id', user.uuid)
-          .order('created_at', { ascending: false })
-          .limit(5);
+          .order('created_at', { ascending: false });
           
         if (subs) {
           setStats({
-            completed: subs.filter(s => s.status === 'approved').length, // basic count
-            pending: subs.filter(s => s.status === 'pending').length,
-            recentSubmissions: subs,
+            completed: subs.filter(s => s.status === 'approved').length, // real count
+            pending: subs.filter(s => s.status === 'pending').length, // real count
+            recentSubmissions: subs.slice(0, 5), // only top 5 for the UI
           });
         }
       } catch (err) {
