@@ -37,3 +37,12 @@ jobs:
         
       - name: Deploy Admin Action Function
         run: supabase functions deploy admin_action --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+
+      - name: Deploy Create Task Function
+        run: supabase functions deploy create_task --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+
+      - name: Deploy Verify Task Submission Function
+        run: supabase functions deploy verify_task_submission --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
+
+      - name: Deploy Telegram Webhook Function
+        run: supabase functions deploy telegram-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
