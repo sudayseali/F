@@ -1,0 +1,68 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  # Tani waxay dhacaysaa markasta oo isbadal lagu daro 'main' soo geloshada GitHub
+  push:
+    branches: ["main"]
+  # Sidoo kale Admin-ku waa uu ka dhaqaajin karaa (Manual run)
+  workflow_dispatch:
+
+# Tani waxay Action-ka u ogolaanaysaa inuu update gareeyo Settings-ka Pages-kaaga GitHub
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Ma ogolaanayso in isku mar laba Deployment dhacaan
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      # ==========================================
+      # ⚠️ MUHIIM AH: XIRITAANKA QAARKA QARSOODIGA AH ⚠️
+      # Tallaabadani waxay qabaneysaa variables-ka qarsoon ee GitHub Secrets oo ay dhex gaynaysaa Frontend-kaaga
+      # ==========================================
+      - name: Build the React App (Vite)
+        env:
+          # Haddii aad dhigtay qeybta Secrets (Waa tan aan kugula talinayo in la isticmaalo):
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          
+          # Haddii aad dhigtay qeybta "Variables" bedelka Secrets, tirtir kuwa sare kadibna isticmaal kuwaan:
+          # VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          # VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact (Koodhka Diyaarka Ah)
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: './dist'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
