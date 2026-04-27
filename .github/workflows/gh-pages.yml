@@ -39,13 +39,8 @@ jobs:
       # ==========================================
       - name: Build the React App (Vite)
         env:
-          # Haddii aad dhigtay qeybta Secrets (Waa tan aan kugula talinayo in la isticmaalo):
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          
-          # Haddii aad dhigtay qeybta "Variables" bedelka Secrets, tirtir kuwa sare kadibna isticmaal kuwaan:
-          # VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          # VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Setup GitHub Pages

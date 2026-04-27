@@ -10,4 +10,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Sameynta isku-xirka (Database Client)
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// We provide fallback dummy valid strings so it doesn't crash the entire app if env vars are missing during build/testing
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-key');
