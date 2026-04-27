@@ -1,0 +1,39 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: ${{ inline_string_for_project_id }}
+      
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+          
+      - name: Deploy Auth Function
+        run: supabase functions deploy auth --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        
+      - name: Deploy Submit Task Function
+        run: supabase functions deploy submit_task --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        
+      - name: Deploy Withdraw Function
+        run: supabase functions deploy withdraw --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        
+      - name: Deploy Deposit Function
+        run: supabase functions deploy deposit --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        
+      - name: Deploy Admin Action Function
+        run: supabase functions deploy admin_action --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
