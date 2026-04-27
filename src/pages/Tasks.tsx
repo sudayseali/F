@@ -1,18 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Search, Filter, ChevronDown, Pin, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-
-const JOBS = [
-  { id: 1, category: "Other", title: "reddit rep post and user. 1 minutes to do", pinned: true, pay: "$0.05", location: "All", timeToComplete: "20 minutes", created: "04/24/26", pending: 15, available: 96, total: 239, percentage: "40.17%", status: "active" },
-  { id: 2, category: "Offer/Sign up", title: "Simple Sign Up only", pinned: true, pay: "$0.05", location: "All", timeToComplete: "1 minutes", created: "04/13/26", pending: 131, available: 496, total: 590, percentage: "84.07%", status: "completed" },
-  { id: 3, category: "Social Media", title: "Download, fast payment", pinned: true, pay: "$0.08", location: "All", timeToComplete: "1 minutes", created: "04/02/26", pending: 4, available: 6, total: 15, percentage: "40.0%", status: "active" },
-  { id: 4, category: "Other", title: "Visit Website (Fast Approval)", pinned: true, pay: "$0.05", location: "All", timeToComplete: "2 minutes", created: "03/31/26", pending: 7, available: 48, total: 500, percentage: "9.6%", status: "active" },
-  { id: 5, category: "Social Media", title: "A task valid for both new and existing users.", pinned: false, pay: "$0.15", location: "All", timeToComplete: "1 minutes", created: "04/26/26", pending: 1, available: 1, total: 10, percentage: "10.0%", status: "canceled" },
-  { id: 6, category: "Write an honest review", title: "5 Star Trustpilot", pinned: false, pay: "$0.05", location: "All", timeToComplete: "1 minutes", created: "04/26/26", pending: 0, available: 0, total: 9, percentage: "0%", status: "active" },
-  { id: 7, category: "Write an honest review", title: "Trustpilot Review", pinned: false, pay: "$0.05", location: "All", timeToComplete: "1 minutes", created: "04/26/26", pending: 1, available: 1, total: 6, percentage: "16.67%", status: "active" },
-  { id: 8, category: "Social Media", title: "comment on reddit post ( 1 min )", pinned: false, pay: "$0.20", location: "All", timeToComplete: "1 minutes", created: "04/26/26", pending: 20, available: 20, total: 120, percentage: "16.67%", status: "active" },
-];
+import { supabase } from "../lib/supabase";
 
 export function Tasks() {
   const navigate = useNavigate();
@@ -23,9 +13,49 @@ export function Tasks() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchTasks() {
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+          
+        if (data) {
+          // Map DB schema to frontend shape as much as possible
+          const mapped = data.map(task => ({
+            id: task.id,
+            category: "Other", // Defaulting as category isn't in DB yet
+            title: task.title,
+            pinned: false,
+            pay: `$${Number(task.reward).toFixed(2)}`,
+            location: "All",
+            timeToComplete: "N/A",
+            created: new Date(task.created_at).toLocaleDateString(),
+            pending: 0,
+            available: task.max_completions - (task.current_completions || 0),
+            total: task.max_completions,
+            percentage: `${Math.round(((task.current_completions || 0) / task.max_completions) * 100)}%`,
+            status: task.status
+          }));
+          setJobs(mapped);
+        }
+      } catch (err) {
+        console.error("Error fetching tasks:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTasks();
+  }, []);
 
   const filteredJobs = useMemo(() => {
-    return JOBS.filter((job) => {
+    return jobs.filter((job) => {
       if (activeTab !== "All" && job.category !== activeTab) return false;
       if (categoryFilter !== "all" && job.category !== categoryFilter) return false;
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
@@ -38,8 +68,7 @@ export function Tasks() {
       }
 
       if (startDate || endDate) {
-        const [month, day, year] = job.created.split('/');
-        const jobDate = new Date(`20${year}-${month}-${day}T00:00:00Z`);
+        const jobDate = new Date(job.created);
 
         if (startDate) {
           const sDate = new Date(startDate);
@@ -55,13 +84,13 @@ export function Tasks() {
 
       return true;
     });
-  }, [activeTab, startDate, endDate, statusFilter, categoryFilter, searchQuery]);
+  }, [jobs, activeTab, startDate, endDate, statusFilter, categoryFilter, searchQuery]);
 
   // Unique categories for the dropdown
   const categories = useMemo(() => {
-    const cats = new Set(JOBS.map(j => j.category));
+    const cats = new Set(jobs.map(j => j.category));
     return Array.from(cats);
-  }, []);
+  }, [jobs]);
 
   return (
     <div className="bg-gray-50 dark:bg-[#0b0c10] min-h-screen text-gray-700 dark:text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
@@ -76,10 +105,10 @@ export function Tasks() {
       {/* Tabs */}
       <div className="flex space-x-6 border-b border-gray-200 dark:border-gray-800 mb-6 overflow-x-auto scrollbar-hide">
         {[
-          { id: "All", count: JOBS.length },
-          { id: "Social Media", count: JOBS.filter(j => j.category === "Social Media").length },
-          { id: "Other", count: JOBS.filter(j => j.category === "Other").length },
-          { id: "Write an honest review", count: JOBS.filter(j => j.category === "Write an honest review").length },
+          { id: "All", count: jobs.length },
+          { id: "Social Media", count: jobs.filter(j => j.category === "Social Media").length },
+          { id: "Other", count: jobs.filter(j => j.category === "Other").length },
+          { id: "Write an honest review", count: jobs.filter(j => j.category === "Write an honest review").length },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -172,7 +201,11 @@ export function Tasks() {
       </div>
 
       {/* Tasks Grid */}
-      {filteredJobs.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Loading tasks...</p>
+        </div>
+      ) : filteredJobs.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800">
           <p className="text-gray-500 dark:text-gray-400 text-sm">No jobs found matching your filters.</p>
         </div>

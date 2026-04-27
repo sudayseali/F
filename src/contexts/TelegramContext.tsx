@@ -1,18 +1,23 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
+// We will export a real user context with UUID and data
 interface TelegramUser {
   id: number;
   username?: string;
   first_name?: string;
   last_name?: string;
+  uuid?: string;
+  balance?: number;
 }
 
 interface TelegramContextType {
   user: TelegramUser | null;
   isAdmin: boolean;
+  refreshUser: () => Promise<void>;
 }
 
-const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false });
+const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false, refreshUser: async () => {} });
 
 export const useTelegram = () => useContext(TelegramContext);
 
@@ -21,17 +26,50 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
+  const fetchUserData = async (telegramId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('telegram_id', telegramId)
+        .maybeSingle();
+      
+      if (data) {
+        setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.balance } : null);
+        setIsAdmin(data.telegram_id.toString() === '5806129562');
+      } else if (telegramId === 5806129562) {
+        // If debug user doesn't exist, create it via supbase locally so it works even without edge function
+        const { data: newData } = await supabase.from('users').upsert({
+           telegram_id: 5806129562,
+           username: 'test_user_ai',
+           first_name: 'Test',
+           balance: 45.50
+        }).select().maybeSingle();
+        if (newData) {
+           setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.balance } : null);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching user data:", err);
+    }
+  };
+
+  const refreshUser = async () => {
+    if (user?.id) {
+      await fetchUserData(user.id);
+    }
+  };
+
   useEffect(() => {
-    // Add a small delay to ensure the script is fully loaded
-    const initTelegram = () => {
+    const initTelegram = async () => {
       const tg = (window as any).Telegram?.WebApp;
       
-      // Development/Preview Bypass:
-      // If "?debug=1" is in the URL, simulate a user so we can preview the app in AI Studio/Browser.
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('debug') === '1') {
-        setUser({ id: 5806129562, username: 'test_user_ai', first_name: 'Test', last_name: 'Admin User' });
-        setIsAdmin(true); // Pretend debug user is an admin for preview purposes
+        const debugUser: TelegramUser = { id: 5806129562, username: 'test_user_ai', first_name: 'Test', last_name: 'Admin User' };
+        setUser(debugUser);
+        setIsAdmin(true);
+        await fetchUserData(debugUser.id);
         setIsReady(true);
         return;
       }
@@ -42,22 +80,34 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         const tgUser = tg.initDataUnsafe?.user;
         
         if (tgUser) {
-          setUser({
+          const userObj: TelegramUser = {
             id: tgUser.id,
             username: tgUser.username,
             first_name: tgUser.first_name,
             last_name: tgUser.last_name,
-          });
+          };
+          setUser(userObj);
           
-          // SECURITY NOTE: In a real production deployment, you would call the Supabase Edge Function here:
-          // fetch('/functions/v1/auth', { method: 'POST', body: JSON.stringify({ initData: tg.initData }) })
-          //   .then(res => res.json())
-          //   .then(data => setIsAdmin(data.is_admin))
-          // 
-          // For immediate app demo functionality without a live backend hooked up yet:
-          if (tgUser.id === 5806129562) {
-             setIsAdmin(true);
+          try {
+            // Attempt remote auth edge function
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const res = await fetch(`${baseUrl}/functions/v1/auth`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ initData: tg.initData })
+            });
+            const authData = await res.json();
+            
+            if (authData.success) {
+              setIsAdmin(authData.is_admin);
+              userObj.uuid = authData.user_uuid;
+              setUser({...userObj});
+            }
+          } catch(e) {
+            console.error("Edge function auth failed, falling back", e);
           }
+          
+          await fetchUserData(tgUser.id);
         }
       }
       setIsReady(true);
