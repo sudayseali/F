@@ -107,13 +107,14 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 
-    // (Optional but Recommended) Setup custom Supabase JWT here 
-    // so the client can safely interact directly with the DB using RLS.
-    // For now, we return success.
+    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV (So leaked code doesn't leak Admin ID)
+    const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID");
+    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID;
 
     return new Response(JSON.stringify({ 
       success: true, 
       user_uuid: userRow.id,
+      is_admin: isAdmin,
       message: "Authentication secure & verified" 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

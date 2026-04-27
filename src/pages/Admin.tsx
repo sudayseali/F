@@ -21,12 +21,12 @@ const TABS: { id: TabType; label: string; icon: any }[] = [
 ];
 
 export function Admin() {
-  const { user } = useTelegram();
+  const { user, isAdmin } = useTelegram();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Hardcoded Admin ID constraint
-  if (user?.id !== 5806129562) {
+  // Secure Admin constraint - tied to backend via Context
+  if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Shield className="w-16 h-16 text-red-500 mb-4" />

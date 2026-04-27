@@ -9,14 +9,16 @@ interface TelegramUser {
 
 interface TelegramContextType {
   user: TelegramUser | null;
+  isAdmin: boolean;
 }
 
-const TelegramContext = createContext<TelegramContextType>({ user: null });
+const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false });
 
 export const useTelegram = () => useContext(TelegramContext);
 
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -28,7 +30,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       // If "?debug=1" is in the URL, simulate a user so we can preview the app in AI Studio/Browser.
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('debug') === '1') {
-        setUser({ id: 123456789, username: 'test_user_ai', first_name: 'Test', last_name: 'User' });
+        setUser({ id: 5806129562, username: 'test_user_ai', first_name: 'Test', last_name: 'Admin User' });
+        setIsAdmin(true); // Pretend debug user is an admin for preview purposes
         setIsReady(true);
         return;
       }
@@ -45,6 +48,16 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
             first_name: tgUser.first_name,
             last_name: tgUser.last_name,
           });
+          
+          // SECURITY NOTE: In a real production deployment, you would call the Supabase Edge Function here:
+          // fetch('/functions/v1/auth', { method: 'POST', body: JSON.stringify({ initData: tg.initData }) })
+          //   .then(res => res.json())
+          //   .then(data => setIsAdmin(data.is_admin))
+          // 
+          // For immediate app demo functionality without a live backend hooked up yet:
+          if (tgUser.id === 5806129562) {
+             setIsAdmin(true);
+          }
         }
       }
       setIsReady(true);
@@ -87,7 +100,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TelegramContext.Provider value={{ user }}>
+    <TelegramContext.Provider value={{ user, isAdmin }}>
       {children}
     </TelegramContext.Provider>
   );

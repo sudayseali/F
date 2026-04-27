@@ -14,7 +14,7 @@ const baseNavItems = [
 
 export function Navigation() {
   const location = useLocation();
-  const { user } = useTelegram();
+  const { user, isAdmin } = useTelegram();
   const displayName = user?.first_name ? `${user?.first_name} ${user?.last_name || ''}`.trim() : 'User';
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -36,7 +36,7 @@ export function Navigation() {
   }, [isDark]);
 
   const navItems = [...baseNavItems];
-  if (user?.id === 5806129562) {
+  if (isAdmin) {
     navItems.push({ label: "Admin", icon: Shield, path: "/admin" });
   }
 
