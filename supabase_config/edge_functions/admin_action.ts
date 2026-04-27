@@ -61,6 +61,17 @@ serve(async (req) => {
         resultMsg = "Withdrawal marked as completed.";
         break;
 
+      case 'approve_deposit':
+        // Safe approval via RPC to prevent balance tampering
+        const { data: depResult, error: depError } = await supabase.rpc('approve_deposit', {
+          tx_id_param: target_id
+        });
+        if (depError) throw depError;
+        if (!depResult.success) throw new Error(depResult.error);
+        
+        resultMsg = "Deposit verified and user balance updated.";
+        break;
+
       default:
         throw new Error("Unknown admin action");
     }

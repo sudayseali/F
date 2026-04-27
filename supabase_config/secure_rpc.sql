@@ -85,3 +85,67 @@ begin
   return json_build_object('success', true, 'message', 'Proof submitted securely.');
 end;
 $$;
+
+-- 3. SECURE DEPOSIT REQUEST (Qofka marka uu lacag soo shubayo)
+create or replace function request_deposit(user_id_param uuid, amount_param numeric, payment_method text, tx_id_proof text)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  v_existing_tx uuid;
+  v_new_tx_id uuid;
+begin
+  if amount_param <= 0 then
+    return json_build_object('success', false, 'error', 'Amount must be greater than zero.');
+  end if;
+
+  -- Prevent duplicate transactions with the same TxID/Proof so hackers can't submit the same receipt twice
+  select id into v_existing_tx from public.transactions where reference_id = payment_method || ':' || tx_id_proof and type = 'deposit';
+  if found then
+    return json_build_object('success', false, 'error', 'Transaction ID already submitted.');
+  end if;
+
+  insert into public.transactions (user_id, amount, type, status, reference_id)
+  values (user_id_param, amount_param, 'deposit', 'pending', payment_method || ':' || tx_id_proof)
+  returning id into v_new_tx_id;
+
+  return json_build_object('success', true, 'transaction_id', v_new_tx_id, 'message', 'Deposit requested securely.');
+end;
+$$;
+
+
+-- 4. SECURE DEPOSIT APPROVAL (Admin-ka marka uu xaqiijiyo)
+create or replace function approve_deposit(tx_id_param uuid)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  v_user_id uuid;
+  v_amount numeric;
+  v_status text;
+begin
+  -- Lock row si aysan u dhicin race conditions
+  select user_id, amount, status into v_user_id, v_amount, v_status
+  from public.transactions
+  where id = tx_id_param and type = 'deposit'
+  for update;
+
+  if not found then
+    return json_build_object('success', false, 'error', 'Deposit transaction not found.');
+  end if;
+
+  if v_status != 'pending' then
+    return json_build_object('success', false, 'error', 'Deposit is already processed.');
+  end if;
+
+  -- Add money to user safely
+  update public.users set balance = balance + v_amount where id = v_user_id;
+
+  -- Mark as completed
+  update public.transactions set status = 'completed' where id = tx_id_param;
+
+  return json_build_object('success', true, 'message', 'Deposit approved and balance updated successfully.');
+end;
+$$;
