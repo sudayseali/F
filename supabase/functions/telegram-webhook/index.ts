@@ -10,6 +10,7 @@ serve(async (req) => {
 
   try {
     const update = await req.json();
+    console.log("Received update:", JSON.stringify(update));
 
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
@@ -55,34 +56,37 @@ Waa madal casri ah oo aad uga shaqaysan karto hawlo kala duwan, saaxiibadaana aa
         };
 
         if (BOT_TOKEN) {
-             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+             const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(payload)
             });
+            const result = await res.json();
+            console.log("Telegram API Start Response:", result);
         } else {
             console.error("TELEGRAM_BOT_TOKEN is not set in environment variables");
         }
-      } else if (update.callback_query) {
-         const callbackQuery = update.callback_query;
-         if (callbackQuery.data === "help") {
-            const helpMessage = `
+      }
+    } else if (update.callback_query) {
+       const callbackQuery = update.callback_query;
+       if (callbackQuery.data === "help") {
+          const helpMessage = `
 Waxaad u baahan tahay inaad gasho Mini App-ka si aad u aragto hawlaha kugu habboon.
 Haddii aad qabto su'aal la xiriir maamulka.
-            `;
-            if (BOT_TOKEN) {
-               await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ chat_id: callbackQuery.message.chat.id, text: helpMessage })
-              });
-            }
-         }
-      }
+          `;
+          if (BOT_TOKEN) {
+             const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ chat_id: callbackQuery.message.chat.id, text: helpMessage })
+            });
+            console.log("Telegram API Help Response:", await res.json());
+          }
+       }
     }
 
     return new Response(JSON.stringify({ ok: true }), {
