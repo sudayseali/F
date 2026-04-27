@@ -90,7 +90,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           
           try {
             // Attempt remote auth edge function
-            const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
             const res = await fetch(`${baseUrl}/functions/v1/auth`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -150,7 +150,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TelegramContext.Provider value={{ user, isAdmin }}>
+    <TelegramContext.Provider value={{ user, isAdmin, refreshUser }}>
       {children}
     </TelegramContext.Provider>
   );
