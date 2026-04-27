@@ -3,7 +3,7 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type ViewType = 'main' | 'withdraw' | 'deposit';
-type PaymentMethod = 'payeer' | 'usdt' | 'trx' | null;
+type PaymentMethod = 'payeer' | 'usdt' | 'trx' | 'ton' | null;
 
 const MOCK_TRANSACTIONS = [
   { id: 1, type: 'reward', title: "Task Reward", desc: "Subscribe to Crypto Channel", amount: "+$0.50", displayDate: "Today, 14:30", dateISO: new Date().toISOString(), isPositive: true },
@@ -197,62 +197,75 @@ export function Wallet() {
             className="space-y-6"
           >
             <header className="flex items-center space-x-3">
-              <button onClick={() => setView('main')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              <button onClick={() => setView('main')} className="p-2 hover:bg-gray-100 dark:hover:bg-white/[0.03] rounded-full transition-colors">
+                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
-              <h1 className="text-2xl font-bold text-gray-900 capitalize">{view} Funds</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">{view} Funds</h1>
             </header>
 
             {successMsg ? (
-               <div className="bg-green-50 border border-green-200 rounded-2xl p-8 flex flex-col items-center text-center">
-                 <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-4">
+               <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-8 flex flex-col items-center text-center">
+                 <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-500 rounded-full flex items-center justify-center mb-4">
                    <CheckCircle2 className="w-8 h-8" />
                  </div>
-                 <h2 className="text-xl font-bold text-gray-900 mb-2">Success!</h2>
-                 <p className="text-gray-600 text-sm">{successMsg}</p>
+                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Success!</h2>
+                 <p className="text-gray-600 dark:text-gray-300 text-sm">{successMsg}</p>
                </div>
             ) : (
               // Method Selection
               <form onSubmit={handleAction} className="space-y-6">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 mb-3 ml-1 uppercase tracking-wider">Select Method</h3>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3 ml-1 uppercase tracking-wider">Select Method</h3>
                   <div className="grid gap-3">
-                    <div onClick={() => selectMethod('usdt')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'usdt' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                    <div onClick={() => selectMethod('usdt')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${method === 'usdt' ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] hover:border-amber-300 dark:hover:border-amber-500/50'}`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">₮</div>
+                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-600 dark:text-emerald-500 font-bold">₮</div>
                         <div>
-                          <h4 className="font-semibold text-gray-900">USDT (TRC20)</h4>
-                          <p className="text-xs text-gray-500">Tether USD • Fee $1.00</p>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">USDT (TRC20)</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Tether USD • Fee $1.00</p>
                         </div>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'usdt' ? 'border-blue-600' : 'border-gray-300'}`}>
-                        {method === 'usdt' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'usdt' ? 'border-amber-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                        {method === 'usdt' && <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>}
                       </div>
                     </div>
 
-                    <div onClick={() => selectMethod('trx')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'trx' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                    <div onClick={() => selectMethod('trx')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${method === 'trx' ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] hover:border-amber-300 dark:hover:border-amber-500/50'}`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-500 font-bold">T</div>
+                        <div className="w-10 h-10 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center text-red-600 dark:text-red-500 font-bold">T</div>
                         <div>
-                          <h4 className="font-semibold text-gray-900">Tron (TRX)</h4>
-                          <p className="text-xs text-gray-500">TRON Network • Free</p>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">Tron (TRX)</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">TRON Network • Free</p>
                         </div>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'trx' ? 'border-blue-600' : 'border-gray-300'}`}>
-                        {method === 'trx' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'trx' ? 'border-amber-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                        {method === 'trx' && <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>}
                       </div>
                     </div>
 
-                    <div onClick={() => selectMethod('payeer')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${method === 'payeer' ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                    <div onClick={() => selectMethod('ton')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${method === 'ton' ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] hover:border-amber-300 dark:hover:border-amber-500/50'}`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold text-xl">P</div>
+                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-500 font-bold">💎</div>
                         <div>
-                          <h4 className="font-semibold text-gray-900">Payeer</h4>
-                          <p className="text-xs text-gray-500">Instant • Fee 0.5%</p>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">The Open Network (TON)</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">TON Network • Free</p>
                         </div>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'payeer' ? 'border-blue-600' : 'border-gray-300'}`}>
-                        {method === 'payeer' && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full"></div>}
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'ton' ? 'border-amber-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                        {method === 'ton' && <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>}
+                      </div>
+                    </div>
+
+                    <div onClick={() => selectMethod('payeer')} className={`border-2 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all ${method === 'payeer' ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] hover:border-amber-300 dark:hover:border-amber-500/50'}`}>
+                      <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 bg-sky-100 dark:bg-sky-500/20 rounded-full flex items-center justify-center text-sky-600 dark:text-sky-500 font-bold text-xl">P</div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">Payeer</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Instant • Fee 0.5%</p>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === 'payeer' ? 'border-amber-500' : 'border-gray-300 dark:border-gray-600'}`}>
+                        {method === 'payeer' && <div className="w-2.5 h-2.5 bg-amber-500 rounded-full"></div>}
                       </div>
                     </div>
                   </div>
@@ -265,7 +278,7 @@ export function Wallet() {
                     className="space-y-4"
                   >
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Amount (USD)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">Amount (USD)</label>
                       <input 
                         type="number" 
                         required
@@ -274,22 +287,22 @@ export function Wallet() {
                         placeholder="0.00"
                         min="1"
                         step="0.01"
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-lg"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 font-medium text-lg transition-colors"
                       />
                     </div>
                     
                     {view === 'withdraw' && (
                       <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
-                          {method === 'payeer' ? 'Payeer Account (e.g., P1000000)' : 'Wallet Address'}
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+                          {method === 'payeer' ? 'Payeer Account (e.g., P1000000)' : method === 'ton' ? 'TON Wallet Address' : `${method.toUpperCase()} Wallet Address`}
                         </label>
                         <input 
                           type="text" 
                           required
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
-                          placeholder={method === 'payeer' ? 'P...' : 'T...'}
-                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                          placeholder={method === 'payeer' ? 'P...' : method === 'ton' ? 'EQ...' : 'T...'}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111218] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-sm transition-colors"
                         />
                       </div>
                     )}
@@ -297,7 +310,7 @@ export function Wallet() {
                     <button 
                       type="submit" 
                       disabled={isProcessing || !amount || (view === 'withdraw' && !address)}
-                      className="w-full py-4 bg-gray-900 hover:bg-black text-gray-900 dark:text-white rounded-xl font-bold shadow-sm transition-colors mt-2 disabled:opacity-70 flex items-center justify-center active:scale-95"
+                      className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-amber-950 rounded-xl font-bold shadow-sm transition-colors mt-2 disabled:opacity-70 flex items-center justify-center active:scale-95"
                     >
                       {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : `${view === 'withdraw' ? 'Submit Withdrawal' : 'Proceed to Payment'}`}
                     </button>
