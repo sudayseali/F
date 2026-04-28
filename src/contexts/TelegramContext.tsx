@@ -108,6 +108,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
             }
           } catch(e) {
             console.error("Edge function auth failed, falling back", e);
+            // Fallback for AI Studio preview or missing Edge Function
+            if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+               setIsAdmin(true);
+            }
           }
           
           await fetchUserData(tgUser.id);

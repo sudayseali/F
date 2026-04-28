@@ -97,13 +97,13 @@ serve(async (req) => {
         first_name: tgUser.first_name,
         last_name: tgUser.last_name
       }, { onConflict: 'telegram_id' })
-      .select('id, is_banned')
+      .select('id, status')
       .single();
 
     if (dbError) throw dbError;
 
     // Check if user is banned
-    if (userRow.is_banned) {
+    if (userRow.status === 'suspended') {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 

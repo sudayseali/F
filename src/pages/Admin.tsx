@@ -228,7 +228,7 @@ export function Admin() {
                         <div className="flex items-center space-x-2">
                           <h4 className="font-bold text-gray-900 dark:text-white text-sm">{u.first_name || 'User'}</h4>
                           <span className="text-xs text-gray-500">(@{u.username || 'unknown'})</span>
-                          {u.is_banned && <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 text-[10px] rounded uppercase font-bold">Banned</span>}
+                          {u.status === 'suspended' && <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 text-[10px] rounded uppercase font-bold">Banned</span>}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">ID: {u.telegram_id} • Balance: <span className="font-bold text-amber-600 dark:text-amber-500">${Number(u.balance || 0).toFixed(2)}</span></p>
                       </div>
@@ -237,8 +237,8 @@ export function Admin() {
                       <button onClick={() => handleAction(u.id, 'User', 'edit_balance')} className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:text-amber-500 dark:hover:text-amber-500 transition-colors tooltip" title="Edit Balance">
                         <Wallet className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleAction(u.id, 'User', u.is_banned ? 'unban_user' : 'ban_user')} className={`p-2 rounded-lg transition-colors ${u.is_banned ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600' : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500'}`} title={u.is_banned ? 'Unban' : 'Ban User'}>
-                        {u.is_banned ? <RefreshCw className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                      <button onClick={() => handleAction(u.id, 'User', u.status === 'suspended' ? 'unban_user' : 'ban_user')} className={`p-2 rounded-lg transition-colors ${u.status === 'suspended' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600' : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500'}`} title={u.status === 'suspended' ? 'Unban' : 'Ban User'}>
+                        {u.status === 'suspended' ? <RefreshCw className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>

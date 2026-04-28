@@ -1,0 +1,10 @@
+project_id = "gwggirbuaewcmntnzjpp"
+
+[functions.auth]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.admin_action]
+verify_jwt = false

@@ -44,10 +44,19 @@ serve(async (req) => {
         // target_id waa user_id
         const { error: banError } = await supabase
           .from('users')
-          .update({ is_banned: true })
+          .update({ status: 'suspended' })
           .eq('id', target_id);
         if (banError) throw banError;
-        resultMsg = `User ${target_id} has been banned permanently.`;
+        resultMsg = `User ${target_id} has been banned.`;
+        break;
+
+      case 'unban_user':
+        const { error: unbanError } = await supabase
+          .from('users')
+          .update({ status: 'active' })
+          .eq('id', target_id);
+        if (unbanError) throw unbanError;
+        resultMsg = `User ${target_id} has been unbanned.`;
         break;
 
       case 'approve_withdrawal':
