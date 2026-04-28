@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// WebCrypto API is built-in for Deno Edge Functions
+import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!; // Crucial: Use Service role to bypass RLS securely
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET") || "your-super-secret-jwt-token-with-at-least-32-characters-long"; // Fallback for local testing, but user should set it!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -107,14 +108,29 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 
-    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV (So leaked code doesn't leak Admin ID)
+    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV
     const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID");
     const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID;
+
+    // GENERATE SECURE CUSTOM JWT
+    const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
+    const jwt = await new jose.SignJWT({
+      aud: 'authenticated',
+      role: 'authenticated',
+      sub: userRow.id,
+      email: `${tgUser.id}@telegram.local`,
+      user_metadata: { tg_id: tgUser.id, is_admin: isAdmin }
+    })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('24h')
+    .sign(secret);
 
     return new Response(JSON.stringify({ 
       success: true, 
       user_uuid: userRow.id,
       is_admin: isAdmin,
+      access_token: jwt,
       message: "Authentication secure & verified" 
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

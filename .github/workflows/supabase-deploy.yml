@@ -23,6 +23,15 @@ jobs:
         with:
           version: latest
           
+      - name: Set Supabase Secrets
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env.func
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.func
+          echo "SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> .env.func
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env.func
+          echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env.func
+          supabase secrets set --env-file .env.func --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
       - name: Deploy Auth Function
         run: supabase functions deploy auth --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
         

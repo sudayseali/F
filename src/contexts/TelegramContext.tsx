@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, setSupabaseToken } from '../lib/supabase';
 
 // We will export a real user context with UUID and data
 interface TelegramUser {
@@ -143,6 +143,9 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
             const authData = await res.json();
             
             if (authData.success) {
+              if (authData.access_token) {
+                setSupabaseToken(authData.access_token);
+              }
               setIsAdmin(authData.is_admin);
               userObj.uuid = authData.user_uuid;
               setUser({...userObj});
