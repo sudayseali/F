@@ -3,6 +3,7 @@ import { PlusCircle, Target, Globe, Image as ImageIcon, Info, CheckCircle2, Circ
 import { useNavigate } from "react-router-dom";
 import { useTelegram } from "../contexts/TelegramContext";
 import { motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
 
 const CATEGORIES = {
   "Social Media": ["Like", "Comment", "Direct Message", "Add Friend/Follow/Connect", "Join an Event/Group", "Post/Share", "Create a Story", "Like + Post/Share", "Add an App"],
@@ -92,8 +93,37 @@ export function CreateTask() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    navigate("/campaigns");
+    
+    let allowedCountries = ['International'];
+    if (targetMode === 'specific') {
+       allowedCountries = selectedCountries;
+    }
+
+    try {
+      if (user && user.uuid) {
+        const { error } = await supabase.from('tasks').insert({
+          title: formData.title,
+          description: formData.description,
+          reward: parseFloat(formData.payRate),
+          max_completions: parseInt(formData.availabilities),
+          status: 'active',
+          advertiser_id: user.uuid,
+          category: formData.category,
+          sub_category: formData.subCategory,
+          allowed_countries: allowedCountries,
+          proof_instructions: formData.proofInstructions,
+          job_length: parseInt(formData.jobLength),
+          target_mode: targetMode
+        });
+        if (error) {
+           console.error("Error creating task:", error);
+        }
+      }
+      navigate("/campaigns");
+    } catch (err) {
+      console.error(err);
+      navigate("/campaigns");
+    }
   };
 
   const estimatedCost = parseFloat(formData.payRate || "0") * parseInt(formData.availabilities || "0", 10);

@@ -11,19 +11,31 @@ interface TelegramUser {
   balance?: number;
 }
 
+export interface LocationData {
+  ip: string;
+  country: string;
+  countryCode: string;
+  continent: string;
+  continentCode: string;
+  isVpn: boolean;
+}
+
 interface TelegramContextType {
   user: TelegramUser | null;
   isAdmin: boolean;
+  location: LocationData | null;
   refreshUser: () => Promise<void>;
 }
 
-const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false, refreshUser: async () => {} });
+const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false, location: null, refreshUser: async () => {} });
 
 export const useTelegram = () => useContext(TelegramContext);
 
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   const fetchUserData = async (telegramId: number) => {
@@ -65,6 +77,31 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initTelegram = async () => {
+      // First fetch location and block if VPN
+      let locData: LocationData | null = null;
+      try {
+        const res = await fetch('https://ipwho.is/');
+        const data = await res.json();
+        if (data && data.success) {
+          locData = {
+            ip: data.ip,
+            country: data.country,
+            countryCode: data.country_code,
+            continent: data.continent,
+            continentCode: data.continent_code,
+            isVpn: data.security?.vpn || data.security?.proxy || data.security?.tor || false,
+          };
+          setLocation(locData);
+          if (locData.isVpn) {
+             setIsVpnBlock(true);
+             setIsReady(true);
+             return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch IP info", e);
+      }
+
       const tg = (window as any).Telegram?.WebApp;
       
       const urlParams = new URLSearchParams(window.location.search);
@@ -136,6 +173,20 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  if (isVpnBlock) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center font-sans">
+        <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-sm">
+          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">VPN Detected</h1>
+        <p className="text-gray-500 max-w-sm mb-6">
+          You are using a VPN or Proxy. To access campaigns targeted to your real location and prevent fraud, please disable your VPN and reload the platform.
+        </p>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center font-sans">
@@ -157,7 +208,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TelegramContext.Provider value={{ user, isAdmin, refreshUser }}>
+    <TelegramContext.Provider value={{ user, isAdmin, location, refreshUser }}>
       {children}
     </TelegramContext.Provider>
   );

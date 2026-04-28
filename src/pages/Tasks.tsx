@@ -3,9 +3,11 @@ import { Search, Filter, ChevronDown, Pin, ChevronRight, CheckCircle2 } from "lu
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
+import { useTelegram } from "../contexts/TelegramContext";
 
 export function Tasks() {
   const navigate = useNavigate();
+  const { location } = useTelegram();
   const [activeTab, setActiveTab] = useState("All");
 
   const [startDate, setStartDate] = useState("");
@@ -27,14 +29,23 @@ export function Tasks() {
           .order('created_at', { ascending: false });
           
         if (data) {
-          const mapped = data.map(task => ({
+          const mapped = data.filter(task => {
+             // Location targeting logic
+             if (task.allowed_countries && Array.isArray(task.allowed_countries) && task.allowed_countries.length > 0) {
+                 if (!task.allowed_countries.includes('International')) {
+                     if (!location) return false;
+                     return task.allowed_countries.includes(location.country) || task.allowed_countries.includes(location.continent);
+                 }
+             }
+             return true;
+          }).map(task => ({
             id: task.id,
-            category: "Other",
+            category: task.category || "Other",
             title: task.title,
             pinned: false,
             pay: `$${Number(task.reward).toFixed(2)}`,
-            location: "All",
-            timeToComplete: "N/A",
+            location: (task.allowed_countries && task.allowed_countries.length > 0 && !task.allowed_countries.includes('International')) ? "Specific Regions" : "International",
+            timeToComplete: task.job_length ? `${task.job_length}m` : "N/A",
             created: new Date(task.created_at).toLocaleDateString(),
             pending: 0,
             available: task.max_completions - (task.current_completions || 0),
@@ -50,8 +61,11 @@ export function Tasks() {
         setLoading(false);
       }
     }
-    fetchTasks();
-  }, []);
+    // ensure location is ready if it's supposed to be fetched
+    if (location !== undefined) {
+      fetchTasks();
+    }
+  }, [location]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
