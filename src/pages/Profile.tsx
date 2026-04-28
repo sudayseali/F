@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 export function Profile() {
-  const { user } = useTelegram();
+  const { user, isAdmin } = useTelegram();
   const navigate = useNavigate();
   const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "User";
   const initial = displayName.charAt(0).toUpperCase();
@@ -21,11 +21,22 @@ export function Profile() {
           {initial}
         </div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{displayName}</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">ID: {user?.id}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">ID: <span className="font-mono text-gray-700 dark:text-gray-300">{user?.id}</span></p>
         {user?.username && (
           <p className="text-sm font-medium text-amber-500 mt-1">@{user.username}</p>
         )}
       </header>
+
+      {!isAdmin && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm text-blue-800 dark:text-blue-300">
+          <p className="font-semibold mb-1">Want to be an Admin?</p>
+          <p className="text-xs opacity-90 mb-2">Set this variable in your project's <code className="bg-white/50 dark:bg-black/30 px-1 rounded">.env</code> file:</p>
+          <div className="bg-white/80 dark:bg-black/40 font-mono text-xs p-2 rounded selectable mb-2 break-all overflow-hidden border border-blue-200 dark:border-blue-700/50">
+            VITE_ADMIN_TELEGRAM_ID={user?.id}
+          </div>
+          <p className="text-xs opacity-90">Or change your user level to <code className="bg-white/50 dark:bg-black/30 px-1 rounded">admin</code> in the Supabase <code className="bg-white/50 dark:bg-black/30 px-1 rounded">users</code> table.</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         <div 

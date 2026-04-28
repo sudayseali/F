@@ -48,8 +48,12 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.balance } : null);
-        // Only set debug admin here, real admin is set by auth edge function
-        if (data.telegram_id.toString() === '5806129562') {
+        // Set admin if level is admin, or matches admin telegram ID, or is debug user
+        if (
+           data.level === 'admin' || 
+           data.telegram_id.toString() === '5806129562' ||
+           data.telegram_id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID
+        ) {
            setIsAdmin(true);
         }
       } else if (telegramId === 5806129562) {
