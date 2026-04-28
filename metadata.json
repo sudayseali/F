@@ -1,5 +1,5 @@
 {
-  "name": "Micro Task Platform",
+  "name": "Payvora",
   "description": "Telegram Mini App and Web Dashboard for micro-tasks with a Supabase backend",
   "requestFramePermissions": [],
   "majorCapabilities": []

@@ -12,7 +12,7 @@ export function Referrals() {
 
   // Generate real referral link based on user's Telegram ID
   const refCode = user?.id ? `ref_${user.id}` : "ref_12345";
-  const refLink = `https://t.me/TaskMasterBot?start=${refCode}`;
+  const refLink = `https://t.me/PayvoraBot?start=${refCode}`;
 
   useEffect(() => {
     async function fetchReferrals() {
@@ -46,7 +46,7 @@ export function Referrals() {
   };
 
   const shareToTelegram = () => {
-    const text = "Join me on TaskMaster and earn money completing simple tasks!";
+    const text = "Join me on Payvora and earn money completing simple tasks!";
     const url = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`;
     
     // Use Telegram WebApp API if available, otherwise fallback to web link

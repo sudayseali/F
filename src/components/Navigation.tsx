@@ -86,7 +86,7 @@ export function Navigation() {
       <aside className="hidden md:flex flex-col w-72 h-screen fixed left-0 top-0 glass-panel border-r-0 border-r-zinc-200/50 dark:border-r-white/5">
         <div className="p-8 flex items-center justify-between">
           <h1 className="text-3xl font-display font-bold gradient-text tracking-tight">
-            TaskMaster
+            Payvora
           </h1>
           <button 
             onClick={() => setIsDark(!isDark)}

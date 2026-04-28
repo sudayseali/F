@@ -83,7 +83,7 @@ export function TaskDetails() {
           </div>
           
           <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-6">
-            Join the official TaskMaster Crypto group on Telegram and stay active for at least 3 days. Do not mute the channel immediately to ensure your verification passes the anti-fraud checks.
+            Join the official Payvora Crypto group on Telegram and stay active for at least 3 days. Do not mute the channel immediately to ensure your verification passes the anti-fraud checks.
           </p>
 
           <div className="flex flex-wrap gap-3">

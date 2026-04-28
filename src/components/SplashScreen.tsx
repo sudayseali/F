@@ -36,7 +36,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
           transition={{ delay: 0.3 }}
           className="text-4xl font-black tracking-tighter bg-gradient-to-r from-amber-400 to-emerald-400 bg-clip-text text-transparent mb-2"
         >
-          TaskMaster
+          Payvora
         </motion.h1>
         
         <motion.p
