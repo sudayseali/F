@@ -32,6 +32,17 @@ jobs:
           echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env.func
           supabase secrets set --env-file .env.func --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
 
+      - name: Deploy Database Schema (Optional)
+        # You need to add DB_PASSWORD as a secret in your GitHub repository
+        # It runs the schema.sql against your Supabase database securely
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        if: ${{ env.DB_PASSWORD != '' }}
+        run: |
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} -p $DB_PASSWORD
+          # supabase db push pushes migrations. But to apply a specific schema file via CLI:
+          PGPASSWORD=$DB_PASSWORD psql -h aws-0-eu-central-1.pooler.supabase.com -p 6543 -d postgres -U postgres.${{ secrets.SUPABASE_PROJECT_ID }} -f supabase_config/schema.sql || true
+
       - name: Deploy Auth Function
         run: supabase functions deploy auth --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} --no-verify-jwt
         
