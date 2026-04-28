@@ -34,7 +34,7 @@ export function Profile() {
           <div className="bg-white/80 dark:bg-black/40 font-mono text-xs p-2 rounded selectable mb-2 break-all overflow-hidden border border-blue-200 dark:border-blue-700/50">
             VITE_ADMIN_TELEGRAM_ID={user?.id}
           </div>
-          <p className="text-xs opacity-90">Or change your user level to <code className="bg-white/50 dark:bg-black/30 px-1 rounded">admin</code> in the Supabase <code className="bg-white/50 dark:bg-black/30 px-1 rounded">users</code> table.</p>
+          <p className="text-xs opacity-90">Or change your user level to <code className="bg-white/50 dark:bg-black/30 px-1 rounded">admin</code> in the Supabase <code className="bg-white/50 dark:bg-black/30 px-1 rounded">users</code> table by setting <code className="bg-white/50 dark:bg-black/30 px-1 rounded">role = 'admin'</code>.</p>
         </div>
       )}
 

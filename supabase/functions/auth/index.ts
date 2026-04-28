@@ -108,9 +108,9 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 
-    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV
+    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV AND DATABASE
     const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID");
-    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID;
+    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID || userRow.role === 'admin';
 
     // GENERATE SECURE CUSTOM JWT
     const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);

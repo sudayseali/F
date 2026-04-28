@@ -12,6 +12,7 @@ create table if not exists public.users (
   username text,
   first_name text,
   last_name text,
+  role text default 'user' check (role in ('user', 'admin', 'moderator')),
   balance numeric(10, 2) default 0.00 check (balance >= 0), -- Prevents negative balance (Hack prevention)
   is_banned boolean default false,
   created_at timestamp with time zone default now()
