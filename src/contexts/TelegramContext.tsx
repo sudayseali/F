@@ -36,7 +36,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.balance } : null);
-        setIsAdmin(data.telegram_id.toString() === '5806129562');
+        // Only set debug admin here, real admin is set by auth edge function
+        if (data.telegram_id.toString() === '5806129562') {
+           setIsAdmin(true);
+        }
       } else if (telegramId === 5806129562) {
         // If debug user doesn't exist, create it via supbase locally so it works even without edge function
         const { data: newData } = await supabase.from('users').upsert({

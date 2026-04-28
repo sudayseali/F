@@ -26,6 +26,7 @@ export function Admin() {
   const [searchQuery, setSearchQuery] = useState('');
   const [adminData, setAdminData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin || !user) return;
@@ -44,9 +45,13 @@ export function Admin() {
         const json = await res.json();
         if (json.success) {
           setAdminData(json.data);
+          setErrorMsg(null);
+        } else {
+          setErrorMsg(json.error || "Failed to load admin data");
         }
       } catch (error) {
         console.error("Error fetching admin data:", error);
+        setErrorMsg("Network error or backend is not deployed properly. Did you deploy admin_action edge function?");
       } finally {
         setLoading(false);
       }
@@ -62,6 +67,10 @@ export function Admin() {
         <Shield className="w-16 h-16 text-red-500 mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
         <p className="text-gray-500 dark:text-gray-400">You do not have administrator privileges to view this page.</p>
+        <p className="text-gray-500 mt-2 text-sm max-w-sm mx-auto">
+          Currently your Telegram ID is {user?.id}. Ensure your ID equals the ADMIN_TELEGRAM_ID in Supabase Secrets. 
+          (<a href="?debug=1" className="text-blue-500 underline ml-1">Try Debug Mode</a>)
+        </p>
       </div>
     );
   }
@@ -137,6 +146,16 @@ export function Admin() {
           );
         })}
       </div>
+
+      {errorMsg && (
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 p-4 rounded-xl flex items-start space-x-3 mb-6">
+           <Shield className="w-5 h-5 shrink-0 mt-0.5" />
+           <div>
+             <h4 className="font-bold text-sm">Failed to load Admin Data</h4>
+             <p className="text-xs mt-1">{errorMsg}</p>
+           </div>
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.div
