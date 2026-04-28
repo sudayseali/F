@@ -18,17 +18,17 @@ serve(async (req) => {
 
       if (text.startsWith("/start")) {
         const welcomeMessage = `
-🌟 *Ku soo dhawow Bot-keena!* 🌟
+🌟 *Welcome to our Bot!* 🌟
 
-Waa madal casri ah oo aad uga shaqaysan karto hawlo kala duwan, saaxiibadaana aad ugu marti qaadi karto si aad u hesho dakhli dheeraad ah.
+A modern platform where you can complete various tasks and invite friends to earn extra income.
 
-*Muxuu bot-kani qabtaa?*
-✅ Qabo hawlo (Tasks) kala duwan si aad u hesho lacag.
-✅ Samee ololeyaal (Campaigns) adigoo lacag abaalmarin ah bixinaya.
-✅ Soo xarow saaxiibadaa (Referrals) oo hel 10% dhaqaale dheeraad ah.
-✅ Dakhligaaga si fudud ula bax (Withdraw).
+*What does this bot do?*
+✅ Complete various Tasks to earn money.
+✅ Create campaigns by offering reward money.
+✅ Invite friends (Referrals) and earn 10% extra income.
+✅ Easily withdraw your earnings.
 
-👉 *Taabo badhanka hoose si aad u bilowdo oo aad App-ka u gasho!*
+👉 *Tap the button below to start and open the App!*
         `;
 
         const payload = {
@@ -39,7 +39,7 @@ Waa madal casri ah oo aad uga shaqaysan karto hawlo kala duwan, saaxiibadaana aa
             inline_keyboard: [
               [
                 {
-                  text: "🚀 Bilow Hadda (Open App)",
+                  text: "🚀 Start Now (Open App)",
                   web_app: {
                     url: Deno.env.get("FRONTEND_URL") || "https://sudayse.vercel.app/"
                   }
@@ -47,7 +47,7 @@ Waa madal casri ah oo aad uga shaqaysan karto hawlo kala duwan, saaxiibadaana aa
               ],
               [
                 {
-                  text: "ℹ️ Caawinaad / Help",
+                  text: "ℹ️ Help",
                   callback_data: "help"
                 }
               ]
@@ -73,8 +73,8 @@ Waa madal casri ah oo aad uga shaqaysan karto hawlo kala duwan, saaxiibadaana aa
        const callbackQuery = update.callback_query;
        if (callbackQuery.data === "help") {
           const helpMessage = `
-Waxaad u baahan tahay inaad gasho Mini App-ka si aad u aragto hawlaha kugu habboon.
-Haddii aad qabto su'aal la xiriir maamulka.
+You need to open the Mini App to see the tasks available for you.
+If you have any questions, please contact the administration.
           `;
           if (BOT_TOKEN) {
              const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
