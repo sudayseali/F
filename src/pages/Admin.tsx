@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { 
   Shield, Users, CheckSquare, ArrowDownLeft, ArrowUpRight, CheckCircle, 
@@ -24,6 +24,36 @@ export function Admin() {
   const { user, isAdmin } = useTelegram();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [adminData, setAdminData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isAdmin || !user) return;
+    const fetchAdminData = async () => {
+      try {
+        const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+        if (!baseUrl) return;
+        const res = await fetch(`${baseUrl}/functions/v1/admin_action`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            admin_telegram_id: user.id,
+            action: 'get_admin_data'
+          })
+        });
+        const json = await res.json();
+        if (json.success) {
+          setAdminData(json.data);
+        }
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAdminData();
+  }, [isAdmin, user]);
 
   // Secure Admin constraint - tied to backend via Context
   if (!isAdmin) {
@@ -36,9 +66,40 @@ export function Admin() {
     );
   }
 
-  const handleAction = (id: number | string, type: string, action: string) => {
-    alert(`${action.toUpperCase()} action triggered for ${type} ${id}`);
+  const handleAction = async (id: number | string, type: string, action: string, extra_data: any = {}) => {
+    if (!user) return;
+    try {
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+      const res = await fetch(`${baseUrl}/functions/v1/admin_action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          admin_telegram_id: user.id,
+          action,
+          target_id: id,
+          extra_data
+        })
+      });
+      const data = await res.json();
+      if (!data.success) {
+         alert("Error: " + data.error);
+      } else {
+         alert("Success: " + data.message);
+         // You could trigger a re-fetch here if needed
+      }
+    } catch (e) {
+      alert("Network error.");
+    }
   };
+
+  if (loading && isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+        <p className="mt-4 text-gray-500">Loading admin data...</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div 
@@ -85,39 +146,38 @@ export function Admin() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && adminData && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-[#111218] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center space-x-3 mb-3 text-gray-500 dark:text-gray-400">
                   <Users className="w-5 h-5" />
                   <span className="text-xs font-bold uppercase tracking-wider">Total Users</span>
                 </div>
-                <p className="text-3xl font-black text-gray-900 dark:text-white">12,459</p>
-                <div className="mt-2 text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block">+142 today</div>
+                <p className="text-3xl font-black text-gray-900 dark:text-white">{adminData.stats?.totalUsers || 0}</p>
               </div>
               <div className="bg-white dark:bg-[#111218] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center space-x-3 mb-3 text-gray-500 dark:text-gray-400">
                   <CheckSquare className="w-5 h-5" />
                   <span className="text-xs font-bold uppercase tracking-wider">Active Tasks</span>
                 </div>
-                <p className="text-3xl font-black text-amber-500">842</p>
-                <div className="mt-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full inline-block">14 Pending Approval</div>
+                <p className="text-3xl font-black text-amber-500">{adminData.stats?.activeTasks || 0}</p>
+                <div className="mt-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full inline-block">{adminData.tasks?.filter((t: any) => t.status === 'pending').length || 0} Pending Approval</div>
               </div>
               <div className="bg-white dark:bg-[#111218] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center space-x-3 mb-3 text-gray-500 dark:text-gray-400">
                   <ArrowDownLeft className="w-5 h-5" />
                   <span className="text-xs font-bold uppercase tracking-wider">Payouts</span>
                 </div>
-                <p className="text-3xl font-black text-red-500">$2.4k</p>
-                <div className="mt-2 text-[10px] text-red-500 font-bold bg-red-500/10 px-2 py-0.5 rounded-full inline-block">8 Pending Requests</div>
+                <p className="text-3xl font-black text-red-500">${adminData.withdrawals?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2) || '0.00'}</p>
+                <div className="mt-2 text-[10px] text-red-500 font-bold bg-red-500/10 px-2 py-0.5 rounded-full inline-block">{adminData.withdrawals?.filter((w: any) => w.status === 'pending').length || 0} Pending Requests</div>
               </div>
               <div className="bg-white dark:bg-[#111218] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center space-x-3 mb-3 text-gray-500 dark:text-gray-400">
                   <ArrowUpRight className="w-5 h-5" />
                   <span className="text-xs font-bold uppercase tracking-wider">Deposits</span>
                 </div>
-                <p className="text-3xl font-black text-emerald-500">$8.9k</p>
-                <div className="mt-2 text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block">3 Unverified</div>
+                <p className="text-3xl font-black text-emerald-500">${adminData.deposits?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2) || '0.00'}</p>
+                <div className="mt-2 text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block">{adminData.deposits?.filter((d: any) => d.status === 'pending').length || 0} Unverified</div>
               </div>
             </div>
           )}
@@ -139,31 +199,27 @@ export function Admin() {
                 </div>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {[
-                  { id: '1849201', name: 'John Doe', username: '@johndoe', bal: '$45.20', status: 'Active' },
-                  { id: '9482012', name: 'Scammer123', username: '@earnfast', bal: '$0.05', status: 'Banned' },
-                  { id: '5820122', name: 'Alice Smith', username: '@alice', bal: '$120.50', status: 'Active' },
-                ].map((u, i) => (
-                  <div key={i} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                {adminData?.users?.map((u: any, i: number) => (
+                  <div key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold">
-                        {u.name[0]}
+                      <div className="w-10 h-10 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold uppercase">
+                        {u.first_name?.[0] || u.username?.[0] || '?'}
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <h4 className="font-bold text-gray-900 dark:text-white text-sm">{u.name}</h4>
-                          <span className="text-xs text-gray-500">({u.username})</span>
-                          {u.status === 'Banned' && <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 text-[10px] rounded uppercase font-bold">Banned</span>}
+                          <h4 className="font-bold text-gray-900 dark:text-white text-sm">{u.first_name || 'User'}</h4>
+                          <span className="text-xs text-gray-500">(@{u.username || 'unknown'})</span>
+                          {u.is_banned && <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 text-[10px] rounded uppercase font-bold">Banned</span>}
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">ID: {u.id} • Balance: <span className="font-bold text-amber-600 dark:text-amber-500">{u.bal}</span></p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">ID: {u.telegram_id} • Balance: <span className="font-bold text-amber-600 dark:text-amber-500">${Number(u.balance || 0).toFixed(2)}</span></p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
                       <button onClick={() => handleAction(u.id, 'User', 'edit_balance')} className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:text-amber-500 dark:hover:text-amber-500 transition-colors tooltip" title="Edit Balance">
                         <Wallet className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleAction(u.id, 'User', u.status === 'Banned' ? 'unban' : 'ban')} className={`p-2 rounded-lg transition-colors ${u.status === 'Banned' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600' : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500'}`} title={u.status === 'Banned' ? 'Unban' : 'Ban User'}>
-                        {u.status === 'Banned' ? <RefreshCw className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                      <button onClick={() => handleAction(u.id, 'User', u.is_banned ? 'unban_user' : 'ban_user')} className={`p-2 rounded-lg transition-colors ${u.is_banned ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600' : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500'}`} title={u.is_banned ? 'Unban' : 'Ban User'}>
+                        {u.is_banned ? <RefreshCw className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
@@ -179,41 +235,33 @@ export function Admin() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">Review new campaigns before they go live on the platform.</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {[
-                  { id: 101, title: 'Join Telegram Channel and React', status: 'Pending' },
-                  { id: 102, title: 'Download app and rate 5 stars', status: 'Active' },
-                ].map((task) => (
+                {adminData?.tasks?.map((task: any) => (
                   <div key={task.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <h4 className="font-bold text-gray-900 dark:text-white">Task #{task.id}: {task.title}</h4>
-                        {task.status === 'Pending' ? (
+                        <h4 className="font-bold text-gray-900 dark:text-white">Task: {task.title}</h4>
+                        {task.status === 'pending' ? (
                           <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-500 text-[10px] font-bold rounded-full uppercase">Needs Approval</span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 text-[10px] font-bold rounded-full uppercase">Live</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-500 text-[10px] font-bold rounded-full uppercase">{task.status}</span>
                         )}
                       </div>
-                      <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        <span>Adv: @cryptoguy</span>
+                      <div className="flex flex-wrap items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <span>Adv ID: {task.advertiser_id?.slice(0,8)}...</span>
                         <span>•</span>
-                        <span>Reward: $0.10</span>
+                        <span>Reward: ${task.reward}</span>
                         <span>•</span>
-                        <span>Slots: 100</span>
-                        <span>•</span>
-                        <span className="font-semibold text-amber-600 dark:text-amber-500">Pool: $10.00</span>
+                        <span>Slots: {task.current_completions}/{task.max_completions}</span>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      {task.status === 'Pending' && (
-                        <button onClick={() => handleAction(task.id, 'Task', 'approve')} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-colors">
+                      {task.status === 'pending' && (
+                        <button onClick={() => handleAction(task.id, 'Task', 'approve_task')} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-colors">
                           Approve
                         </button>
                       )}
-                      <button onClick={() => handleAction(task.id, 'Task', 'edit')} className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:text-amber-500 transition-colors">
+                      <button onClick={() => handleAction(task.id, 'Task', task.status === 'paused' ? 'resume_task' : 'pause_task')} className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg hover:text-amber-500 transition-colors">
                         <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleAction(task.id, 'Task', 'reject_delete')} className="p-2 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -229,26 +277,30 @@ export function Admin() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">Verify user proofs that were flagged for manual admin review.</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {[1, 2].map((id) => (
-                  <div key={id} className="p-4 flex flex-col lg:flex-row lg:items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                {adminData?.submissions?.map((sub: any) => (
+                  <div key={sub.id} className="p-4 flex flex-col lg:flex-row lg:items-start justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div className="flex space-x-4">
                       <div className="w-24 h-24 bg-gray-100 dark:bg-[#0b0c10] rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-center shrink-0 overflow-hidden">
-                        <img src={`https://placehold.co/200x200?text=Proof+${id}`} alt="Proof" className="w-full h-full object-cover" />
+                         {sub.proof?.startsWith('http') ? (
+                           <img src={sub.proof} alt="Proof" className="w-full h-full object-cover" />
+                         ) : (
+                           <span className="text-xs text-gray-400">No Image</span>
+                         )}
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">Join Group Task #{id}</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Worker: <span className="font-semibold text-gray-700 dark:text-gray-300">@worker{id}</span></p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">IP: <span className="font-mono">192.168.1.{100 + id}</span></p>
+                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">Task: {sub.task?.title}</h4>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Worker: <span className="font-semibold text-gray-700 dark:text-gray-300">@{sub.worker?.username || 'unknown'}</span></p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">IP: <span className="font-mono">{sub.ip_address || 'hidden'}</span></p>
                         <div className="mt-2 bg-gray-50 dark:bg-[#0b0c10] p-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-300">
-                          <strong>Submitted Text:</strong> I joined with username @myuser{id}
+                          <strong>Proof data:</strong> <span className="overflow-hidden text-ellipsis inline-block max-w-[200px]">{sub.proof || 'None provided'}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0 w-full lg:w-auto">
-                      <button onClick={() => handleAction(id, 'Submission', 'approve')} className="flex-1 lg:flex-none justify-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
+                      <button onClick={() => handleAction(sub.id, 'Submission', 'approve_submission', { advertiser_id: sub.task?.advertiser_id })} className="flex-1 lg:flex-none justify-center px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
                         Approve (Pay)
                       </button>
-                      <button onClick={() => handleAction(id, 'Submission', 'reject')} className="flex-1 lg:flex-none justify-center px-4 py-2 border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 text-sm font-bold rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">
+                      <button onClick={() => handleAction(sub.id, 'Submission', 'reject_submission')} className="flex-1 lg:flex-none justify-center px-4 py-2 border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-500 text-sm font-bold rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors">
                         Reject
                       </button>
                     </div>
@@ -312,26 +364,30 @@ export function Admin() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">Manually process user payouts (verify for fraud before approving).</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {[1, 2].map((id) => (
-                  <div key={id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                {adminData?.withdrawals?.map((tx: any) => (
+                  <div key={tx.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
                       <div className="flex items-center space-x-2">
                         <ArrowDownLeft className="w-5 h-5 text-red-500" />
-                        <h4 className="font-black text-gray-900 dark:text-white text-lg">${(id * 5.5).toFixed(2)}</h4>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded uppercase">TRX (TRC20)</span>
+                        <h4 className="font-black text-gray-900 dark:text-white text-lg">${Number(tx.amount).toFixed(2)}</h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded uppercase">{tx.status}</span>
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">User: <span className="font-semibold text-gray-700 dark:text-gray-200">@earner{id}</span></p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">User: <span className="font-semibold text-gray-700 dark:text-gray-200">@{tx.user?.username || 'user'}</span></p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-[#0b0c10] p-1.5 rounded mt-1 overflow-hidden text-ellipsis">
-                        T{id}JxyzABCdefGHIjklMNOpqrSTUvwxYZ
+                        Address/Ref: {tx.reference_id || 'N/A'}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      <button onClick={() => handleAction(id, 'Withdrawal', 'approve')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
-                        Mark Paid
-                      </button>
-                      <button onClick={() => handleAction(id, 'Withdrawal', 'reject')} className="px-4 py-2 bg-red-100 dark:bg-red-500/10 hover:bg-red-200 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 text-sm font-bold rounded-xl transition-colors">
-                        Decline
-                      </button>
+                      {tx.status === 'pending' && (
+                        <>
+                          <button onClick={() => handleAction(tx.id, 'Withdrawal', 'approve_withdrawal')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
+                            Mark Paid
+                          </button>
+                          <button onClick={() => handleAction(tx.id, 'Withdrawal', 'reject_withdrawal')} className="px-4 py-2 bg-red-100 dark:bg-red-500/10 hover:bg-red-200 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 text-sm font-bold rounded-xl transition-colors">
+                            Decline
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -346,24 +402,28 @@ export function Admin() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">Verify cross-chain or manual deposits visually.</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
-                {[1].map((id) => (
-                  <div key={id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                {adminData?.deposits?.map((tx: any) => (
+                  <div key={tx.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
                       <div className="flex items-center space-x-2">
                         <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-                        <h4 className="font-black text-gray-900 dark:text-white text-lg">$50.00</h4>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded uppercase">USDT</span>
+                        <h4 className="font-black text-gray-900 dark:text-white text-lg">${Number(tx.amount).toFixed(2)}</h4>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded uppercase">{tx.status}</span>
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Adv: <span className="font-semibold text-gray-700 dark:text-gray-200">@bigposter</span></p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">TXID: 0x123abc987def654...</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">User: <span className="font-semibold text-gray-700 dark:text-gray-200">@{tx.user?.username || 'user'}</span></p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">TXID: {tx.reference_id || 'N/A'}</p>
                     </div>
                     <div className="flex items-center space-x-2 shrink-0">
-                      <button onClick={() => handleAction(id, 'Deposit', 'approve')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
-                        Verify & Credit
-                      </button>
-                      <button onClick={() => handleAction(id, 'Deposit', 'reject')} className="px-4 py-2 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-200 dark:hover:bg-red-500/20 text-sm font-bold rounded-xl transition-colors">
-                        Reject
-                      </button>
+                      {tx.status === 'pending' && (
+                        <>
+                          <button onClick={() => handleAction(tx.id, 'Deposit', 'approve_deposit')} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-xl transition-colors">
+                            Verify & Credit
+                          </button>
+                          <button onClick={() => handleAction(tx.id, 'Deposit', 'reject_deposit')} className="px-4 py-2 bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 hover:bg-red-200 dark:hover:bg-red-500/20 text-sm font-bold rounded-xl transition-colors">
+                            Reject
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}

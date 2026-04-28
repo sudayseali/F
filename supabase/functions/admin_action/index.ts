@@ -72,6 +72,35 @@ serve(async (req) => {
         resultMsg = "Deposit verified and user balance updated.";
         break;
 
+      case 'get_admin_data': {
+        const [
+          { data: users }, 
+          { data: tasks }, 
+          { data: submissions }, 
+          { data: disputes }, 
+          { data: withdrawals }, 
+          { data: deposits }
+        ] = await Promise.all([
+          supabase.from('users').select('*').order('created_at', { ascending: false }).limit(100),
+          supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(100),
+          supabase.from('submissions').select('*, worker:users!worker_id(username, id), task:tasks!task_id(title, advertiser_id)').eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
+          supabase.from('submissions').select('*, worker:users!worker_id(username), task:tasks!task_id(title, advertiser_id)').eq('status', 'disputed').order('created_at', { ascending: false }).limit(100),
+          supabase.from('transactions').select('*, user:users!user_id(username)').eq('type', 'withdrawal').order('created_at', { ascending: false }).limit(100),
+          supabase.from('transactions').select('*, user:users!user_id(username)').eq('type', 'deposit').order('created_at', { ascending: false }).limit(100)
+        ]);
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: { 
+            users, tasks, submissions, disputes, withdrawals, deposits,
+            stats: {
+               totalUsers: users?.length || 0,
+               activeTasks: tasks?.filter(t => t.status === 'active').length || 0,
+            }
+          } 
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       default:
         throw new Error("Unknown admin action");
     }
