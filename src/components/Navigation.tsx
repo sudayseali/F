@@ -3,6 +3,7 @@ import { LayoutDashboard, CheckSquare, Wallet, User as UserIcon, Shield, Megapho
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
@@ -45,14 +46,14 @@ export function Navigation() {
       {/* Mobile Dark Mode Floating Toggle */}
       <button 
         onClick={() => setIsDark(!isDark)}
-        className="md:hidden fixed top-4 right-4 z-50 p-2.5 rounded-full bg-white dark:bg-[#111218] border border-gray-200 dark:border-gray-800 text-amber-500 shadow-sm"
+        className="md:hidden fixed top-4 right-4 z-50 p-2.5 rounded-full glass-panel text-brand hover-lift"
       >
         {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
       </button>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 w-full bg-white dark:bg-[#111218] border-t border-gray-200 dark:border-gray-800 pb-safe z-50">
-        <div className="flex justify-around items-center h-16 px-2">
+      {/* Mobile Bottom Navigation - Floating Glass Dock */}
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 rounded-2xl glass-panel pb-safe z-50 grid items-center px-2 py-2">
+        <div className="flex justify-around items-center h-14">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
             const Icon = item.icon;
@@ -62,33 +63,40 @@ export function Navigation() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
-                  isActive ? "text-amber-500" : "text-gray-500 dark:text-gray-500 hover:text-gray-300 dark:hover:text-gray-300"
+                  "relative flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
+                  isActive ? "text-brand" : "text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 )}
               >
-                <Icon className="w-6 h-6" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabMobile"
+                    className="absolute inset-0 bg-brand/10 dark:bg-brand/20 rounded-xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <Icon className={cn("w-5 h-5 z-10", isActive && "drop-shadow-[0_0_8px_rgba(124,58,237,0.5)]")} />
+                <span className="text-[10px] font-medium z-10">{item.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 h-screen fixed left-0 top-0 bg-gray-50 dark:bg-[#0b0c10] border-r border-gray-200 dark:border-gray-800">
-        <div className="p-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+      {/* Desktop Sidebar - Glass Panel */}
+      <aside className="hidden md:flex flex-col w-72 h-screen fixed left-0 top-0 glass-panel border-r-0 border-r-zinc-200/50 dark:border-r-white/5">
+        <div className="p-8 flex items-center justify-between">
+          <h1 className="text-3xl font-display font-bold gradient-text tracking-tight">
             TaskMaster
           </h1>
           <button 
             onClick={() => setIsDark(!isDark)}
-            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-white/[0.03] text-amber-500 transition-colors"
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 hover:text-brand transition-colors"
           >
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
         </div>
         
-        <nav className="flex-1 px-4 space-y-2 mt-4">
+        <nav className="flex-1 px-6 space-y-2 mt-4">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
             const Icon = item.icon;
@@ -98,27 +106,36 @@ export function Navigation() {
                 key={item.path}
                 to={item.path}
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-xl transition-all font-semibold",
+                  "relative flex items-center space-x-3 px-4 py-3.5 rounded-xl transition-all font-semibold group",
                   isActive 
-                    ? "bg-amber-500/10 text-amber-500" 
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.03] hover:text-gray-900 dark:hover:text-gray-200"
+                    ? "text-brand" 
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                 {isActive && (
+                  <motion.div
+                    layoutId="activeTabDesktop"
+                    className="absolute inset-0 bg-brand/10 dark:bg-brand/20 rounded-xl"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <Icon className={cn("w-5 h-5 z-10 transition-transform group-hover:scale-110", isActive && "drop-shadow-[0_0_8px_rgba(124,58,237,0.5)]")} />
+                <span className="z-10">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-          <div className="flex items-center space-x-3 p-4 rounded-xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-gray-800">
-            <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 font-bold uppercase">
-              {initial}
+        <div className="p-6">
+          <div className="flex items-center space-x-4 p-4 rounded-2xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 glass-panel hover-lift cursor-pointer">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-brand to-pink-500 p-[2px]">
+               <div className="w-full h-full rounded-full bg-white dark:bg-zinc-900 items-center justify-center flex font-display font-bold text-lg">
+                 {initial}
+               </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{displayName}</p>
-              <p className="text-xs text-gray-500 truncate">
+            <div className="overflow-hidden flex-1">
+              <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{displayName}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5 truncate">
                 {user?.username ? `@${user.username}` : `ID: ${user?.id}`}
               </p>
             </div>
