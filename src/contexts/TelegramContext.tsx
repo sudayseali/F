@@ -48,12 +48,13 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.balance } : null);
-        // Set admin if level is admin, or matches admin telegram ID, or is debug user
-        if (
+        // Check if admin
+        const isUserAdmin = 
            data.role === 'admin' || 
-           data.telegram_id.toString() === '5806129562' ||
-           data.telegram_id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID
-        ) {
+           data.telegram_id?.toString() === '5806129562' ||
+           data.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID;
+           
+        if (isUserAdmin) {
            setIsAdmin(true);
         }
       } else if (telegramId === 5806129562) {
@@ -132,6 +133,11 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           };
           setUser(userObj);
           
+          // Immediate frontend admin override for the specific user before any backend calls
+          if (tgUser.id.toString() === '5806129562' || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+            setIsAdmin(true);
+          }
+          
           try {
             // Attempt remote auth edge function
             const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
@@ -146,7 +152,11 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
               if (authData.access_token) {
                 setSupabaseToken(authData.access_token);
               }
-              setIsAdmin(authData.is_admin);
+              if (authData.is_admin || tgUser.id.toString() === '5806129562' || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+                 setIsAdmin(true);
+              } else {
+                 setIsAdmin(authData.is_admin);
+              }
               userObj.uuid = authData.user_uuid;
               setUser({...userObj});
             }
