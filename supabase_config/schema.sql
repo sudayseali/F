@@ -6,7 +6,7 @@ create extension if not exists "uuid-ossp";
 -- ==========================================
 -- 1. USERS TABLE
 -- ==========================================
-create table public.users (
+create table if not exists public.users (
   id uuid primary key default uuid_generate_v4(),
   telegram_id bigint unique not null,
   username text,
@@ -20,7 +20,7 @@ create table public.users (
 -- ==========================================
 -- 2. TASKS TABLE
 -- ==========================================
-create table public.tasks (
+create table if not exists public.tasks (
   id uuid primary key default uuid_generate_v4(),
   advertiser_id uuid references public.users(id) not null,
   title text not null,
@@ -35,7 +35,7 @@ create table public.tasks (
 -- ==========================================
 -- 3. SUBMISSIONS TABLE
 -- ==========================================
-create table public.submissions (
+create table if not exists public.submissions (
   id uuid primary key default uuid_generate_v4(),
   task_id uuid references public.tasks(id) not null,
   worker_id uuid references public.users(id) not null,
@@ -49,7 +49,7 @@ create table public.submissions (
 -- ==========================================
 -- 4. TRANSACTIONS TABLE
 -- ==========================================
-create table public.transactions (
+create table if not exists public.transactions (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references public.users(id) not null,
   amount numeric(10, 2) not null,
@@ -66,6 +66,15 @@ alter table public.users enable row level security;
 alter table public.tasks enable row level security;
 alter table public.submissions enable row level security;
 alter table public.transactions enable row level security;
+
+-- Drop existing policies if they exist so we can re-run this script safely
+drop policy if exists "Users can read own data" on public.users;
+drop policy if exists "Anyone can read active tasks" on public.tasks;
+drop policy if exists "Advertisers can manage their tasks" on public.tasks;
+drop policy if exists "Workers can read own submissions" on public.submissions;
+drop policy if exists "Workers can insert submissions" on public.submissions;
+drop policy if exists "Advertisers can read submissions for their tasks" on public.submissions;
+drop policy if exists "Users can read own transactions" on public.transactions;
 
 -- Users can only read their own data
 create policy "Users can read own data" on public.users 
