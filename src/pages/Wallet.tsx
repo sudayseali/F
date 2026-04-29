@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 
-type ViewType = 'main' | 'withdraw' | 'deposit';
+type ViewType = 'main' | 'withdraw';
 type PaymentMethod = 'payeer' | 'usdt' | 'trx' | 'ton' | null;
 
 export function Wallet() {
@@ -79,53 +79,7 @@ export function Wallet() {
 
     setIsProcessing(true);
     try {
-      if (view === 'deposit') {
-        const depositAmount = parseFloat(amount);
-        if (isNaN(depositAmount) || depositAmount <= 0) throw new Error("Invalid amount");
-        let txid = '';
-
-        if (method === 'trx') {
-          const tronWeb = (window as any).tronWeb;
-          if (!tronWeb || !tronWeb.defaultAddress?.base58) {
-            alert('TronLink extension not found or not logged in! Please install TronLink and log in to deposit automatically.');
-            setIsProcessing(false);
-            return;
-          }
-
-          // Fallback company address, in production this should be in .env
-          const recipient = import.meta.env.VITE_COMPANY_TRON_ADDRESS || 'TMpG7r79rS2K8d2VzV914N8w9Z4SwwVv3c'; 
-          
-          // Using a fixed conversion rate of 1 USD = 7.5 TRX for demonstration
-          const trxAmount = depositAmount * 7.5;
-          const sunAmount = Math.floor(trxAmount * 1_000_000);
-
-          try {
-             const transaction = await tronWeb.trx.sendTransaction(recipient, sunAmount);
-             if (transaction.result || transaction.transaction?.txID) {
-                 txid = transaction.txid || transaction.transaction?.txID || 'unknown_tx';
-             } else {
-                 throw new Error("Transaction rejected or failed");
-             }
-          } catch(e: any) {
-             console.error(e);
-             alert("Transaction error: " + (e.message || e));
-             setIsProcessing(false);
-             return;
-          }
-          
-          const res = await supabase.functions.invoke('deposit', {
-             body: { user_uuid: user.uuid, amount: depositAmount, method, tx_id: txid }
-          });
-          if (res.error) throw new Error(res.error.message || 'Deposit failed');
-          setSuccessMsg('Deposit verified automatically via TronWeb! TXID: ' + txid.substring(0, 8) + '...');
-        } else {
-          const res = await supabase.functions.invoke('deposit', {
-            body: { user_uuid: user.uuid, amount: depositAmount, method, tx_id: address }
-          });
-          if (res.error) throw new Error(res.error.message || 'Deposit failed');
-          setSuccessMsg('Deposit request submitted successfully. Awaiting admin approval.');
-        }
-      } else if (view === 'withdraw') {
+      if (view === 'withdraw') {
         const res = await supabase.functions.invoke('withdraw', {
           body: { user_uuid: user.uuid, amount: parseFloat(amount), method, wallet_address: address }
         });
@@ -181,20 +135,13 @@ export function Wallet() {
                     <span className="text-xl font-medium text-gray-500 pt-1">USD</span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <button 
                       onClick={() => { setView('withdraw'); setMethod(null); }}
                       className="group relative w-full bg-brand hover:bg-brand-light text-white py-4 rounded-2xl font-bold shadow-[0_0_40px_-10px_rgba(124,58,237,0.5)] flex items-center justify-center transition-all overflow-hidden"
                     >
                       <ArrowDownLeft className="w-5 h-5 mr-2 group-hover:-translate-y-1 group-hover:-translate-x-1 transition-transform" />
                       Withdraw
-                    </button>
-                    <button 
-                      onClick={() => { setView('deposit'); setMethod(null); }}
-                      className="group relative w-full bg-white/50 hover:bg-white/80 dark:bg-white/5 dark:hover:bg-white/10 text-gray-900 dark:text-white py-4 rounded-2xl font-bold flex items-center justify-center transition-all border border-gray-200/50 dark:border-white/10 backdrop-blur-sm"
-                    >
-                      <ArrowUpRight className="w-5 h-5 mr-2 group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform" />
-                      Deposit
                     </button>
                   </div>
                 </div>
@@ -222,7 +169,6 @@ export function Wallet() {
                     <option value="all">All Transactions</option>
                     <option value="reward">Offer Rewards</option>
                     <option value="withdrawal">Withdrawals</option>
-                    <option value="deposit">Deposits</option>
                   </select>
                 </div>
                 
