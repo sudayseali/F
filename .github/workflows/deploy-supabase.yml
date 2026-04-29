@@ -44,10 +44,10 @@ jobs:
 
       - name: Deploy Database Schema 
         env:
-          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase link --project-ref ${{ env.PROJECT_ID }} -p "$DB_PASSWORD"
-          supabase db push -p "$DB_PASSWORD"
+          supabase link --project-ref "${{ env.PROJECT_ID }}"
+          supabase db push
 
       - name: Deploy all Edge Functions
         run: supabase functions deploy --project-ref ${{ env.PROJECT_ID }} --no-verify-jwt || true
