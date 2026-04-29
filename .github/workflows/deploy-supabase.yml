@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy Database Schema 
         env:
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         if: ${{ env.DB_PASSWORD != '' }}
         run: |
           PGPASSWORD=$DB_PASSWORD psql -h aws-0-eu-central-1.pooler.supabase.com -p 6543 -d postgres -U postgres.${{ env.PROJECT_ID }} << 'EOF'
