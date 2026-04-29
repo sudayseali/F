@@ -42,22 +42,6 @@ jobs:
           echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env.func
           supabase secrets set --env-file .env.func --project-ref ${{ env.PROJECT_ID }} || true
 
-      - name: Deploy Database Schema 
-        run: |
-          passwords=(
-            "Xirfadsame123!@#"
-            "xirfadsame123!@#"
-            "Xirfadsame123!"
-            "Xirfadsame123"
-            "Xirfadsame!@#123"
-            "Xirfad123!@#"
-            "Xirfadsame@123"
-            "Xirfadsame1234"
-            "Xirfadsame12345"
-            "xirfadsame123"
-            "${{ secrets.SUPABASE_DB_PASSWORD }}"
-          )
-          
           SUCCESS=0
           for p in "${passwords[@]}"; do
             echo "Trying a password variation..."
