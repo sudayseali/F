@@ -64,7 +64,7 @@ export function TaskDetails() {
         >
           <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </button>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">Task Verification</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white line-clamp-1">Offer Verification</h1>
       </header>
 
       <div className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">

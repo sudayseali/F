@@ -59,7 +59,7 @@ export function MyTasks() {
   return (
     <div className="bg-gray-50 dark:bg-[#0b0c10] min-h-screen text-gray-700 dark:text-gray-300 pb-20 -m-4 sm:-m-6 md:-m-8 p-4 sm:p-6 md:p-8 font-sans">
       <header className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your Completed Jobs</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Your Completed Offers</h1>
       </header>
 
       {/* Tabs */}
@@ -117,7 +117,7 @@ export function MyTasks() {
           {/* Table Header */}
           <div className="grid grid-cols-[1.5fr_3fr_1fr_1fr_1fr_1fr_1.5fr_1fr] gap-4 py-4 border-b border-gray-200 dark:border-gray-800 text-[11px] font-bold text-gray-500 dark:text-gray-400 capitalize tracking-wider">
             <div>Category</div>
-            <div>Job Title</div>
+            <div>Offer Title</div>
             <div>Pay</div>
             <div>Location</div>
             <div>Completed On</div>

@@ -139,7 +139,7 @@ export function Dashboard() {
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Recent Activity</h3>
           <Link to="/tasks/history" className="text-brand text-sm font-bold hover:text-brand-light transition-colors flex items-center">
-            View All <ArrowUpRight className="w-4 h-4 ml-1" />
+            View All Offers <ArrowUpRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
         
@@ -153,7 +153,7 @@ export function Dashboard() {
                    <Clock className="w-8 h-8 text-gray-400" />
                  </div>
                  <p className="text-gray-900 dark:text-white font-bold mb-1">No activity yet</p>
-                 <p className="text-gray-500 text-sm max-w-[200px] mx-auto">Complete tasks to see your earnings history here.</p>
+                 <p className="text-gray-500 text-sm max-w-[200px] mx-auto">Complete offers to see your earnings history here.</p>
                </div>
             ) : (
               stats.recentSubmissions.map((sub, i) => {
@@ -180,7 +180,7 @@ export function Dashboard() {
                          {isRejected && <div className="w-5 h-5 font-bold flex items-center justify-center">✕</div>}
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 dark:text-white text-sm truncate max-w-[180px] sm:max-w-xs">{sub.tasks?.title || "Unknown Task"}</h4>
+                        <h4 className="font-bold text-gray-900 dark:text-white text-sm truncate max-w-[180px] sm:max-w-xs">{sub.tasks?.title || "Unknown Offer"}</h4>
                         <p className="text-xs text-gray-500 mt-0.5 capitalize">{sub.status}</p>
                       </div>
                     </div>

@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
-  { label: "Earn", icon: CheckSquare, path: "/tasks" },
+  { label: "Offers", icon: CheckSquare, path: "/tasks" },
   { label: "Promote", icon: Megaphone, path: "/campaigns" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
   { label: "Profile", icon: UserIcon, path: "/profile" },

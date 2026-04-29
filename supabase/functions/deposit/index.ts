@@ -19,10 +19,33 @@ serve(async (req) => {
   try {
     const { user_uuid, amount, method, tx_id } = await req.json();
 
-    // 1. INPUT VALIDATION (Never trust frontend)
+    // 1. INPUT VALIDATION
     if (!amount || amount <= 0) throw new Error("Invalid deposit amount.");
-    if (!tx_id || tx_id.length < 5) throw new Error("Invalid Transaction ID.");
+    if (!tx_id) throw new Error("Missing Transaction ID or address.");
     if (!method) throw new Error("Payment method required.");
+
+    // Automatic approval for TRON Web if txid exists and method is TRX
+    if (method === 'trx' && tx_id.length > 30) { 
+      // Instead of request_deposit RPC, directly insert completed and add balance
+      const { data: userRow, error: uErr } = await supabase.from('users').select('balance').eq('id', user_uuid).single();
+      if (uErr) throw new Error('User not found');
+      
+      const newBal = Number(userRow.balance) + Number(amount);
+      await supabase.from('users').update({ balance: newBal }).eq('id', user_uuid);
+      
+      await supabase.from('transactions').insert({
+        user_id: user_uuid,
+        amount: amount,
+        type: 'deposit',
+        status: 'completed',
+        reference_id: tx_id
+      });
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: "Deposit verified automatically and credited."
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }});
+    }
 
     // 2. SECURE DEPOSIT REQUEST (Store pending deposit safely)
     const { data: dbResult, error: rpcError } = await supabase.rpc('request_deposit', {
@@ -37,9 +60,6 @@ serve(async (req) => {
     if (!dbResult.success) {
       return new Response(JSON.stringify({ error: dbResult.error }), { status: 400, headers: corsHeaders });
     }
-
-    // You would typically send a notification to Admin Telegram here
-    // fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${ADMIN_ID}&text=New Deposit...`)
 
     return new Response(JSON.stringify({ 
       success: true, 

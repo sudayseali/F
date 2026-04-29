@@ -107,9 +107,9 @@ export function Tasks() {
   return (
     <div className="space-y-8 pb-10">
       <header className="mb-8">
-        <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white tracking-tight mb-2">Explore Tasks</h1>
+        <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white tracking-tight mb-2">Explore Offers</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-lg">
-          We've detected your location. Only tasks available in your region are displayed.
+          We've detected your location. Only offers available in your region are displayed.
           <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 dark:border-gray-600 text-[10px] ml-1 opacity-70">i</span>
         </p>
       </header>
@@ -159,7 +159,7 @@ export function Tasks() {
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks..." 
+            placeholder="Search offers..." 
             className="w-full glass-panel border border-gray-200/50 dark:border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900 dark:text-white placeholder:text-gray-400 relative z-0 transition-all shadow-sm"
           />
         </div>
@@ -219,12 +219,12 @@ export function Tasks() {
       <AnimatePresence mode="popLayout">
         {loading ? (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-20 glass-panel rounded-[2rem]">
-            <p className="text-gray-500 font-medium animate-pulse">Loading tasks...</p>
+            <p className="text-gray-500 font-medium animate-pulse">Loading offers...</p>
           </motion.div>
         ) : filteredJobs.length === 0 ? (
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-20 glass-panel rounded-[2rem] flex flex-col items-center">
             <Filter className="w-12 h-12 text-gray-400 mb-4" />
-            <p className="text-gray-900 dark:text-white font-bold text-lg mb-1">No tasks found</p>
+            <p className="text-gray-900 dark:text-white font-bold text-lg mb-1">No offers found</p>
             <p className="text-gray-500 text-sm">Try adjusting your filters or search query.</p>
           </motion.div>
         ) : (

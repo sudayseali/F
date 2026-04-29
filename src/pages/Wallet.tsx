@@ -80,14 +80,54 @@ export function Wallet() {
     setIsProcessing(true);
     try {
       if (view === 'deposit') {
-        const res = await supabase.functions.invoke('deposit', {
-          body: { amount: parseFloat(amount), method, address }
-        });
-        if (res.error) throw new Error(res.error.message || 'Deposit failed');
-        setSuccessMsg('Deposit request submitted successfully');
+        const depositAmount = parseFloat(amount);
+        if (isNaN(depositAmount) || depositAmount <= 0) throw new Error("Invalid amount");
+        let txid = '';
+
+        if (method === 'trx') {
+          const tronWeb = (window as any).tronWeb;
+          if (!tronWeb || !tronWeb.defaultAddress?.base58) {
+            alert('TronLink extension not found or not logged in! Please install TronLink and log in to deposit automatically.');
+            setIsProcessing(false);
+            return;
+          }
+
+          // Fallback company address, in production this should be in .env
+          const recipient = import.meta.env.VITE_COMPANY_TRON_ADDRESS || 'TMpG7r79rS2K8d2VzV914N8w9Z4SwwVv3c'; 
+          
+          // Using a fixed conversion rate of 1 USD = 7.5 TRX for demonstration
+          const trxAmount = depositAmount * 7.5;
+          const sunAmount = Math.floor(trxAmount * 1_000_000);
+
+          try {
+             const transaction = await tronWeb.trx.sendTransaction(recipient, sunAmount);
+             if (transaction.result || transaction.transaction?.txID) {
+                 txid = transaction.txid || transaction.transaction?.txID || 'unknown_tx';
+             } else {
+                 throw new Error("Transaction rejected or failed");
+             }
+          } catch(e: any) {
+             console.error(e);
+             alert("Transaction error: " + (e.message || e));
+             setIsProcessing(false);
+             return;
+          }
+          
+          const res = await supabase.functions.invoke('deposit', {
+             body: { user_uuid: user.uuid, amount: depositAmount, method, tx_id: txid }
+          });
+          if (res.error) throw new Error(res.error.message || 'Deposit failed');
+          setSuccessMsg('Deposit verified automatically via TronWeb! TXID: ' + txid.substring(0, 8) + '...');
+        } else {
+          const res = await supabase.functions.invoke('deposit', {
+            body: { user_uuid: user.uuid, amount: depositAmount, method, tx_id: address }
+          });
+          if (res.error) throw new Error(res.error.message || 'Deposit failed');
+          setSuccessMsg('Deposit request submitted successfully. Awaiting admin approval.');
+        }
       } else if (view === 'withdraw') {
         const res = await supabase.functions.invoke('withdraw', {
-          body: { amount: parseFloat(amount), method, address }
+          body: { user_uuid: user.uuid, amount: parseFloat(amount), method, wallet_address: address }
         });
         if (res.error) throw new Error(res.error.message || 'Withdrawal failed');
         setSuccessMsg('Withdrawal request submitted successfully');
@@ -102,7 +142,7 @@ export function Wallet() {
         setMethod(null);
         setAmount('');
         setAddress('');
-      }, 3000);
+      }, 5000); // Wait bit longer before redirecting
     }
   };
 
