@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Wallet, User as UserIcon, Shield, Megaphone, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Wallet, User as UserIcon, Shield, Sun, Moon } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { Logo } from "./Logo";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
@@ -42,13 +43,26 @@ export function Navigation() {
 
   return (
     <>
-      {/* Mobile Dark Mode Floating Toggle */}
-      <button 
-        onClick={() => setIsDark(!isDark)}
-        className="md:hidden fixed top-4 right-4 z-50 p-2.5 rounded-full glass-panel text-brand hover-lift"
-      >
-        {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-      </button>
+      {/* Mobile Top Bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 glass-panel z-40 border-b border-zinc-200/50 dark:border-white/5 flex items-center justify-between px-4">
+        <div className="flex items-center space-x-2">
+          <Logo className="w-8 h-8" />
+          <span className="text-xl font-display font-bold gradient-text">Payvora</span>
+        </div>
+        <button 
+          onClick={() => setIsDark(!isDark)}
+          className="p-2.5 rounded-full bg-white/50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-brand hover-lift"
+        >
+          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </div>
+
+      {/* Main content needs padding due to fixed mobile top bar */}
+      <style>{`
+        @media (max-width: 768px) {
+          main { padding-top: 5rem; }
+        }
+      `}</style>
 
       {/* Mobile Bottom Navigation - Floating Glass Dock */}
       <nav className="md:hidden fixed bottom-4 left-4 right-4 rounded-2xl glass-panel pb-safe z-50 grid items-center px-2 py-2">
@@ -84,9 +98,12 @@ export function Navigation() {
       {/* Desktop Sidebar - Glass Panel */}
       <aside className="hidden md:flex flex-col w-72 h-screen fixed left-0 top-0 glass-panel border-r-0 border-r-zinc-200/50 dark:border-r-white/5">
         <div className="p-8 flex items-center justify-between">
-          <h1 className="text-3xl font-display font-bold gradient-text tracking-tight">
-            Payvora
-          </h1>
+          <div className="flex items-center space-x-3">
+            <Logo className="w-8 h-8" />
+            <h1 className="text-3xl font-display font-bold gradient-text tracking-tight">
+              Payvora
+            </h1>
+          </div>
           <button 
             onClick={() => setIsDark(!isDark)}
             className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 hover:text-brand transition-colors"
