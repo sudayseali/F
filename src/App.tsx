@@ -9,12 +9,9 @@ import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { Tasks } from "./pages/Tasks";
 import { TaskDetails } from "./pages/TaskDetails";
-import { CreateTask } from "./pages/CreateTask";
 import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
 import { Admin } from "./pages/Admin";
-import { MyCampaigns } from "./pages/MyCampaigns";
-import { ReviewSubmissions } from "./pages/ReviewSubmissions";
 import { MyTasks } from "./pages/MyTasks";
 import { Profile } from "./pages/Profile";
 import { TelegramProvider } from "./contexts/TelegramContext";
@@ -36,10 +33,7 @@ export default function App() {
               <Route index element={<Dashboard />} />
               <Route path="tasks" element={<Tasks />} />
               <Route path="tasks/history" element={<MyTasks />} />
-              <Route path="tasks/create" element={<CreateTask />} />
               <Route path="tasks/:id" element={<TaskDetails />} />
-              <Route path="campaigns" element={<MyCampaigns />} />
-              <Route path="campaigns/:id/review" element={<ReviewSubmissions />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="profile" element={<Profile />} />
               <Route path="referrals" element={<Referrals />} />

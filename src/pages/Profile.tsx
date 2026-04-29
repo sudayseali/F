@@ -48,8 +48,8 @@ export function Profile() {
               <History className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 dark:text-white">Task History</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">View tasks you've completed</p>
+              <h3 className="font-bold text-gray-900 dark:text-white">Offer History</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">View offers you've completed</p>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-400" />

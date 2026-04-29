@@ -46,7 +46,7 @@ export function Referrals() {
   };
 
   const shareToTelegram = () => {
-    const text = "Join me on Payvora and earn money completing simple tasks!";
+    const text = "Join me on Payvora and earn money completing simple offers!";
     const url = `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(text)}`;
     
     // Use Telegram WebApp API if available, otherwise fallback to web link

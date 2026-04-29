@@ -12,7 +12,7 @@ type TabType = 'overview' | 'users' | 'tasks' | 'submissions' | 'disputes' | 'wi
 const TABS: { id: TabType; label: string; icon: any }[] = [
   { id: 'overview', label: 'Overview', icon: Activity },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'tasks', label: 'Live Tasks', icon: CheckSquare },
+  { id: 'tasks', label: 'Live Offers', icon: CheckSquare },
   { id: 'submissions', label: 'Flagged Submissions', icon: CheckCircle },
   { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
   { id: 'withdrawals', label: 'Withdrawals', icon: ArrowDownLeft },
@@ -177,7 +177,7 @@ export function Admin() {
               <div className="bg-white dark:bg-[#111218] p-5 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-center space-x-3 mb-3 text-gray-500 dark:text-gray-400">
                   <CheckSquare className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Active Tasks</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">Active Offers</span>
                 </div>
                 <p className="text-3xl font-black text-amber-500">{adminData.stats?.activeTasks || 0}</p>
                 <div className="mt-2 text-[10px] text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full inline-block">{adminData.tasks?.filter((t: any) => t.status === 'pending').length || 0} Pending Approval</div>
@@ -259,15 +259,15 @@ export function Admin() {
           {activeTab === 'tasks' && (
             <div className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#0b0c10]">
-                <h3 className="font-bold text-gray-900 dark:text-white">Live & Pending Tasks</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Review new campaigns before they go live on the platform.</p>
+                <h3 className="font-bold text-gray-900 dark:text-white">Live & Pending Offers</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Review new offers before they go live on the platform.</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
                 {adminData?.tasks?.map((task: any) => (
                   <div key={task.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <h4 className="font-bold text-gray-900 dark:text-white">Task: {task.title}</h4>
+                        <h4 className="font-bold text-gray-900 dark:text-white">Offer: {task.title}</h4>
                         {task.status === 'pending' ? (
                           <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-500 text-[10px] font-bold rounded-full uppercase">Needs Approval</span>
                         ) : (
@@ -275,8 +275,6 @@ export function Admin() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center space-x-3 text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        <span>Adv ID: {task.advertiser_id?.slice(0,8)}...</span>
-                        <span>•</span>
                         <span>Reward: ${task.reward}</span>
                         <span>•</span>
                         <span>Slots: {task.current_completions}/{task.max_completions}</span>
@@ -301,7 +299,7 @@ export function Admin() {
           {activeTab === 'submissions' && (
             <div className="bg-white dark:bg-[#111218] rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-[#0b0c10]">
-                <h3 className="font-bold text-gray-900 dark:text-white">Task Submissions (System Flags)</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white">Offer Submissions (System Flags)</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Verify user proofs that were flagged for manual admin review.</p>
               </div>
               <div className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -316,7 +314,7 @@ export function Admin() {
                          )}
                       </div>
                       <div>
-                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">Task: {sub.task?.title}</h4>
+                        <h4 className="font-bold text-gray-900 dark:text-white text-sm">Offer: {sub.task?.title}</h4>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Worker: <span className="font-semibold text-gray-700 dark:text-gray-300">@{sub.worker?.username || 'unknown'}</span></p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">IP: <span className="font-mono">{sub.ip_address || 'hidden'}</span></p>
                         <div className="mt-2 bg-gray-50 dark:bg-[#0b0c10] p-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-300">
@@ -356,7 +354,7 @@ export function Admin() {
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <h4 className="font-bold text-gray-900 dark:text-white text-sm">Task: Sign up for Newsletter</h4>
+                          <h4 className="font-bold text-gray-900 dark:text-white text-sm">Offer: Sign up for Newsletter</h4>
                           <span className="px-2 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-500 text-[10px] font-bold rounded-full">ACTION REQ</span>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-col space-y-1">

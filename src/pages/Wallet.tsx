@@ -220,7 +220,7 @@ export function Wallet() {
                     className="w-full px-4 py-2.5 glass-panel rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand appearance-none"
                   >
                     <option value="all">All Transactions</option>
-                    <option value="reward">Task Rewards</option>
+                    <option value="reward">Offer Rewards</option>
                     <option value="withdrawal">Withdrawals</option>
                     <option value="deposit">Deposits</option>
                   </select>
@@ -256,7 +256,7 @@ export function Wallet() {
                        <History className="w-8 h-8 text-gray-400" />
                      </div>
                      <p className="text-gray-900 dark:text-white font-bold mb-1">No transactions found</p>
-                     <p className="text-gray-500 text-sm max-w-[200px] mx-auto">Try adjusting your filters or complete more tasks.</p>
+                     <p className="text-gray-500 text-sm max-w-[200px] mx-auto">Try adjusting your filters or complete more offers.</p>
                   </div>
                 ) : (
                   filteredTransactions.map((tx) => {
