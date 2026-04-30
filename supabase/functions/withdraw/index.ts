@@ -22,7 +22,7 @@ serve(async (req) => {
 
     // 1. INPUT VALIDATION (Never trust frontend!)
     if (!amount || amount <= 0) throw new Error("Invalid withdrawal amount.");
-    if (!wallet_address || wallet_address.length < 10) throw new Error("Invalid wallet address.");
+    if (!wallet_address || wallet_address.length < 5) throw new Error("Invalid wallet address or phone number.");
     
     // 2. CALL SECURE DATABASE RPC
     // By calling an RPC, we execute the 'lock row' logic inside PostgreSQL,

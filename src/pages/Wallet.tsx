@@ -5,7 +5,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 
 type ViewType = 'main' | 'withdraw';
-type PaymentMethod = 'payeer' | 'usdt' | 'trx' | 'ton' | null;
+type PaymentMethod = 'payeer' | 'trx' | 'zaad' | null;
 
 export function Wallet() {
   const { user } = useTelegram();
@@ -262,16 +262,16 @@ export function Wallet() {
                 <div>
                   <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-widest ml-2">Select Method</h3>
                   <div className="grid gap-3">
-                    <div onClick={() => selectMethod('usdt')} className={`glass-panel border border-transparent rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover-lift ${method === 'usdt' ? '!border-brand bg-brand/5 dark:bg-brand/10' : 'hover:border-brand/30'}`}>
+                    <div onClick={() => selectMethod('payeer')} className={`glass-panel border border-transparent rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover-lift ${method === 'payeer' ? '!border-brand bg-brand/5 dark:bg-brand/10' : 'hover:border-brand/30'}`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-500 font-bold text-lg">₮</div>
+                        <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center text-sky-500 font-bold text-2xl pr-1">P</div>
                         <div>
-                          <h4 className="font-bold text-gray-900 dark:text-white">USDT (TRC20)</h4>
-                          <p className="text-xs text-gray-500 mt-1">Tether USD • Fee $1.00</p>
+                          <h4 className="font-bold text-gray-900 dark:text-white">Payeer</h4>
+                          <p className="text-xs text-gray-500 mt-1">Instant • Fee 0.5%</p>
                         </div>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${method === 'usdt' ? 'border-brand' : 'border-gray-300 dark:border-gray-700'}`}>
-                        {method === 'usdt' && <div className="w-3 h-3 bg-brand rounded-full"></div>}
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${method === 'payeer' ? 'border-brand' : 'border-gray-300 dark:border-gray-700'}`}>
+                        {method === 'payeer' && <div className="w-3 h-3 bg-brand rounded-full"></div>}
                       </div>
                     </div>
 
@@ -288,29 +288,16 @@ export function Wallet() {
                       </div>
                     </div>
 
-                    <div onClick={() => selectMethod('ton')} className={`glass-panel border border-transparent rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover-lift ${method === 'ton' ? '!border-brand bg-brand/5 dark:bg-brand/10' : 'hover:border-brand/30'}`}>
+                    <div onClick={() => selectMethod('zaad')} className={`glass-panel border border-transparent rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover-lift ${method === 'zaad' ? '!border-brand bg-brand/5 dark:bg-brand/10' : 'hover:border-brand/30'}`}>
                       <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 font-bold text-xl">💎</div>
+                        <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center text-green-500 font-bold text-xl px-1">Z</div>
                         <div>
-                          <h4 className="font-bold text-gray-900 dark:text-white">The Open Network (TON)</h4>
-                          <p className="text-xs text-gray-500 mt-1">TON Network • Free</p>
+                          <h4 className="font-bold text-gray-900 dark:text-white">Zaad Service</h4>
+                          <p className="text-xs text-gray-500 mt-1">Mobile Money • Somaliland</p>
                         </div>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${method === 'ton' ? 'border-brand' : 'border-gray-300 dark:border-gray-700'}`}>
-                        {method === 'ton' && <div className="w-3 h-3 bg-brand rounded-full"></div>}
-                      </div>
-                    </div>
-
-                    <div onClick={() => selectMethod('payeer')} className={`glass-panel border border-transparent rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all hover-lift ${method === 'payeer' ? '!border-brand bg-brand/5 dark:bg-brand/10' : 'hover:border-brand/30'}`}>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-sky-500/10 rounded-full flex items-center justify-center text-sky-500 font-bold text-2xl pr-1">P</div>
-                        <div>
-                          <h4 className="font-bold text-gray-900 dark:text-white">Payeer</h4>
-                          <p className="text-xs text-gray-500 mt-1">Instant • Fee 0.5%</p>
-                        </div>
-                      </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${method === 'payeer' ? 'border-brand' : 'border-gray-300 dark:border-gray-700'}`}>
-                        {method === 'payeer' && <div className="w-3 h-3 bg-brand rounded-full"></div>}
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${method === 'zaad' ? 'border-brand' : 'border-gray-300 dark:border-gray-700'}`}>
+                        {method === 'zaad' && <div className="w-3 h-3 bg-brand rounded-full"></div>}
                       </div>
                     </div>
                   </div>
@@ -339,14 +326,14 @@ export function Wallet() {
                     {view === 'withdraw' && (
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2 ml-1">
-                          {method === 'payeer' ? 'Payeer Account (e.g., P1000000)' : method === 'ton' ? 'TON Wallet Address' : `${method.toUpperCase()} Wallet Address`}
+                          {method === 'payeer' ? 'Payeer Account (e.g., P1000000)' : method === 'zaad' ? 'Zaad Number' : `${method.toUpperCase()} Wallet Address`}
                         </label>
                         <input 
                           type="text" 
                           required
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
-                          placeholder={method === 'payeer' ? 'P...' : method === 'ton' ? 'EQ...' : 'T...'}
+                          placeholder={method === 'payeer' ? 'P...' : method === 'zaad' ? 'e.g., 063...' : 'T...'}
                           className="w-full px-5 py-4 rounded-xl glass-panel text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand font-mono text-sm transition-all"
                         />
                       </div>
