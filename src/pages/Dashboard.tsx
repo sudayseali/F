@@ -171,6 +171,24 @@ export function Dashboard() {
         </div>
       </motion.div>
 
+      {/* Offerwall CTA */}
+      <motion.div variants={itemVariants} className="premium-card bg-brand/5 border-brand/20 !p-10 group overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-12 opacity-5 mix-blend-overlay pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+          <TrendingUp className="w-48 h-48 -rotate-12 text-white" />
+        </div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+          <div className="max-w-xl text-center md:text-left">
+            <h3 className="text-3xl font-display font-bold text-white mb-4">Scale Your Rewards</h3>
+            <p className="text-slate-400 text-base leading-relaxed">
+              Integrate your account with our global partner networks. Access high-priority tasks and exclusive bounty operations in the Global Offerwall.
+            </p>
+          </div>
+          <Link to="/offerwall" className="btn-primary !px-12 !py-5 whitespace-nowrap shadow-2xl">
+            Open Global Offerwall
+          </Link>
+        </div>
+      </motion.div>
+
     </motion.div>
   );
 }

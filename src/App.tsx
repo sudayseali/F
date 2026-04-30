@@ -13,9 +13,10 @@ import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
 import { Admin } from "./pages/Admin";
 import { Profile } from "./pages/Profile";
+import { Offerwall } from "./pages/Offerwall";
 import { TelegramProvider } from "./contexts/TelegramContext";
 import { SplashScreen } from "./components/SplashScreen";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "motion/react";
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="tasks" element={<Tasks />} />
+              <Route path="offerwall" element={<Offerwall />} />
               <Route path="tasks/:id" element={<TaskDetails />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="profile" element={<Profile />} />

@@ -1,14 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Wallet, User as UserIcon, Shield, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Shield, Sun, Moon } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Logo } from "./Logo";
 
 const baseNavItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
   { label: "Offers", icon: CheckSquare, path: "/tasks" },
+  { label: "Offerwall", icon: Layers, path: "/offerwall" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
   { label: "Profile", icon: UserIcon, path: "/profile" },
 ];
