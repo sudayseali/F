@@ -41,7 +41,7 @@ A modern platform where you can complete various tasks and invite friends to ear
                 {
                   text: "🚀 Start Now (Open App)",
                   web_app: {
-                    url: Deno.env.get("FRONTEND_URL") || "https://sudayse.vercel.app/"
+                    url: Deno.env.get("FRONTEND_URL") || "https://payvora-tan.vercel.app/"
                   }
                 }
               ],
