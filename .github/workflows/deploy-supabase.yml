@@ -43,45 +43,11 @@ jobs:
           supabase secrets set --env-file .env.func --project-ref ${{ env.PROJECT_ID }} || true
 
       - name: Deploy Database Schema 
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          passwords=(
-            "Xirfadsame123!@#"
-            "xirfadsame123!@#"
-            "Xirfadsame123!"
-            "Xirfadsame123"
-            "Xirfadsame!@#123"
-            "Xirfad123!@#"
-            "Xirfadsame@123"
-            "Xirfadsame1234"
-            "Xirfadsame12345"
-            "xirfadsame123"
-            "${{ secrets.SUPABASE_DB_PASSWORD }}"
-          )
-          
-          SUCCESS=0
-          for p in "${passwords[@]}"; do
-            echo "Trying a password variation..."
-            export SUPABASE_DB_PASSWORD="$p"
-            if supabase link --project-ref "${{ env.PROJECT_ID }}" -p "$p"; then
-              if supabase db push -p "$p"; then
-                echo "============================================="
-                echo "SUCCESS! The correct password is: $p"
-                echo "NOTE: Fadlan password-ka saxda ah ku xafid Github Secrets (SUPABASE_DB_PASSWORD)"
-                echo "============================================="
-                SUCCESS=1
-                break
-              fi
-            fi
-          done
-          
-          if [ $SUCCESS -eq 0 ]; then
-            echo "============================================="
-            echo "Dhammaan password-yadii waa ay fashilmeen."
-            echo "Fadlan dib ugu noqo Supabase Dashboard -> Project Settings -> Database -> Database Password"
-            echo "Kaddib samee 'Reset Password' oo password cusub daji."
-            echo "============================================="
-            exit 1
-          fi
+          supabase link --project-ref "${{ env.PROJECT_ID }}"
+          supabase db push
 
       - name: Deploy all Edge Functions
         run: supabase functions deploy --project-ref ${{ env.PROJECT_ID }} --no-verify-jwt || true
