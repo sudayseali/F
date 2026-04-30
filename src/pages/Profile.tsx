@@ -40,22 +40,6 @@ export function Profile() {
 
       <div className="space-y-3">
         <div 
-          onClick={() => navigate("/tasks/history")}
-          className="bg-white dark:bg-[#111218] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between cursor-pointer hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
-        >
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center border border-amber-500/20">
-              <History className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900 dark:text-white">Offer History</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">View offers you've completed</p>
-            </div>
-          </div>
-          <ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-        </div>
-
-        <div 
           onClick={() => navigate("/referrals")}
           className="bg-white dark:bg-[#111218] p-4 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between cursor-pointer hover:border-gray-300 dark:hover:border-gray-700 transition-colors"
         >

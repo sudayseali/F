@@ -12,7 +12,6 @@ import { TaskDetails } from "./pages/TaskDetails";
 import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
 import { Admin } from "./pages/Admin";
-import { MyTasks } from "./pages/MyTasks";
 import { Profile } from "./pages/Profile";
 import { TelegramProvider } from "./contexts/TelegramContext";
 import { SplashScreen } from "./components/SplashScreen";
@@ -32,7 +31,6 @@ export default function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="tasks" element={<Tasks />} />
-              <Route path="tasks/history" element={<MyTasks />} />
               <Route path="tasks/:id" element={<TaskDetails />} />
               <Route path="wallet" element={<Wallet />} />
               <Route path="profile" element={<Profile />} />
