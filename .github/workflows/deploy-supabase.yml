@@ -32,6 +32,10 @@ jobs:
             echo "Error: SUPABASE_DB_PASSWORD secret is missing or empty."
             exit 1
           fi
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+            echo "Error: SUPABASE_ACCESS_TOKEN secret is missing or empty."
+            exit 1
+          fi
 
       - name: Set Supabase Secrets
         run: |
@@ -46,8 +50,8 @@ jobs:
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase link --project-ref "${{ env.PROJECT_ID }}"
-          supabase db push
+          supabase link --project-ref "${{ env.PROJECT_ID }}" -p "$SUPABASE_DB_PASSWORD"
+          supabase db push -p "$SUPABASE_DB_PASSWORD"
 
       - name: Deploy all Edge Functions
         run: supabase functions deploy --project-ref ${{ env.PROJECT_ID }} --no-verify-jwt || true
