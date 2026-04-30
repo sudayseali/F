@@ -184,21 +184,21 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
   if (!isReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#020617] text-slate-200">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
       </div>
     );
   }
 
   if (isVpnBlock) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center font-sans">
-        <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-sm">
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#020617] text-center">
+        <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mb-8 border border-red-500/20">
           <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">VPN Detected</h1>
-        <p className="text-gray-500 max-w-sm mb-6">
-          You are using a VPN or Proxy. To access campaigns targeted to your real location and prevent fraud, please disable your VPN and reload the platform.
+        <h1 className="text-3xl font-display font-bold text-white mb-3">Security Restriction</h1>
+        <p className="text-slate-400 max-w-sm mb-6">
+          Access denied due to VPN or Proxy detection. Please use your native connection to continue.
         </p>
       </div>
     );
@@ -206,19 +206,19 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50 text-center font-sans">
-        <div className="w-20 h-20 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mb-6 shadow-sm">
-          <svg className="w-10 h-10 ml-[-2px]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.84 1.15-5.06 3.28-.47.33-.89.49-1.27.48-.41-.01-1.21-.24-1.8-.43-.49-.16-.88-.24-.85-.51.02-.14.22-.29.62-.46 2.44-1.06 4.07-1.74 4.88-2.07 2.32-.97 2.8-1.14 3.12-1.15.07 0 .22.02.3.09.07.06.09.14.1.23-.01.07-.01.12-.02.21z"/></svg>
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[#020617] text-center">
+        <div className="w-24 h-24 bg-brand/10 text-brand rounded-[2rem] flex items-center justify-center mb-10 border border-brand/20 shadow-2xl">
+          <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.84 1.15-5.06 3.28-.47.33-.89.49-1.27.48-.41-.01-1.21-.24-1.8-.43-.49-.16-.88-.24-.85-.51.02-.14.22-.29.62-.46 2.44-1.06 4.07-1.74 4.88-2.07 2.32-.97 2.8-1.14 3.12-1.15.07 0 .22.02.3.09.07.06.09.14.1.23-.01.07-.01.12-.02.21z"/></svg>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Telegram Only</h1>
-        <p className="text-gray-500 max-w-sm mb-6">
-          This platform is exclusively designed for Telegram. Please open it via the official Telegram Mini App bot.
+        <h1 className="text-3xl font-display font-bold text-white mb-4 tracking-tight">Telegram Infrastructure</h1>
+        <p className="text-slate-400 max-w-sm mb-10 text-balance">
+          Payvora is built on the Telegram Open Network. Please launch the application through the official portal.
         </p>
         <button 
           onClick={() => window.location.href = '?debug=1'} 
-          className="text-xs text-gray-400 hover:text-gray-600 underline"
+          className="px-8 py-4 bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white rounded-2xl transition-all border border-white/5 font-bold text-sm tracking-widest"
         >
-          Developer: Preview with Mock User
+          AUTHENTICATE AS MOCK USER
         </button>
       </div>
     );

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Search, Filter, ChevronDown, Pin, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
 
@@ -192,31 +192,33 @@ export function Tasks() {
       </div>
 
       <div className="lg:hidden mb-6 relative">
-          <label className="absolute -top-2.5 left-4 z-10 bg-[#f8fafc] dark:bg-[#09090b] px-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Category</label>
+          <label className="absolute -top-2.5 left-4 z-10 bg-[#020617] px-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Category</label>
           <select 
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full glass-panel border border-gray-200/50 dark:border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent appearance-none text-gray-900 dark:text-white shadow-sm font-medium"
+            className="w-full bg-slate-900 border border-white/5 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand/50 appearance-none text-slate-300 shadow-inner font-medium"
           >
             <option value="all">All Categories</option>
             {categories.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
       </div>
 
       {/* Tasks Grid */}
       <AnimatePresence mode="popLayout">
         {loading ? (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-20 glass-panel rounded-[2rem]">
-            <p className="text-gray-500 font-medium animate-pulse">Loading offers...</p>
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-20 premium-card !p-12 border-white/5">
+            <p className="text-slate-400 font-bold uppercase tracking-[0.2em] animate-pulse">Synchronizing Jobs...</p>
           </motion.div>
         ) : filteredJobs.length === 0 ? (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-20 glass-panel rounded-[2rem] flex flex-col items-center">
-            <Filter className="w-12 h-12 text-gray-400 mb-4" />
-            <p className="text-gray-900 dark:text-white font-bold text-lg mb-1">No offers found</p>
-            <p className="text-gray-500 text-sm">Try adjusting your filters or search query.</p>
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-24 premium-card border-white/5 flex flex-col items-center">
+            <div className="p-6 bg-slate-900 rounded-full mb-6 border border-white/5">
+              <Filter className="w-12 h-12 text-slate-600" />
+            </div>
+            <p className="text-white font-bold text-2xl mb-2">Filters Exhausted</p>
+            <p className="text-slate-500 text-sm max-w-xs line-height-relaxed mx-auto text-balance">We couldn't find any contracts matching your current parameters. Try a broader search.</p>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

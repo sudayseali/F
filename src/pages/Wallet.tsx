@@ -1,6 +1,6 @@
 import { ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Filter } from "lucide-react";
 import React, { useState, useMemo, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 

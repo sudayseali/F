@@ -1,6 +1,6 @@
-import { ArrowUpRight, TrendingUp, CheckCircle, Clock } from "lucide-react";
+import { ArrowUpRight, TrendingUp, CheckCircle, Clock, Wallet } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { Link } from "react-router-dom";
@@ -61,8 +61,17 @@ export function Dashboard() {
         setLoading(false);
       }
     }
-    fetchStats();
-  }, [user?.uuid]);
+    if (user?.uuid !== undefined) {
+      fetchStats();
+    } else if (user) {
+      // If we have a user but no UUID yet (waiting for data), we still want to show something eventually
+      // but fetchStats will return early. We might want a smaller timeout if it hangs.
+      const timer = setTimeout(() => setLoading(false), 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setLoading(false);
+    }
+  }, [user?.uuid, user]);
 
   return (
     <motion.div 
