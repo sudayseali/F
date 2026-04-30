@@ -66,94 +66,124 @@ export function Dashboard() {
 
   return (
     <motion.div 
-      className="space-y-8"
+      className="space-y-10 pb-10"
       variants={containerVariants}
       initial="hidden"
       animate="show"
     >
-      <motion.header variants={itemVariants} className="flex justify-between items-end">
+      <motion.header variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-1 tracking-wide uppercase">Overview</p>
-          <h1 className="text-3xl font-display font-bold text-gray-900 dark:text-white tracking-tight">
+          <span className="text-brand font-bold text-[10px] uppercase tracking-[0.3em] mb-2 block">Enterprise Console</span>
+          <h1 className="text-4xl lg:text-5xl font-display font-bold text-white tracking-tighter">
             Hi, {displayName} <span className="inline-block animate-wave">👋</span>
           </h1>
         </div>
+        <div className="flex -space-x-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="w-10 h-10 rounded-full border-2 border-[#020617] bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">
+              {i === 4 ? "+12" : ""}
+            </div>
+          ))}
+          <div className="ml-4 pl-4 border-l border-white/5 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Rank</span>
+            <span className="text-sm font-bold text-emerald-500">Top 5%</span>
+          </div>
+        </div>
       </motion.header>
 
-      {/* Balance Card - Modern Glass Design */}
-      <motion.div variants={itemVariants} className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand to-brand-light p-[1px] shadow-2xl">
-        <div className="absolute inset-0 bg-white/20 dark:bg-black/20" />
-        <div className="relative h-full w-full rounded-[2rem] bg-gradient-to-br from-white/90 to-white/40 dark:from-zinc-900/90 dark:to-zinc-900/40 backdrop-blur-xl p-8 border border-white/20 dark:border-white/10">
+      {/* Balance Card - Ultra Premium */}
+      <motion.div variants={itemVariants} className="relative group perspective">
+        <div className="absolute -inset-1 bg-gradient-to-r from-brand/50 to-emerald-500/50 rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+        <div className="relative premium-card border-white/10 !p-10 flex flex-col lg:flex-row lg:items-center justify-between gap-10">
           
-          <div className="absolute top-0 right-0 p-8 opacity-10 mix-blend-overlay pointer-events-none">
-            <TrendingUp className="w-48 h-48 -rotate-12" />
+          <div className="absolute top-0 right-0 p-10 opacity-5 mix-blend-overlay pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+            <TrendingUp className="w-64 h-64 -rotate-12 text-white" />
           </div>
 
-          <div className="relative z-10 flex flex-col h-full justify-between">
-            <div>
-              <p className="text-brand-dark dark:text-brand-light text-sm font-bold uppercase tracking-widest mb-2">Total Balance</p>
-              <div className="flex items-baseline space-x-2">
-                <span className="text-5xl font-display font-black text-gray-900 dark:text-white tracking-tighter">
-                  ${balance.toFixed(2)}
-                </span>
-                <span className="text-xl font-medium text-gray-500">USD</span>
+          <div className="relative z-10 space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+                <Wallet className="w-5 h-5" />
               </div>
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">Portfolio Liquidity</p>
             </div>
-            
-            <div className="flex space-x-4 mt-8">
-              <Link to="/wallet" className="group relative w-full sm:w-auto bg-brand hover:bg-brand-light text-white px-8 py-3.5 rounded-2xl font-bold text-sm shadow-[0_0_40px_-10px_rgba(124,58,237,0.5)] transition-all flex items-center justify-center overflow-hidden">
-                <span className="relative z-10 flex items-center">
-                  Withdraw Funds
-                  <ArrowUpRight className="w-4 h-4 ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                </span>
-              </Link>
-              <Link to="/wallet" className="w-full sm:w-auto bg-white/50 hover:bg-white/80 dark:bg-white/5 dark:hover:bg-white/10 text-gray-900 dark:text-white px-8 py-3.5 rounded-2xl font-bold text-sm transition-all border border-gray-200/50 dark:border-white/10 flex items-center justify-center backdrop-blur-sm">
-                History
-              </Link>
+            <div className="flex items-baseline space-x-3">
+              <span className="text-6xl lg:text-7xl font-display font-bold text-white tracking-tighter">
+                ${balance.toFixed(2)}
+              </span>
+              <span className="text-2xl font-bold font-display text-slate-500 uppercase">USD</span>
             </div>
+            <div className="flex items-center space-x-2 text-emerald-500 bg-emerald-500/10 w-fit px-3 py-1 rounded-lg border border-emerald-500/20">
+              <TrendingUp className="w-3 h-3" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">+12.5% This Month</span>
+            </div>
+          </div>
+          
+          <div className="relative z-10 flex flex-col sm:flex-row gap-4">
+            <Link to="/wallet" className="btn-primary group !px-10 !py-5">
+              <span className="relative z-10 flex items-center text-base">
+                Withdrawal Console
+                <ArrowUpRight className="w-5 h-5 ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              </span>
+            </Link>
+            <Link to="/wallet" className="flex items-center justify-center px-10 py-5 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all border border-white/5 active:scale-95">
+              View Audit Log
+            </Link>
           </div>
         </div>
       </motion.div>
 
-      {/* Stats Grid - Glass Cards */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
-        <div className="glass-panel p-6 rounded-[2rem] flex flex-col items-center justify-center text-center group hover:-translate-y-1 transition-transform duration-300">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4 border border-emerald-500/20 group-hover:scale-110 transition-transform">
-            <CheckCircle className="w-7 h-7" />
+      {/* Stats Bento Grid */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="premium-card flex flex-row items-center justify-between group hover-lift border-white/5">
+          <div className="flex items-center space-x-6">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20 group-hover:rotate-12 transition-transform duration-500">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Contract Fulfilled</p>
+              <h4 className="text-4xl font-display font-bold text-white">{loading ? "-" : stats.completed}</h4>
+            </div>
           </div>
-          <p className="text-3xl font-display font-black text-gray-900 dark:text-white mb-1">{loading ? "-" : stats.completed}</p>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Completed</p>
+          <div className="w-12 h-1 bg-emerald-500/20 rounded-full" />
         </div>
         
-        <div className="glass-panel p-6 rounded-[2rem] flex flex-col items-center justify-center text-center group hover:-translate-y-1 transition-transform duration-300">
-          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4 border border-amber-500/20 group-hover:scale-110 transition-transform">
-            <Clock className="w-7 h-7" />
+        <div className="premium-card flex flex-row items-center justify-between group hover-lift border-white/5">
+          <div className="flex items-center space-x-6">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-500/20 group-hover:-rotate-12 transition-transform duration-500">
+              <Clock className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Pending Audit</p>
+              <h4 className="text-4xl font-display font-bold text-white">{loading ? "-" : stats.pending}</h4>
+            </div>
           </div>
-          <p className="text-3xl font-display font-black text-gray-900 dark:text-white mb-1">{loading ? "-" : stats.pending}</p>
-          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pending</p>
+          <div className="w-12 h-1 bg-amber-500/20 rounded-full" />
         </div>
       </motion.div>
 
-      {/* Recent Activity */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-display font-bold text-gray-900 dark:text-white">Recent Activity</h3>
-          <Link to="/tasks/history" className="text-brand text-sm font-bold hover:text-brand-light transition-colors flex items-center">
-            View All Offers <ArrowUpRight className="w-4 h-4 ml-1" />
+      {/* Activity Feed */}
+      <motion.div variants={itemVariants} className="space-y-6">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-2xl font-display font-bold text-white">Resource Stream</h3>
+          <Link to="/tasks" className="text-brand text-xs font-bold uppercase tracking-widest hover:text-brand-light transition-all flex items-center group">
+            Global Marketplace <ArrowUpRight className="w-4 h-4 ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
           </Link>
         </div>
         
-        <div className="glass-panel rounded-[2rem] overflow-hidden">
-          <div className="divide-y divide-gray-200/50 dark:divide-white/5 flex flex-col items-stretch">
+        <div className="premium-card !p-0 border-white/5 overflow-hidden">
+          <div className="divide-y divide-white/5 flex flex-col items-stretch">
             {loading ? (
-              <div className="p-8 text-center text-gray-500 animate-pulse">Loading activity...</div>
+              <div className="p-12 text-center text-slate-500 font-bold uppercase tracking-[0.2em] animate-pulse">Syncing Network...</div>
             ) : stats.recentSubmissions.length === 0 ? (
-               <div className="p-12 text-center flex flex-col items-center justify-center">
-                 <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center mb-4">
-                   <Clock className="w-8 h-8 text-gray-400" />
+               <div className="p-20 text-center flex flex-col items-center justify-center">
+                 <div className="w-20 h-20 rounded-[2rem] bg-slate-900 border border-white/5 flex items-center justify-center mb-6">
+                   <TrendingUp className="w-10 h-10 text-slate-700" />
                  </div>
-                 <p className="text-gray-900 dark:text-white font-bold mb-1">No activity yet</p>
-                 <p className="text-gray-500 text-sm max-w-[200px] mx-auto">Complete offers to see your earnings history here.</p>
+                 <p className="text-white font-bold text-xl mb-2">No Operations Found</p>
+                 <p className="text-slate-500 text-sm max-w-sm mx-auto line-height-relaxed">
+                   Initiate contract submissions in the marketplace to populate your operations ledger.
+                 </p>
                </div>
             ) : (
               stats.recentSubmissions.map((sub, i) => {
@@ -164,31 +194,39 @@ export function Dashboard() {
                 return (
                   <motion.div 
                     key={sub.id} 
-                    className="p-5 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                    className="p-8 flex items-center justify-between hover:bg-white/[0.03] transition-all group"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
+                    transition={{ delay: i * 0.1, duration: 0.5 }}
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isApproved ? 'bg-emerald-500/10 text-emerald-500' :
-                        isPending ? 'bg-amber-500/10 text-amber-500' :
-                        'bg-red-500/10 text-red-500'
+                    <div className="flex items-center space-x-6 overflow-hidden">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-500 ${
+                        isApproved ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 group-hover:bg-emerald-500/20' :
+                        isPending ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 group-hover:bg-amber-500/20' :
+                        'bg-red-500/10 text-red-500 border-red-500/20 group-hover:bg-red-500/20'
                       }`}>
-                         {isApproved && <CheckCircle className="w-5 h-5" />}
-                         {isPending && <Clock className="w-5 h-5" />}
-                         {isRejected && <div className="w-5 h-5 font-bold flex items-center justify-center">✕</div>}
+                         {isApproved && <CheckCircle className="w-6 h-6" />}
+                         {isPending && <Clock className="w-6 h-6" />}
+                         {isRejected && <div className="w-6 h-6 font-black flex items-center justify-center">✕</div>}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-gray-900 dark:text-white text-sm truncate max-w-[180px] sm:max-w-xs">{sub.tasks?.title || "Unknown Offer"}</h4>
-                        <p className="text-xs text-gray-500 mt-0.5 capitalize">{sub.status}</p>
+                      <div className="overflow-hidden">
+                        <h4 className="font-bold text-white text-base truncate mb-1 group-hover:text-brand transition-colors">{sub.tasks?.title || "Contract Operation"}</h4>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{new Date(sub.created_at).toLocaleDateString()}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isApproved ? 'bg-emerald-500' : isPending ? 'bg-amber-500' : 'bg-red-500'}`} />
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${isApproved ? 'text-emerald-500' : isPending ? 'text-amber-500' : 'text-red-500'}`}>
+                            {sub.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <span className={`font-display font-bold text-lg ${
-                      isApproved ? 'text-emerald-500' : 'text-gray-900 dark:text-white'
-                    }`}>
-                      {isApproved ? '+' : ''}${Number(sub.tasks?.reward || 0).toFixed(2)}
-                    </span>
+                    <div className="text-right shrink-0">
+                      <span className={`font-display font-bold text-2xl ${
+                        isApproved ? 'text-emerald-400' : 'text-slate-400'
+                      }`}>
+                        {isApproved ? '+' : ''}${Number(sub.tasks?.reward || 0).toFixed(2)}
+                      </span>
+                    </div>
                   </motion.div>
                 );
               })

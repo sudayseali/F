@@ -1,34 +1,44 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand: #7c3aed;
-  --color-brand-light: #8b5cf6;
-  --color-brand-dark: #6d28d9;
+  --color-brand: #3b82f6;
+  --color-brand-light: #60a5fa;
+  --color-brand-dark: #1d4ed8;
+  --color-surface: #0f172a;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   body {
-    @apply bg-[#f8fafc] dark:bg-[#09090b] text-gray-900 dark:text-gray-100 antialiased selection:bg-brand selection:text-white;
+    @apply bg-[#020617] text-slate-200 antialiased selection:bg-brand/30;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 
 .glass-panel {
-  @apply bg-white/70 dark:bg-zinc-900/40 backdrop-blur-xl border border-white/20 dark:border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)];
+  @apply bg-slate-900/40 backdrop-blur-2xl border border-white/5 shadow-2xl;
+}
+
+.premium-card {
+  @apply relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-800/50 to-slate-900/50 p-6 transition-all duration-500 hover:border-brand/40 hover:shadow-[0_0_40px_rgba(59,130,246,0.1)];
 }
 
 .gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-slate-500;
 }
 
 .hover-lift {
-  @apply transition-transform duration-300 ease-out hover:-translate-y-1 hover:shadow-lg;
+  @apply transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1.5 active:scale-95;
+}
+
+.btn-primary {
+  @apply relative flex items-center justify-center px-6 py-4 bg-brand text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_35px_rgba(59,130,246,0.5)] active:scale-95 disabled:opacity-50;
 }
 
 ::-webkit-scrollbar {
