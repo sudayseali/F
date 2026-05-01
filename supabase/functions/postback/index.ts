@@ -37,8 +37,14 @@ serve(async (req) => {
       const ayetSecret = Deno.env.get('AYET_SECRET');
       console.log(`[POSTBACK] Ayet Setup - Provided Secret: ${params.secret}, Env Secret exists: ${!!ayetSecret}`);
       
-      if (params.secret && ayetSecret && params.secret === ayetSecret) {
+      if (!ayetSecret) {
+         return new Response(`403 Forbidden - AYET_SECRET environment variable is not set in Supabase Edge Function! Please run 'supabase secrets set AYET_SECRET="your_secret"' and redeploy.`, { status: 403 });
+      }
+
+      if (params.secret === ayetSecret) {
         isSecure = true; 
+      } else {
+         return new Response(`403 Forbidden - Security Hash Mismatch for ayet. Provided secret in URL does not match AYET_SECRET in Supabase. Lengths: URL(${params.secret?.length}), ENV(${ayetSecret?.length})`, { status: 403 });
       }
     }
     
