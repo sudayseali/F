@@ -1,4 +1,4 @@
-import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight, ArrowLeft } from "lucide-react";
+import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight, ArrowLeft, Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
@@ -99,19 +99,128 @@ const CATEGORIES = [
 export function Offerwall() {
   const { user } = useTelegram();
   const [activeOfferwall, setActiveOfferwall] = useState<string | null>(null);
+  const [ayetData, setAyetData] = useState<any>(null);
+  const [loadingAyet, setLoadingAyet] = useState(false);
+  const [ayetError, setAyetError] = useState<string | null>(null);
 
-  const handleProviderClick = (providerId: string) => {
+  const handleProviderClick = async (providerId: string) => {
     if (!user?.id) {
       alert("User identification not found. Please re-open the app.");
       return;
     }
 
     if (providerId === "ayet") {
-      setActiveOfferwall(`https://www.ayetstudios.com/offers/web_offerwall/26815?external_identifier=${user.id}`);
+      setActiveOfferwall("ayet_api");
+      setLoadingAyet(true);
+      setAyetError(null);
+      
+      try {
+        const res = await fetch(`https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${user.id}`);
+        if (!res.ok) throw new Error("Failed to connect to Ayet Studios");
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+          setAyetData(data);
+        } else {
+          setAyetError(data.error || "Failed to load offers from Ayet Studios.");
+        }
+      } catch (err: any) {
+        setAyetError(err.message || "Network error while loading offers. Make sure CORS is supported or try again later.");
+      } finally {
+        setLoadingAyet(false);
+      }
     } else {
       alert(`Provider ${providerId} setup logic coming soon.`);
     }
   };
+
+  if (activeOfferwall === "ayet_api") {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="fixed inset-0 z-[100] bg-[#0a0502] flex flex-col"
+      >
+        <div className="flex items-center p-4 border-b border-white/10 bg-[#1a0f0a]">
+          <button 
+            onClick={() => { setActiveOfferwall(null); setAyetData(null); }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <span className="flex-1 text-center font-bold text-white pr-10 text-lg tracking-wide">
+            {ayetData?.offerwall?.name || 'Offerwall'}
+          </span>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto w-full p-4 md:p-6 bg-[#0a0502]">
+          {loadingAyet ? (
+            <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
+              <Loader2 className="w-8 h-8 text-brand animate-spin" />
+              <p className="text-white/60 font-medium tracking-wide">Loading Offers...</p>
+            </div>
+          ) : ayetError ? (
+            <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+              <div className="w-16 h-16 rounded-full border border-red-500/30 flex items-center justify-center mb-4 bg-red-500/10">
+                <Globe className="w-8 h-8 text-red-500" />
+              </div>
+              <p className="text-red-400 font-medium mb-2">Error connecting to Ayet Studios</p>
+              <p className="text-white/40 text-sm max-w-sm mx-auto">{ayetError}</p>
+            </div>
+          ) : ayetData?.offers?.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-[50vh] text-center">
+              <div className="w-16 h-16 rounded-[1.5rem] border border-white/5 flex items-center justify-center mb-4 bg-white/5">
+                <Star className="w-8 h-8 text-white/30" />
+              </div>
+              <p className="text-white font-medium mb-1 tracking-wide">No Offers Available</p>
+              <p className="text-white/40 text-sm">Check back later for more earning opportunities.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto pb-20">
+              {ayetData?.offers?.map((offer: any, i: number) => (
+                <a 
+                  key={offer.id || i}
+                  href={offer.tracking_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="premium-card !p-5 !rounded-[1.5rem] border-white/5 hover:border-brand/30 transition-all duration-300 flex flex-col group bg-white/[0.02]"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-14 h-14 rounded-[1rem] overflow-hidden bg-white/10 shrink-0 border border-white/10 group-hover:scale-105 transition-transform duration-500">
+                      {offer.icon ? (
+                         <img src={offer.icon} alt={offer.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-brand/20">
+                          <Gift className="w-6 h-6 text-brand" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full flex items-center space-x-1.5">
+                      <Zap className="w-3.5 h-3.5 text-brand" />
+                      <span className="text-brand font-bold text-sm">
+                        +{offer.payout_currency} {ayetData?.offerwall?.currency_name_plural || 'Coins'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-white font-bold mb-2 line-clamp-1">{offer.name}</h3>
+                  <p className="text-white/50 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
+                    {offer.description || offer.instructions}
+                  </p>
+                  
+                  <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between text-sm">
+                    <span className="text-white/40 font-medium">Earn Reward</span>
+                    <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-1" />
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
 
   if (activeOfferwall) {
     return (
