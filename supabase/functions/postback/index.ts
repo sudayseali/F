@@ -92,31 +92,47 @@ serve(async (req) => {
     const { data: existingTx } = await supabaseAdmin
       .from('transactions')
       .select('id')
-      .eq('id', transactionId)
-      .single();
+      .eq('reference_id', transactionId)
+      .maybeSingle();
 
     if (existingTx) {
       return new Response('200 OK - Duplicate, already processed', { status: 200 });
     }
 
     // 2. Fetch the current user balance
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('balance')
-      .eq('id', userId)
-      .single();
+    // The userId passed by the offerwall might be the Telegram ID (number)
+    let userQuery = supabaseAdmin.from('users').select('id, balance');
+    
+    console.log(`[POSTBACK] Searching for user with id/telegram_id: ${userId}`);
 
-    if (!profile) {
+    if (/^\d+$/.test(userId)) {
+      // It's a Telegram ID
+      userQuery = userQuery.eq('telegram_id', parseInt(userId, 10));
+    } else {
+      // It's a UUID
+      userQuery = userQuery.eq('id', userId);
+    }
+
+    const { data: userRecord, error: userError } = await userQuery.maybeSingle();
+
+    if (userError) {
+      console.error(`[POSTBACK] User lookup error:`, userError);
+      return new Response('500 Internal Server Error (User Lookup)', { status: 500 });
+    }
+
+    if (!userRecord) {
+      console.warn(`[POSTBACK] User not found for: ${userId}`);
       return new Response('404 User Not Found', { status: 404 });
     }
 
-    const newBalance = profile.balance + rewardAmount;
+    console.log(`[POSTBACK] User found: ${userRecord.id}, Current Balance: ${userRecord.balance}`);
+    const newBalance = Number(userRecord.balance) + rewardAmount;
 
     // 3. Update User Balance
     const { error: profileError } = await supabaseAdmin
-      .from('profiles')
+      .from('users')
       .update({ balance: newBalance })
-      .eq('id', userId);
+      .eq('id', userRecord.id);
 
     if (profileError) throw profileError;
 
@@ -124,12 +140,11 @@ serve(async (req) => {
     const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
-        id: transactionId,
-        user_id: userId,
+        user_id: userRecord.id,
         amount: rewardAmount,
-        type: 'offerwall_reward',
+        type: 'reward',
         status: 'completed',
-        created_at: new Date().toISOString(),
+        reference_id: transactionId,
       });
 
     if (txError) throw txError;
