@@ -1,5 +1,5 @@
-import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight } from "lucide-react";
-import React from "react";
+import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight, ArrowLeft } from "lucide-react";
+import React, { useState } from "react";
 import { motion } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
 
@@ -98,6 +98,7 @@ const CATEGORIES = [
 
 export function Offerwall() {
   const { user } = useTelegram();
+  const [activeOfferwall, setActiveOfferwall] = useState<string | null>(null);
 
   const handleProviderClick = (providerId: string) => {
     if (!user?.id) {
@@ -106,11 +107,40 @@ export function Offerwall() {
     }
 
     if (providerId === "ayet") {
-      window.open(`https://www.ayetstudios.com/offers/web_offerwall/26815?external_identifier=${user.id}`, '_blank');
+      setActiveOfferwall(`https://www.ayetstudios.com/offers/web_offerwall/26815?external_identifier=${user.id}`);
     } else {
       alert(`Provider ${providerId} setup logic coming soon.`);
     }
   };
+
+  if (activeOfferwall) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="fixed inset-0 z-[100] bg-[#0a0502] flex flex-col"
+      >
+        <div className="flex items-center p-4 border-b border-white/10 bg-[#1a0f0a]">
+          <button 
+            onClick={() => setActiveOfferwall(null)}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <span className="flex-1 text-center font-bold text-white pr-10 text-lg tracking-wide">Offerwall</span>
+        </div>
+        <div className="flex-1 w-full bg-white relative">
+          <iframe 
+            src={activeOfferwall}
+            title="Offerwall API"
+            className="absolute inset-0 w-full h-full border-none"
+            allow="fullscreen"
+          />
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 
