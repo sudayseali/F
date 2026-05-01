@@ -1,6 +1,7 @@
 import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight } from "lucide-react";
 import React from "react";
 import { motion } from "motion/react";
+import { useTelegram } from "../contexts/TelegramContext";
 
 const CATEGORIES = [
   {
@@ -96,6 +97,21 @@ const CATEGORIES = [
 ];
 
 export function Offerwall() {
+  const { user } = useTelegram();
+
+  const handleProviderClick = (providerId: string) => {
+    if (!user?.id) {
+      alert("User identification not found. Please re-open the app.");
+      return;
+    }
+
+    if (providerId === "ayet") {
+      window.open(`https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${user.id}`, '_blank');
+    } else {
+      alert(`Provider ${providerId} setup logic coming soon.`);
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -162,6 +178,7 @@ export function Offerwall() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 + (i * 0.05) + (catIndex * 0.1) }}
                   whileHover={{ scale: 1.02 }}
+                  onClick={() => handleProviderClick(provider.id)}
                   className="premium-card !p-8 !rounded-[2rem] border-white/5 flex items-center space-x-6 group cursor-pointer hover:border-brand/30 transition-all duration-500 bg-[#1a0f0a]/30"
                 >
                   <div className={`w-16 h-16 rounded-[1.2rem] ${provider.bg} ${provider.color} flex items-center justify-center border ${provider.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shrink-0 shadow-inner`}>
