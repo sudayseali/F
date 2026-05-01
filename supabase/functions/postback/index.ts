@@ -96,11 +96,16 @@ serve(async (req) => {
     // --- PROCESS THE REWARD ---
 
     // 1. Check if transaction ID already exists to prevent double crediting
-    const { data: existingTx } = await supabaseAdmin
+    const { data: existingTx, error: txCheckError } = await supabaseAdmin
       .from('transactions')
       .select('id')
       .eq('reference_id', transactionId)
       .maybeSingle();
+
+    if (txCheckError) {
+      console.error(`[POSTBACK] Tx lookup error:`, txCheckError);
+      return new Response(`500 Internal Server Error (Tx Lookup): ${JSON.stringify(txCheckError)}`, { status: 500 });
+    }
 
     if (existingTx) {
       return new Response('200 OK - Duplicate, already processed', { status: 200 });
@@ -113,8 +118,8 @@ serve(async (req) => {
     console.log(`[POSTBACK] Searching for user with id/telegram_id: ${userId}`);
 
     if (/^\d+$/.test(userId)) {
-      // It's a Telegram ID
-      userQuery = userQuery.eq('telegram_id', parseInt(userId, 10));
+      // It's a Telegram ID. We pass it as a string to avoid precision loss on BIGINT in Postgres.
+      userQuery = userQuery.eq('telegram_id', userId);
     } else {
       // It's a UUID
       userQuery = userQuery.eq('id', userId);
@@ -124,7 +129,7 @@ serve(async (req) => {
 
     if (userError) {
       console.error(`[POSTBACK] User lookup error:`, userError);
-      return new Response('500 Internal Server Error (User Lookup)', { status: 500 });
+      return new Response(`500 Internal Server Error (User Lookup): ${JSON.stringify(userError)}`, { status: 500 });
     }
 
     if (!userRecord) {
