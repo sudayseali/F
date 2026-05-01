@@ -30,7 +30,7 @@ serve(async (req) => {
     // --- 1. AYET STUDIOS ---
     if (provider === 'ayet') {
       // Ayet sends params like: uid, currency_amount, transaction_id, payout_usd
-      userId = params.uid;
+      userId = params.uid ? params.uid.replace(/[\[\]{}"]/g, '') : '';
       rewardAmount = parseFloat(params.currency_amount);
       transactionId = params.transaction_id;
       
@@ -87,6 +87,10 @@ serve(async (req) => {
     if (!isSecure) {
       console.error(`[POSTBACK] 403 Forbidden. Secret mismatch or missing for ${provider}. Is Env Secret set? ${!!Deno.env.get('AYET_SECRET')}`);
       return new Response(`403 Forbidden - Security Hash Mismatch for ${provider}`, { status: 403 });
+    }
+
+    if (userId) {
+      userId = userId.replace(/[\[\]{}"]/g, '');
     }
 
     if (!userId || isNaN(rewardAmount) || rewardAmount <= 0) {
