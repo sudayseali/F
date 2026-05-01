@@ -44,6 +44,11 @@ jobs:
           echo "SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> .env.func
           echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env.func
           echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env.func
+          echo "AYET_SECRET=${{ secrets.AYET_SECRET }}" >> .env.func
+          echo "TOROX_SECRET=${{ secrets.TOROX_SECRET }}" >> .env.func
+          echo "ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}" >> .env.func
+          echo "LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}" >> .env.func
+          echo "CPX_SECRET=${{ secrets.CPX_SECRET }}" >> .env.func
           supabase secrets set --env-file .env.func --project-ref ${{ env.PROJECT_ID }} || true
 
       - name: Deploy Database Schema 
