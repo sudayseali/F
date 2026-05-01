@@ -34,11 +34,12 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.currency_amount);
       transactionId = params.transaction_id;
       
-      // Security: Ayet requires checking the exact server IPs or an HMAC signature
-      // For this example, let's assume a secret key validation.
-      // E.g., verifying an HMAC sent in headers if configured, or a custom secret param.
       const ayetSecret = Deno.env.get('AYET_SECRET');
-      if (params.secret === ayetSecret) isSecure = true; 
+      console.log(`[POSTBACK] Ayet Setup - Provided Secret: ${params.secret}, Env Secret exists: ${!!ayetSecret}`);
+      
+      if (params.secret && ayetSecret && params.secret === ayetSecret) {
+        isSecure = true; 
+      }
     }
     
     // --- 2. TOROX ---
@@ -78,8 +79,8 @@ serve(async (req) => {
     }
 
     if (!isSecure) {
-      console.error(`Invalid Security Signature for ${provider}`);
-      return new Response('403 Forbidden', { status: 403 });
+      console.error(`[POSTBACK] 403 Forbidden. Secret mismatch or missing for ${provider}. Is Env Secret set? ${!!Deno.env.get('AYET_SECRET')}`);
+      return new Response(`403 Forbidden - Security Hash Mismatch for ${provider}`, { status: 403 });
     }
 
     if (!userId || isNaN(rewardAmount) || rewardAmount <= 0) {
