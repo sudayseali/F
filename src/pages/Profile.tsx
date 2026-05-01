@@ -1,6 +1,6 @@
 import React from "react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { Users, History, Settings, LogOut, ChevronRight, Gift, Shield } from "lucide-react";
+import { Users, History, Settings, LogOut, ChevronRight, Gift, Shield, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 
@@ -14,78 +14,91 @@ export function Profile() {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-10 pb-10"
+      className="space-y-12 pb-24"
     >
-      <header className="flex flex-col items-center justify-center text-center">
-        <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-brand to-emerald-500 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
-          <div className="relative w-32 h-32 rounded-3xl bg-slate-900 text-brand flex items-center justify-center font-display font-black text-5xl border-2 border-white/5 shadow-2xl mb-6">
+      <header className="flex flex-col items-center justify-center text-center pt-8">
+        <div className="relative group perspective">
+          <div className="absolute -inset-2 bg-gradient-to-br from-brand/40 via-brand text-transparent to-[#ff7638]/40 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-70 transition duration-1000"></div>
+          <div className="relative w-40 h-40 rounded-[2.5rem] bg-gradient-to-b from-[#1a0f0a] to-[#0a0502] text-brand flex items-center justify-center font-display font-black text-6xl border border-white/10 shadow-inner mb-8 transform group-hover:-translate-y-2 transition-transform duration-700">
             {initial}
+            <div className="absolute inset-0 rounded-[2.5rem] border border-white/5 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
           </div>
           {isAdmin && (
-            <div className="absolute -bottom-2 -right-2 bg-brand text-white p-2 rounded-xl shadow-lg border border-white/10">
-              <Shield className="w-5 h-5" />
+            <div className="absolute -bottom-4 -right-4 bg-[#1a0f0a] border border-white/10 p-1.5 rounded-2xl shadow-2xl">
+              <div className="bg-brand text-white p-3 rounded-xl shadow-inner flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+              </div>
             </div>
           )}
         </div>
         
-        <h1 className="text-4xl font-display font-bold text-white tracking-tighter mb-2">
+        <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-2 drop-shadow-md">
           {displayName}
         </h1>
         
-        <div className="flex items-center space-x-3">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em]">
-            Identity Protocol
+        <div className="flex items-center space-x-4 mt-4 bg-white/[0.02] py-2 px-6 rounded-full border border-white/5 backdrop-blur-md">
+          <CheckCircle className="w-4 h-4 text-emerald-500" />
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
+            Identity Verified
           </span>
-          <span className="text-sm font-mono text-brand font-bold">
-            #{user?.id?.toString().slice(-6) || "000000"}
+          <div className="w-1 h-1 rounded-full bg-white/20" />
+          <span className="text-sm font-mono text-brand font-medium tracking-widest">
+            ID: {user?.id?.toString().slice(-6) || "000000"}
           </span>
         </div>
       </header>
 
       {!isAdmin && (
         <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="premium-card bg-brand/5 border-brand/20 p-8"
+          className="relative premium-card bg-gradient-to-br from-[#1a0f0a] to-[#0a0502] border-brand/20 !p-10 !rounded-[2.5rem] overflow-hidden"
         >
-          <div className="flex items-start space-x-6">
-            <div className="w-12 h-12 rounded-2xl bg-brand/10 flex items-center justify-center text-brand shrink-0 border border-brand/20">
-              <Settings className="w-6 h-6" />
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none" />
+          <div className="flex flex-col md:flex-row md:items-start gap-8 relative z-10">
+            <div className="w-16 h-16 rounded-[1.2rem] bg-brand/5 flex items-center justify-center text-brand shrink-0 border border-brand/10 shadow-inner">
+              <Shield className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-xl font-display font-bold text-white mb-2">Administrative Node</h3>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                To access the ecosystem management console, initialize your identity in the database parameters.
+              <h3 className="text-2xl font-display font-bold text-white mb-3">Administrative Node</h3>
+              <p className="text-white/40 text-base leading-relaxed font-serif italic mb-6 max-w-2xl">
+                To access the ecosystem management console and elevate your privileges, initialize your identity in the database environment parameters.
               </p>
-              <div className="bg-slate-950/50 rounded-2xl p-4 border border-white/5 mb-4 group overflow-hidden">
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">Access Variable</p>
-                <code className="text-xs text-brand font-mono break-all block">
-                  VITE_ADMIN_TELEGRAM_ID={user?.id}
-                </code>
+              <div className="bg-[#0a0502]/80 rounded-[1.5rem] p-6 border border-white/5 overflow-hidden shadow-inner flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] text-brand/60 font-bold uppercase tracking-[0.2em] mb-2">Access Variable Requirement</p>
+                  <code className="text-sm text-white/60 font-mono break-all select-all">
+                    VITE_ADMIN_TELEGRAM_ID={user?.id}
+                  </code>
+                </div>
               </div>
             </div>
           </div>
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="space-y-4">
+        <h3 className="text-3xl font-serif font-light text-white flex items-center mb-6 pl-2">
+          Ecosystem <span className="font-bold ml-2">Protocols</span>
+          <span className="ml-6 h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        </h3>
+
         {[
           {
             label: "Affiliate Network",
-            desc: "Access your 10% commission stream",
+            desc: "Access your 10% perpetual commission stream",
             icon: Gift,
-            color: "text-emerald-500",
-            bg: "bg-emerald-500/10",
-            border: "border-emerald-500/20",
+            color: "text-[#ff7638]",
+            bg: "bg-[#ff7638]/5",
+            border: "border-[#ff7638]/20",
             path: "/referrals"
           },
           {
             label: "Security Settings",
-            desc: "Manage authentication and sessions",
+            desc: "Manage authentication and encrypted sessions",
             icon: Settings,
-            color: "text-slate-400",
-            bg: "bg-slate-800/50",
+            color: "text-white/30",
+            bg: "bg-white/[0.02]",
             border: "border-white/5",
             disabled: true
           }
@@ -96,29 +109,29 @@ export function Profile() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1 }}
             onClick={() => !item.disabled && navigate(item.path || "/")}
-            className={`premium-card p-6 flex items-center justify-between cursor-pointer transition-all duration-300 group ${item.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-brand/40'}`}
+            className={`premium-card !p-8 !rounded-[2rem] flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-all duration-500 group ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-brand/40 bg-[#1a0f0a]/30'}`}
           >
-            <div className="flex items-center space-x-6">
-              <div className={`w-14 h-14 rounded-2xl ${item.bg} ${item.color} flex items-center justify-center border ${item.border} group-hover:scale-110 transition-transform duration-500`}>
-                <item.icon className="w-7 h-7" />
+            <div className="flex items-center space-x-6 mb-4 sm:mb-0">
+              <div className={`w-16 h-16 rounded-[1.2rem] ${item.bg} ${item.color} flex items-center justify-center border ${item.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shadow-inner`}>
+                <item.icon className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-brand transition-colors">{item.label}</h3>
-                <p className="text-sm text-slate-500">{item.desc}</p>
+                <h3 className="text-xl font-display font-bold text-white group-hover:text-brand transition-colors tracking-tight">{item.label}</h3>
+                <p className="text-sm text-white/40 font-serif italic">{item.desc}</p>
               </div>
             </div>
             {!item.disabled && (
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500 group-hover:text-brand transition-colors group-hover:translate-x-1 duration-300">
-                <ChevronRight className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-[1rem] bg-[#0a0502] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-2 duration-500 shadow-inner">
+                <ChevronRight className="w-6 h-6" />
               </div>
             )}
           </motion.div>
         ))}
       </div>
       
-      <div className="pt-10 flex justify-center">
-        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.5em]">
-          Payvora v2.4.0 • Enterprise Edition
+      <div className="pt-16 pb-8 flex justify-center">
+        <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] font-mono">
+          Payvora v3.0.0 • Enterprise Edition
         </p>
       </div>
     </motion.div>
