@@ -106,7 +106,7 @@ export function Offerwall() {
     }
 
     if (providerId === "ayet") {
-      window.open(`https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${user.id}`, '_blank');
+      window.open(`https://www.ayetstudios.com/offers/web_offerwall/26815?external_identifier=${user.id}`, '_blank');
     } else {
       alert(`Provider ${providerId} setup logic coming soon.`);
     }
