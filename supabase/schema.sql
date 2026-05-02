@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS public.users (
     username TEXT,
     first_name TEXT,
     wallet_balance NUMERIC(10, 2) DEFAULT 0.00,
+    level TEXT DEFAULT 'basic',
+    total_earned NUMERIC(10, 2) DEFAULT 0.00,
+    status TEXT DEFAULT 'active',
     registered_at TIMESTAMPTZ DEFAULT NOW(),
     last_login TIMESTAMPTZ DEFAULT NOW()
 );
