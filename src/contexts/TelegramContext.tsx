@@ -47,6 +47,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
       } else {
+        console.log("User not found, attempting fallback upsert for telegram_id:", telegramId);
         // If user doesn't exist, create it via supbase locally so it works even without edge function
         const { data: newData, error: upsertError } = await supabase.from('users').upsert({
            telegram_id: telegramId,
@@ -56,11 +57,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         }, { onConflict: 'telegram_id' }).select().maybeSingle();
         
         if (upsertError) {
-          console.error("Upsert error:", upsertError);
-        }
-        
-        if (newData) {
-           setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
+          console.error("Upsert error in TelegramContext:", upsertError);
+        } else if (newData) {
+          console.log("Upsert success:", newData);
+          setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
         }
       }
     } catch (err) {
@@ -101,6 +101,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           try {
             // Attempt remote auth edge function
             const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
+            console.log("Using auth URL:", `${baseUrl}/functions/v1/auth`);
             
             const authController = new AbortController();
             const authTimeoutId = setTimeout(() => authController.abort(), 4000);
