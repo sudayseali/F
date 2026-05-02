@@ -85,7 +85,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       // First fetch location and block if VPN
       let locData: LocationData | null = null;
       try {
-        const res = await fetch('https://ipwho.is/');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch('https://ipwho.is/', { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (data && data.success) {
           locData = {
@@ -141,11 +144,16 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           try {
             // Attempt remote auth edge function
             const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
+            
+            const authController = new AbortController();
+            const authTimeoutId = setTimeout(() => authController.abort(), 4000);
             const res = await fetch(`${baseUrl}/functions/v1/auth`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ initData: tg.initData })
+              body: JSON.stringify({ initData: tg.initData }),
+              signal: authController.signal
             });
+            clearTimeout(authTimeoutId);
             const authData = await res.json();
             
             if (authData.success) {
@@ -174,12 +182,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       setIsReady(true);
     };
 
-    if (document.readyState === 'complete') {
-        initTelegram();
-    } else {
-        window.addEventListener('load', initTelegram);
-        return () => window.removeEventListener('load', initTelegram);
-    }
+    // Execute immediately to prevent hanging if window.onload already fired or is delayed
+    initTelegram();
   }, []);
 
   if (!isReady) {

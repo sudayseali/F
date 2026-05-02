@@ -22,27 +22,29 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   return (
-    <TelegramProvider>
+    <>
       <AnimatePresence>
         {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
       </AnimatePresence>
-      {!showSplash && (
-        <Router>
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="tasks" element={<Tasks />} />
-              <Route path="offerwall" element={<Offerwall />} />
-              <Route path="tasks/:id" element={<TaskDetails />} />
-              <Route path="wallet" element={<Wallet />} />
-              <Route path="profile" element={<Profile />} />
-              <Route path="referrals" element={<Referrals />} />
-              <Route path="admin" element={<Admin />} />
-            </Route>
-          </Routes>
-        </Router>
-      )}
-    </TelegramProvider>
+      <div className={showSplash ? "hidden" : ""}>
+        <TelegramProvider>
+          <Router>
+            <Routes>
+              <Route path="/" element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="offerwall" element={<Offerwall />} />
+                <Route path="tasks/:id" element={<TaskDetails />} />
+                <Route path="wallet" element={<Wallet />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="referrals" element={<Referrals />} />
+                <Route path="admin" element={<Admin />} />
+              </Route>
+            </Routes>
+          </Router>
+        </TelegramProvider>
+      </div>
+    </>
   );
 }
 
