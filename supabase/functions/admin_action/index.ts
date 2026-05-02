@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID")!;
+const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -103,6 +104,46 @@ serve(async (req) => {
         
         resultMsg = "Deposit verified and user balance updated.";
         break;
+
+      case 'broadcast_message': {
+         const message = extra_data.message;
+         if (!message) throw new Error("No message provided");
+         if (!BOT_TOKEN) throw new Error("Bot token not configured");
+         
+         const { data: users, error: userError } = await supabase.from('users').select('telegram_id').not('telegram_id', 'is', null);
+         if (userError) throw userError;
+         
+         let sentCount = 0;
+         let errorCount = 0;
+         
+         // Send message to each user via Telegram API
+         for (const u of users) {
+             if (!u.telegram_id) continue;
+             try {
+                const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                      chat_id: u.telegram_id,
+                      text: message,
+                      parse_mode: 'HTML'
+                   })
+                });
+                if (res.ok) {
+                   sentCount++;
+                } else {
+                   errorCount++;
+                }
+             } catch (e) {
+                errorCount++;
+             }
+             // Be mindful of rate limits
+             await new Promise(r => setTimeout(r, 40)); 
+         }
+         
+         resultMsg = `Broadcast sent to ${sentCount} users. Failed for ${errorCount} users.`;
+         break;
+      }
 
       case 'get_admin_data': {
         const [

@@ -30,6 +30,7 @@ export function Admin() {
 
   const [modalState, setModalState] = useState<{ isOpen: boolean; type: string; data: any }>({ isOpen: false, type: '', data: null });
   const [modalInput, setModalInput] = useState('');
+  const [broadcastMsg, setBroadcastMsg] = useState('');
   
   useEffect(() => {
     if (!isAdmin || !user) return;
@@ -395,11 +396,24 @@ export function Admin() {
               <div className="pt-10 mt-10 border-t border-white/5">
                 <div className="mb-6">
                   <h3 className="text-xl font-display font-bold text-white tracking-tight">Global Network Broadcast</h3>
-                  <p className="text-slate-500 text-sm mt-1">Send a high-priority alert to all connected nodes.</p>
+                  <p className="text-slate-500 text-sm mt-1">Send a high-priority message to all connected users via the Telegram Bot.</p>
                 </div>
                 <div className="flex gap-4">
-                   <input type="text" placeholder="Enter broadcast message..." className="flex-1 px-6 py-4 bg-slate-950 border border-brand/20 rounded-2xl text-white focus:outline-none focus:border-brand transition-all shadow-inner" />
-                   <button onClick={() => alert("Broadcast dispatched to all nodes.")} className="px-8 py-4 bg-brand hover:brightness-110 text-[#0a0502] font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] shrink-0">
+                   <input 
+                     type="text" 
+                     value={broadcastMsg}
+                     onChange={(e) => setBroadcastMsg(e.target.value)}
+                     placeholder="Enter broadcast message..." 
+                     className="flex-1 px-6 py-4 bg-slate-950 border border-brand/20 rounded-2xl text-white focus:outline-none focus:border-brand transition-all shadow-inner" 
+                   />
+                   <button 
+                     onClick={() => {
+                        if(!broadcastMsg.trim()) return alert("Message is empty");
+                        handleAction('global', 'Network', 'broadcast_message', { message: broadcastMsg });
+                        setBroadcastMsg('');
+                     }} 
+                     className="px-8 py-4 bg-brand hover:brightness-110 text-[#0a0502] font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] shrink-0"
+                   >
                      Transmit
                    </button>
                 </div>
