@@ -143,7 +143,7 @@ export function Navigation() {
               <div className="overflow-hidden flex-1">
                 <p className="text-sm font-bold text-white truncate">{displayName}</p>
                 <p className="text-[10px] text-brand/70 font-mono mt-1 uppercase tracking-[0.15em] truncate font-medium">
-                  {user?.username ? `@${user.username}` : `ID: ${user?.id?.slice(0, 8)}`}
+                  {user?.username ? `@${user.username}` : `ID: ${user?.id?.toString().slice(0, 8)}`}
                 </p>
               </div>
             </div>

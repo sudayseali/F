@@ -98,19 +98,19 @@ serve(async (req) => {
         first_name: tgUser.first_name,
         last_name: tgUser.last_name
       }, { onConflict: 'telegram_id' })
-      .select('id, is_banned, role')
+      .select('id, status, level')
       .single();
 
     if (dbError) throw dbError;
 
     // Check if user is banned
-    if (userRow.is_banned) {
+    if (userRow.status === 'suspended') {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 
     // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV AND DATABASE
     const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID");
-    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID || tgUser.id.toString() === '5806129562' || userRow.role === 'admin';
+    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID || tgUser.id.toString() === '5806129562' || userRow.level === 'admin';
 
     // GENERATE SECURE CUSTOM JWT
     const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);

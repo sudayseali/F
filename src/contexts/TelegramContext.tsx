@@ -47,10 +47,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       
       if (data) {
-        setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.balance } : null);
+        setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
         // Check if admin
         const isUserAdmin = 
-           data.role === 'admin' || 
+           data.level === 'admin' || 
            data.telegram_id?.toString() === '5806129562' ||
            data.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID;
            
@@ -59,14 +59,19 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         }
       } else {
         // If user doesn't exist, create it via supbase locally so it works even without edge function
-        const { data: newData } = await supabase.from('users').upsert({
+        const { data: newData, error: upsertError } = await supabase.from('users').upsert({
            telegram_id: telegramId,
            username: 'user_' + telegramId,
            first_name: 'User',
-           balance: telegramId === 5806129562 ? 45.50 : 0
+           wallet_balance: telegramId === 5806129562 ? 45.50 : 0
         }).select().maybeSingle();
+        
+        if (upsertError) {
+          console.error("Upsert error:", upsertError);
+        }
+        
         if (newData) {
-           setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.balance } : null);
+           setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
            if (newData.telegram_id?.toString() === '5806129562' || newData.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
                setIsAdmin(true);
            }
