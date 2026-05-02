@@ -96,36 +96,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           };
           setUser(userObj);
           
-          // Removed frontend admin override
-          
-          try {
-            // Attempt remote auth edge function
-            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
-            console.log("Using auth URL:", `${baseUrl}/functions/v1/auth`);
-            
-            const authController = new AbortController();
-            const authTimeoutId = setTimeout(() => authController.abort(), 4000);
-            const res = await fetch(`${baseUrl}/functions/v1/auth`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ initData: tg.initData }),
-              signal: authController.signal
-            });
-            clearTimeout(authTimeoutId);
-            const authData = await res.json();
-            
-            if (authData.success) {
-              if (authData.access_token) {
-                setSupabaseToken(authData.access_token);
-              }
-              userObj.uuid = authData.user_uuid;
-              setUser({...userObj});
-            }
-          } catch(e) {
-            console.error("Edge function auth failed, falling back", e);
-            // Fallback for AI Studio preview or missing Edge Function
-          }
-          
+          // Direct SQL Registration bypassing the Edge Function
           await fetchUserData(tgUser.id);
         }
       }
