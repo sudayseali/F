@@ -48,7 +48,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
-        if (data.level === 'admin') {
+        if (data.level === 'admin' || telegramId.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
            setIsAdmin(true);
         }
       } else {
@@ -122,7 +122,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
               if (authData.access_token) {
                 setSupabaseToken(authData.access_token);
               }
-              if (authData.is_admin) {
+              if (authData.is_admin || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
                  setIsAdmin(true);
               }
               userObj.uuid = authData.user_uuid;
@@ -131,6 +131,9 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           } catch(e) {
             console.error("Edge function auth failed, falling back", e);
             // Fallback for AI Studio preview or missing Edge Function
+            if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+               setIsAdmin(true);
+            }
           }
           
           await fetchUserData(tgUser.id);
