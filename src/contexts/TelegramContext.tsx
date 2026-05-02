@@ -22,18 +22,16 @@ export interface LocationData {
 
 interface TelegramContextType {
   user: TelegramUser | null;
-  isAdmin: boolean;
   location: LocationData | null;
   refreshUser: () => Promise<void>;
 }
 
-const TelegramContext = createContext<TelegramContextType>({ user: null, isAdmin: false, location: null, refreshUser: async () => {} });
+const TelegramContext = createContext<TelegramContextType>({ user: null, location: null, refreshUser: async () => {} });
 
 export const useTelegram = () => useContext(TelegramContext);
 
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -48,9 +46,6 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
-        if (data.level === 'admin' || telegramId.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID || telegramId.toString() === '5806129562') {
-           setIsAdmin(true);
-        }
       } else {
         // If user doesn't exist, create it via supbase locally so it works even without edge function
         const { data: newData, error: upsertError } = await supabase.from('users').upsert({
@@ -122,18 +117,12 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
               if (authData.access_token) {
                 setSupabaseToken(authData.access_token);
               }
-              if (authData.is_admin || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID || tgUser.id.toString() === '5806129562') {
-                 setIsAdmin(true);
-              }
               userObj.uuid = authData.user_uuid;
               setUser({...userObj});
             }
           } catch(e) {
             console.error("Edge function auth failed, falling back", e);
             // Fallback for AI Studio preview or missing Edge Function
-            if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID || tgUser.id.toString() === '5806129562') {
-               setIsAdmin(true);
-            }
           }
           
           await fetchUserData(tgUser.id);
@@ -189,7 +178,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TelegramContext.Provider value={{ user, isAdmin, location, refreshUser }}>
+    <TelegramContext.Provider value={{ user, location, refreshUser }}>
       {children}
     </TelegramContext.Provider>
   );

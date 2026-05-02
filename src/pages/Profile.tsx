@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 
 export function Profile() {
-  const { user, isAdmin } = useTelegram();
+  const { user } = useTelegram();
   const navigate = useNavigate();
   const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "User";
   const initial = displayName.charAt(0).toUpperCase();
@@ -23,13 +23,6 @@ export function Profile() {
             {initial}
             <div className="absolute inset-0 rounded-[2.5rem] border border-white/5 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
           </div>
-          {isAdmin && (
-            <div className="absolute -bottom-4 -right-4 bg-[#1a0f0a] border border-white/10 p-1.5 rounded-2xl shadow-2xl">
-              <div className="bg-brand text-white p-3 rounded-xl shadow-inner flex items-center space-x-2">
-                <Shield className="w-5 h-5" />
-              </div>
-            </div>
-          )}
         </div>
         
         <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-2 drop-shadow-md">
@@ -47,35 +40,6 @@ export function Profile() {
           </span>
         </div>
       </header>
-
-      {!isAdmin && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative premium-card bg-gradient-to-br from-[#1a0f0a] to-[#0a0502] border-brand/20 !p-10 !rounded-[2.5rem] overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none" />
-          <div className="flex flex-col md:flex-row md:items-start gap-8 relative z-10">
-            <div className="w-16 h-16 rounded-[1.2rem] bg-brand/5 flex items-center justify-center text-brand shrink-0 border border-brand/10 shadow-inner">
-              <Shield className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-display font-bold text-white mb-3">Administrative Node</h3>
-              <p className="text-white/40 text-base leading-relaxed font-serif italic mb-6 max-w-2xl">
-                To access the ecosystem management console and elevate your privileges, initialize your identity in the database environment parameters.
-              </p>
-              <div className="bg-[#0a0502]/80 rounded-[1.5rem] p-6 border border-white/5 overflow-hidden shadow-inner flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <p className="text-[10px] text-brand/60 font-bold uppercase tracking-[0.2em] mb-2">Access Variable Requirement</p>
-                  <code className="text-sm text-white/60 font-mono break-all select-all">
-                    VITE_ADMIN_TELEGRAM_ID={user?.id}
-                  </code>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       <div className="space-y-4">
         <h3 className="text-3xl font-serif font-light text-white flex items-center mb-6 pl-2">

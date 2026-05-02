@@ -16,7 +16,7 @@ const baseNavItems = [
 
 export function Navigation() {
   const location = useLocation();
-  const { user, isAdmin } = useTelegram();
+  const { user } = useTelegram();
   const displayName = user?.first_name ? `${user?.first_name} ${user?.last_name || ''}`.trim() : 'User';
   const initial = displayName.charAt(0).toUpperCase();
 
