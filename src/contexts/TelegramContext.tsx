@@ -51,7 +51,6 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         // Check if admin
         const isUserAdmin = 
            data.level === 'admin' || 
-           data.telegram_id?.toString() === '5806129562' ||
            data.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID;
            
         if (isUserAdmin) {
@@ -63,7 +62,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
            telegram_id: telegramId,
            username: 'user_' + telegramId,
            first_name: 'User',
-           wallet_balance: telegramId === 5806129562 ? 45.50 : 0
+           wallet_balance: telegramId.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID ? 45.50 : 0
         }).select().maybeSingle();
         
         if (upsertError) {
@@ -72,7 +71,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         
         if (newData) {
            setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
-           if (newData.telegram_id?.toString() === '5806129562' || newData.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+           if (newData.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
                setIsAdmin(true);
            }
         }
@@ -94,14 +93,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       const tg = (window as any).Telegram?.WebApp;
       
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('debug') === '1') {
-        const debugUser: TelegramUser = { id: 5806129562, username: 'test_user_ai', first_name: 'Test', last_name: 'Admin User' };
-        setUser(debugUser);
-        setIsAdmin(true);
-        await fetchUserData(debugUser.id);
-        setIsReady(true);
-        return;
-      }
+      // Removed debug backdoor for security.
 
       if (tg && tg.initDataUnsafe) {
         tg.ready();
@@ -118,7 +110,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           setUser(userObj);
           
           // Immediate frontend admin override for the specific user before any backend calls
-          if (tgUser.id.toString() === '5806129562' || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+          if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
             setIsAdmin(true);
           }
           
@@ -141,7 +133,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
               if (authData.access_token) {
                 setSupabaseToken(authData.access_token);
               }
-              if (authData.is_admin || tgUser.id.toString() === '5806129562' || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+              if (authData.is_admin || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
                  setIsAdmin(true);
               } else {
                  setIsAdmin(authData.is_admin);
