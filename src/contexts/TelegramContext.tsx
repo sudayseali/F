@@ -167,12 +167,6 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         <p className="text-slate-400 max-w-sm mb-10 text-balance">
           Payvora is built on the Telegram Open Network. Please launch the application through the official portal.
         </p>
-        <button 
-          onClick={() => window.location.href = '?debug=1'} 
-          className="px-8 py-4 bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white rounded-2xl transition-all border border-white/5 font-bold text-sm tracking-widest"
-        >
-          AUTHENTICATE AS MOCK USER
-        </button>
       </div>
     );
   }

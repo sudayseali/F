@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, Image as ImageIcon, X } from "lucide-react";
 import React, { useState, useRef } from "react";
+import { supabase } from "../lib/supabase";
 
 export function TaskDetails() {
   const { id } = useParams();
@@ -42,7 +43,7 @@ export function TaskDetails() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
       setError('Please upload a screenshot proof.');
@@ -50,9 +51,44 @@ export function TaskDetails() {
     }
     setError(null);
     setStatus('submitting');
-    setTimeout(() => {
+    
+    try {
+      // First upload the image to supabase storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('proofs')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL for the uploaded file
+      const { data: { publicUrl } } = supabase.storage
+        .from('proofs')
+        .getPublicUrl(filePath);
+
+      // Invoke the submit_task edge function
+      const { error: submitError } = await supabase.functions.invoke('submit_task', {
+        body: {
+          task_id: id,
+          proof: publicUrl
+        }
+      });
+
+      if (submitError) {
+        throw submitError;
+      }
+
       setStatus('success');
-    }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to submit proof. Please try again.');
+      setStatus('idle');
+    }
   };
 
   return (

@@ -101,19 +101,19 @@ export function CreateTask() {
 
     try {
       if (user && user.uuid) {
-        const { error } = await supabase.from('tasks').insert({
-          title: formData.title,
-          description: formData.description,
-          reward: parseFloat(formData.payRate),
-          max_completions: parseInt(formData.availabilities),
-          status: 'active',
-          advertiser_id: user.uuid,
-          category: formData.category,
-          sub_category: formData.subCategory,
-          allowed_countries: allowedCountries,
-          proof_instructions: formData.proofInstructions,
-          job_length: parseInt(formData.jobLength),
-          target_mode: targetMode
+        const { error } = await supabase.functions.invoke('create_task', {
+          body: {
+            title: formData.title,
+            description: formData.description,
+            reward: parseFloat(formData.payRate),
+            max_completions: parseInt(formData.availabilities),
+            category: formData.category,
+            sub_category: formData.subCategory,
+            allowed_countries: allowedCountries,
+            proof_instructions: formData.proofInstructions,
+            job_length: parseInt(formData.jobLength),
+            target_mode: targetMode
+          }
         });
         if (error) {
            console.error("Error creating task:", error);
