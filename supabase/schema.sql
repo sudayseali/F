@@ -49,6 +49,14 @@ ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own data" ON public.users;
 CREATE POLICY "Users can read own data" ON public.users FOR SELECT USING (auth.uid() = id OR telegram_id IS NOT NULL);
 
+-- Allow users to insert their own record
+DROP POLICY IF EXISTS "Allow users to insert own record" ON public.users;
+CREATE POLICY "Allow users to insert own record" ON public.users FOR INSERT WITH CHECK (true);
+
+-- Allow users to update their own data
+DROP POLICY IF EXISTS "Allow users to update own record" ON public.users;
+CREATE POLICY "Allow users to update own record" ON public.users FOR UPDATE USING (auth.uid() = id OR telegram_id = auth.uid()::bigint);
+
 -- Transactions: Users can only read their own
 DROP POLICY IF EXISTS "Users can read own transactions" ON public.transactions;
 CREATE POLICY "Users can read own transactions" ON public.transactions FOR SELECT USING (auth.uid() = user_id);
