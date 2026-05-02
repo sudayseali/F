@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Shield, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Sun, Moon } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useTelegram } from "../contexts/TelegramContext";
 import { useState, useEffect } from "react";
@@ -38,9 +38,6 @@ export function Navigation() {
   }, [isDark]);
 
   const navItems = [...baseNavItems];
-  if (isAdmin) {
-    navItems.push({ label: "Admin", icon: Shield, path: "/admin" });
-  }
 
   return (
     <>

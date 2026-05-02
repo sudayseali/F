@@ -11,7 +11,6 @@ import { Tasks } from "./pages/Tasks";
 import { TaskDetails } from "./pages/TaskDetails";
 import { Wallet } from "./pages/Wallet";
 import { Referrals } from "./pages/Referrals";
-import { Admin } from "./pages/Admin";
 import { Profile } from "./pages/Profile";
 import { Offerwall } from "./pages/Offerwall";
 import { TelegramProvider } from "./contexts/TelegramContext";
@@ -38,7 +37,6 @@ export default function App() {
                 <Route path="wallet" element={<Wallet />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="referrals" element={<Referrals />} />
-                <Route path="admin" element={<Admin />} />
               </Route>
             </Routes>
           </Router>
