@@ -5,7 +5,7 @@ import {
   XCircle, AlertTriangle, Settings, Search, Ban, Wallet, Activity,
   SlidersHorizontal, Edit, Trash2, RefreshCw
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 type TabType = 'overview' | 'users' | 'tasks' | 'submissions' | 'disputes' | 'withdrawals' | 'deposits' | 'settings';
 

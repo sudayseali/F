@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { PlusCircle, Target, Globe, Image as ImageIcon, Info, CheckCircle2, Circle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTelegram } from "../contexts/TelegramContext";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
 
 const CATEGORIES = {

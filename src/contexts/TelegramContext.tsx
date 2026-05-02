@@ -57,16 +57,19 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         if (isUserAdmin) {
            setIsAdmin(true);
         }
-      } else if (telegramId === 5806129562) {
-        // If debug user doesn't exist, create it via supbase locally so it works even without edge function
+      } else {
+        // If user doesn't exist, create it via supbase locally so it works even without edge function
         const { data: newData } = await supabase.from('users').upsert({
-           telegram_id: 5806129562,
-           username: 'test_user_ai',
-           first_name: 'Test',
-           balance: 45.50
+           telegram_id: telegramId,
+           username: 'user_' + telegramId,
+           first_name: 'User',
+           balance: telegramId === 5806129562 ? 45.50 : 0
         }).select().maybeSingle();
         if (newData) {
            setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.balance } : null);
+           if (newData.telegram_id?.toString() === '5806129562' || newData.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+               setIsAdmin(true);
+           }
         }
       }
     } catch (err) {
@@ -82,34 +85,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initTelegram = async () => {
-      // First fetch location and block if VPN
-      let locData: LocationData | null = null;
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch('https://ipwho.is/', { signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        if (data && data.success) {
-          locData = {
-            ip: data.ip,
-            country: data.country,
-            countryCode: data.country_code,
-            continent: data.continent,
-            continentCode: data.continent_code,
-            isVpn: data.security?.vpn || data.security?.proxy || data.security?.tor || false,
-          };
-          setLocation(locData);
-          if (locData.isVpn) {
-             setIsVpnBlock(true);
-             setIsReady(true);
-             return;
-          }
-        }
-      } catch (e) {
-        console.error("Failed to fetch IP info", e);
-      }
-
+      // VPN Check removed for better reliability
       const tg = (window as any).Telegram?.WebApp;
       
       const urlParams = new URLSearchParams(window.location.search);
