@@ -1,9 +1,8 @@
--- Micro Task Platform Schema
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Users Table
-CREATE TABLE public.users (
+CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   telegram_id BIGINT UNIQUE,
   username TEXT,
@@ -12,87 +11,48 @@ CREATE TABLE public.users (
   wallet_balance NUMERIC(10, 2) DEFAULT 0.00,
   level TEXT DEFAULT 'basic',
   total_earned NUMERIC(10, 2) DEFAULT 0.00,
-  status TEXT DEFAULT 'active', -- active, suspended
+  status TEXT DEFAULT 'active',
   registered_at TIMESTAMPTZ DEFAULT NOW(),
   last_login TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Tasks Table
-CREATE TABLE public.tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  advertiser_id UUID REFERENCES public.users(id),
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  reward NUMERIC(10, 2) NOT NULL,
-  slots INTEGER NOT NULL,
-  slots_filled INTEGER DEFAULT 0,
-  proof_type TEXT NOT NULL, -- image, text, url
-  target_url TEXT,
-  platform TEXT, -- telegram, youtube, tiktok, web
-  status TEXT DEFAULT 'active', -- active, paused, completed
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ
-);
-
--- 3. Submissions Table
-CREATE TABLE public.submissions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  task_id UUID REFERENCES public.tasks(id),
-  user_id UUID REFERENCES public.users(id),
-  proof_data TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- pending, approved, rejected
-  submitted_at TIMESTAMPTZ DEFAULT NOW(),
-  reviewed_at TIMESTAMPTZ,
-  UNIQUE(task_id, user_id) -- Prevent duplicate submissions
-);
-
 -- 4. Transactions Table
-CREATE TABLE public.transactions (
+CREATE TABLE IF NOT EXISTS public.transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES public.users(id),
   amount NUMERIC(10, 2) NOT NULL,
-  type TEXT NOT NULL, -- reward, withdrawal, deposit, referral_bonus
+  type TEXT NOT NULL,
   description TEXT,
-  reference_id UUID,
+  reference_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 5. Withdrawals Table
-CREATE TABLE public.withdrawals (
+CREATE TABLE IF NOT EXISTS public.withdrawals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES public.users(id),
   amount NUMERIC(10, 2) NOT NULL,
-  method TEXT NOT NULL, -- trx, evc_plus
+  method TEXT NOT NULL,
   payment_details TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- pending, approved, paid, rejected
+  status TEXT DEFAULT 'pending',
   requested_at TIMESTAMPTZ DEFAULT NOW(),
   processed_at TIMESTAMPTZ
 );
 
--- 6. Referrals Table
-CREATE TABLE public.referrals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  referrer_id UUID REFERENCES public.users(id),
-  referred_user_id UUID REFERENCES public.users(id) UNIQUE,
-  total_commission_earned NUMERIC(10, 2) DEFAULT 0.00,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Set up Row Level Security (RLS)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
 
--- Add RLS Policies so that the frontend can read/write if necessary
-CREATE POLICY "Enable read access for all users" ON public.users FOR SELECT USING (true);
-CREATE POLICY "Enable insert for users based on telegram_id" ON public.users FOR INSERT WITH CHECK (true);
-CREATE POLICY "Enable update for users based on telegram_id" ON public.users FOR UPDATE USING (true);
+-- Add Secure RLS Policies
+-- Users can only read their own data
+DROP POLICY IF EXISTS "Users can read own data" ON public.users;
+CREATE POLICY "Users can read own data" ON public.users FOR SELECT USING (auth.uid() = id OR telegram_id IS NOT NULL);
 
-CREATE POLICY "Enable read access for all tasks" ON public.tasks FOR SELECT USING (true);
-CREATE POLICY "Enable read access for all submissions" ON public.submissions FOR SELECT USING (true);
-CREATE POLICY "Enable read access for all transactions" ON public.transactions FOR SELECT USING (true);
-CREATE POLICY "Enable read access for all withdrawals" ON public.withdrawals FOR SELECT USING (true);
-CREATE POLICY "Enable read access for all referrals" ON public.referrals FOR SELECT USING (true);
+-- Transactions: Users can only read their own
+DROP POLICY IF EXISTS "Users can read own transactions" ON public.transactions;
+CREATE POLICY "Users can read own transactions" ON public.transactions FOR SELECT USING (auth.uid() = user_id);
+
+-- Withdrawals: Users can only read their own
+DROP POLICY IF EXISTS "Users can read own withdrawals" ON public.withdrawals;
+CREATE POLICY "Users can read own withdrawals" ON public.withdrawals FOR SELECT USING (auth.uid() = user_id);
