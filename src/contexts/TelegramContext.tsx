@@ -48,12 +48,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       
       if (data) {
         setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
-        // Check if admin
-        const isUserAdmin = 
-           data.level === 'admin' || 
-           data.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID;
-           
-        if (isUserAdmin) {
+        if (data.level === 'admin') {
            setIsAdmin(true);
         }
       } else {
@@ -62,7 +57,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
            telegram_id: telegramId,
            username: 'user_' + telegramId,
            first_name: 'User',
-           wallet_balance: telegramId.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID ? 45.50 : 0
+           wallet_balance: 0
         }).select().maybeSingle();
         
         if (upsertError) {
@@ -71,9 +66,6 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         
         if (newData) {
            setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
-           if (newData.telegram_id?.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
-               setIsAdmin(true);
-           }
         }
       }
     } catch (err) {
@@ -109,10 +101,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           };
           setUser(userObj);
           
-          // Immediate frontend admin override for the specific user before any backend calls
-          if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
-            setIsAdmin(true);
-          }
+          // Removed frontend admin override
           
           try {
             // Attempt remote auth edge function
@@ -133,10 +122,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
               if (authData.access_token) {
                 setSupabaseToken(authData.access_token);
               }
-              if (authData.is_admin || tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
+              if (authData.is_admin) {
                  setIsAdmin(true);
-              } else {
-                 setIsAdmin(authData.is_admin);
               }
               userObj.uuid = authData.user_uuid;
               setUser({...userObj});
@@ -144,9 +131,6 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           } catch(e) {
             console.error("Edge function auth failed, falling back", e);
             // Fallback for AI Studio preview or missing Edge Function
-            if (tgUser.id.toString() === import.meta.env.VITE_ADMIN_TELEGRAM_ID) {
-               setIsAdmin(true);
-            }
           }
           
           await fetchUserData(tgUser.id);

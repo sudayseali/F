@@ -126,9 +126,9 @@ export function Dashboard() {
             </div>
             <div className="flex items-baseline space-x-4">
               <span className="text-7xl lg:text-8xl font-display font-black text-white tracking-tighter drop-shadow-2xl">
-                ${balance.toFixed(2)}
+                {(balance * 1000).toLocaleString()}
               </span>
-              <span className="text-3xl font-bold font-serif text-white/30 uppercase tracking-widest">USD</span>
+              <span className="text-3xl font-bold font-serif text-white/30 uppercase tracking-widest">Paycoin</span>
             </div>
             <div className="flex items-center space-x-3 bg-[#1a0f0a] w-fit px-4 py-2 rounded-xl border border-white/5 shadow-inner">
               <TrendingUp className="w-4 h-4 text-emerald-500" />

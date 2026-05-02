@@ -209,8 +209,8 @@ export function Admin() {
               {[
                 { label: 'Network Users', val: adminData.stats?.totalUsers || 0, icon: Users, color: 'text-brand' },
                 { label: 'Active Contracts', val: adminData.stats?.activeTasks || 0, icon: CheckSquare, color: 'text-brand' },
-                { label: 'Total Outflow', val: `$${adminData.withdrawals?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2) || '0.00'}`, icon: ArrowDownLeft, color: 'text-red-400' },
-                { label: 'System Inflow', val: `$${adminData.deposits?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0).toFixed(2) || '0.00'}`, icon: ArrowUpRight, color: 'text-emerald-400' },
+                { label: 'Total Outflow', val: `${(adminData.withdrawals?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0) * 1000).toLocaleString() || '0'} Paycoin`, icon: ArrowDownLeft, color: 'text-red-400' },
+                { label: 'System Inflow', val: `${(adminData.deposits?.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0) * 1000).toLocaleString() || '0'} Paycoin`, icon: ArrowUpRight, color: 'text-emerald-400' },
               ].map((stat, i) => (
                 <div key={i} className="premium-card border-white/5 p-6 hover:border-brand/30 transition-all duration-300">
                   <div className="flex items-center justify-between mb-4">
@@ -259,14 +259,14 @@ export function Admin() {
                           {u.is_banned && <span className="px-2 py-0.5 bg-red-500/10 text-red-500 text-[9px] rounded-lg uppercase font-black border border-red-500/20 tracking-tighter">Terminated</span>}
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
-                          Network ID: <span className="font-mono text-slate-400">{u.telegram_id}</span> • Credits: <span className="font-display font-bold text-brand ml-1">${Number(u.balance || 0).toFixed(2)}</span>
+                          Network ID: <span className="font-mono text-slate-400">{u.telegram_id}</span> • Credits: <span className="font-display font-bold text-brand ml-1">{(Number(u.balance || 0) * 1000).toLocaleString()} Paycoin</span>
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <button onClick={(e) => {
                         setModalState({ isOpen: true, type: 'edit_balance', data: u });
-                        setModalInput(String(u.balance || 0));
+                        setModalInput(String((u.balance || 0) * 1000));
                       }} className="p-4 bg-slate-900 hover:bg-slate-800 text-slate-400 border border-white/5 rounded-2xl hover:text-brand transition-all group/btn">
                         <Wallet className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
                       </button>
@@ -445,13 +445,13 @@ export function Admin() {
               
               <div className="space-y-4 mb-6">
                 <label className="text-sm font-bold text-white/50 uppercase tracking-widest pl-1">
-                  {modalState.type === 'edit_balance' ? 'New Balance Amount ($)' : 'Input Parameter'}
+                  {modalState.type === 'edit_balance' ? 'New Balance Amount (Paycoin)' : 'Input Parameter'}
                 </label>
                 <input 
                   type={modalState.type === 'edit_balance' ? 'number' : 'text'}
                   value={modalInput}
                   onChange={(e) => setModalInput(e.target.value)}
-                  placeholder={modalState.type === 'edit_balance' ? "e.g. 50.00" : "Enter value..."}
+                  placeholder={modalState.type === 'edit_balance' ? "e.g. 50000" : "Enter value..."}
                   className="w-full bg-[#0a0502] border border-white/10 rounded-2xl p-4 text-white font-mono focus:outline-none focus:border-brand/50 transition-colors"
                   autoFocus
                 />
@@ -467,8 +467,9 @@ export function Admin() {
                 <button 
                   onClick={() => {
                     if (modalState.type === 'edit_balance') {
-                       const newBalance = parseFloat(modalInput);
-                       if (isNaN(newBalance) || newBalance < 0) return alert("Invalid amount");
+                       const newBalancePC = parseFloat(modalInput);
+                       if (isNaN(newBalancePC) || newBalancePC < 0) return alert("Invalid amount");
+                       const newBalance = newBalancePC / 1000;
                        handleAction(modalState.data.id, 'User', 'edit_balance', { new_balance: newBalance });
                     }
                     setModalState({ isOpen: false, type: '', data: null });

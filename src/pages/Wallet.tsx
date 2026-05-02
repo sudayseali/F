@@ -132,9 +132,9 @@ export function Wallet() {
                   <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.3em] font-mono mb-6">Available Liquidity</p>
                   <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 mb-12 justify-center sm:justify-start">
                     <h2 className="text-6xl md:text-7xl font-display font-black tracking-tighter text-white drop-shadow-md">
-                      ${balance.toFixed(2)}
+                      {(balance * 1000).toLocaleString()}
                     </h2>
-                    <span className="text-2xl font-serif italic text-white/30 pt-2">USD</span>
+                    <span className="text-2xl font-serif italic text-white/30 pt-2">Paycoin</span>
                   </div>
                   
                   <div className="grid grid-cols-1 w-full max-w-md mx-auto sm:mx-0">
