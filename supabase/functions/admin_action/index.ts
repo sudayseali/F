@@ -27,8 +27,8 @@ serve(async (req) => {
     if (admin_telegram_id.toString() === ADMIN_TELEGRAM_ID || admin_telegram_id.toString() === '5806129562') {
         isAuthorized = true;
     } else {
-        const { data: userRow } = await supabase.from('users').select('role').eq('telegram_id', admin_telegram_id).single();
-        if (userRow && userRow.role === 'admin') {
+        const { data: userRow } = await supabase.from('users').select('level').eq('telegram_id', admin_telegram_id).single();
+        if (userRow && userRow.level === 'admin') {
             isAuthorized = true;
         }
     }
@@ -55,19 +55,19 @@ serve(async (req) => {
         // target_id waa user_id
         const { error: banError } = await supabase
           .from('users')
-          .update({ is_banned: true })
+          .update({ status: 'suspended' })
           .eq('id', target_id);
         if (banError) throw banError;
-        resultMsg = `User ${target_id} has been banned.`;
+        resultMsg = `User ${target_id} has been suspended.`;
         break;
 
       case 'unban_user':
         const { error: unbanError } = await supabase
           .from('users')
-          .update({ is_banned: false })
+          .update({ status: 'active' })
           .eq('id', target_id);
         if (unbanError) throw unbanError;
-        resultMsg = `User ${target_id} has been unbanned.`;
+        resultMsg = `User ${target_id} has been activated.`;
         break;
         
       case 'edit_balance':
@@ -77,7 +77,7 @@ serve(async (req) => {
         }
         const { error: balanceError } = await supabase
           .from('users')
-          .update({ balance: newBalance })
+          .update({ wallet_balance: newBalance })
           .eq('id', target_id);
         if (balanceError) throw balanceError;
         resultMsg = `Balance updated to ${newBalance} for user ${target_id}.`;
@@ -156,8 +156,8 @@ serve(async (req) => {
         ] = await Promise.all([
           supabase.from('users').select('*').order('created_at', { ascending: false }).limit(100),
           supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(100),
-          supabase.from('submissions').select('*, worker:users!worker_id(username, id), task:tasks!task_id(title, advertiser_id)').eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
-          supabase.from('submissions').select('*, worker:users!worker_id(username), task:tasks!task_id(title, advertiser_id)').eq('status', 'disputed').order('created_at', { ascending: false }).limit(100),
+          supabase.from('submissions').select('*, worker:users!user_id(username, id), task:tasks!task_id(title, advertiser_id)').eq('status', 'pending').order('created_at', { ascending: false }).limit(100),
+          supabase.from('submissions').select('*, worker:users!user_id(username), task:tasks!task_id(title, advertiser_id)').eq('status', 'disputed').order('created_at', { ascending: false }).limit(100),
           supabase.from('transactions').select('*, user:users!user_id(username)').eq('type', 'withdrawal').order('created_at', { ascending: false }).limit(100),
           supabase.from('transactions').select('*, user:users!user_id(username)').eq('type', 'deposit').order('created_at', { ascending: false }).limit(100)
         ]);

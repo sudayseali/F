@@ -42,9 +42,9 @@ export function Admin() {
           setAdminData({
             stats: { totalUsers: 142, activeTasks: 12 },
             users: [
-              { id: '1', telegram_id: 12345, first_name: 'John', balance: 10.5, is_banned: false, level: 'user' },
-              { id: '2', telegram_id: 54321, first_name: 'Jane', balance: 50.0, is_banned: true, level: 'user' },
-              { id: '3', telegram_id: 99999, first_name: 'Admin', balance: 1000.0, is_banned: false, level: 'admin' },
+              { id: '1', telegram_id: 12345, first_name: 'John', wallet_balance: 10.5, status: 'active', level: 'user' },
+              { id: '2', telegram_id: 54321, first_name: 'Jane', wallet_balance: 50.0, status: 'suspended', level: 'user' },
+              { id: '3', telegram_id: 99999, first_name: 'Admin', wallet_balance: 1000.0, status: 'active', level: 'admin' },
             ],
             tasks: [
               { id: '1', title: 'Test Application', reward: 0.5, current_completions: 5, max_completions: 100, status: 'active' },
@@ -257,22 +257,22 @@ export function Admin() {
                       <div>
                         <div className="flex items-center space-x-3">
                           <h4 className="font-bold text-white text-lg">{u.first_name || 'Anonymous Node'}</h4>
-                          {u.is_banned && <span className="px-2 py-0.5 bg-red-500/10 text-red-500 text-[9px] rounded-lg uppercase font-black border border-red-500/20 tracking-tighter">Terminated</span>}
+                          {u.status === 'suspended' && <span className="px-2 py-0.5 bg-red-500/10 text-red-500 text-[9px] rounded-lg uppercase font-black border border-red-500/20 tracking-tighter">Terminated</span>}
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
-                          Network ID: <span className="font-mono text-slate-400">{u.telegram_id}</span> • Credits: <span className="font-display font-bold text-brand ml-1">{(Number(u.balance || 0) * 1000).toLocaleString()} Paycoin</span>
+                          Network ID: <span className="font-mono text-slate-400">{u.telegram_id}</span> • Credits: <span className="font-display font-bold text-brand ml-1">{(Number(u.wallet_balance || 0) * 1000).toLocaleString()} Paycoin</span>
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <button onClick={(e) => {
                         setModalState({ isOpen: true, type: 'edit_balance', data: u });
-                        setModalInput(String((u.balance || 0) * 1000));
+                        setModalInput(String((u.wallet_balance || 0) * 1000));
                       }} className="p-4 bg-slate-900 hover:bg-slate-800 text-slate-400 border border-white/5 rounded-2xl hover:text-brand transition-all group/btn">
                         <Wallet className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />
                       </button>
-                      <button onClick={() => handleAction(u.id, 'User', u.is_banned ? 'unban_user' : 'ban_user')} className={`p-4 rounded-2xl transition-all border group/btn ${u.is_banned ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'}`}>
-                        {u.is_banned ? <RefreshCw className="w-5 h-5 group-hover/btn:rotate-180 transition-transform duration-700" /> : <Ban className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />}
+                      <button onClick={() => handleAction(u.id, 'User', u.status === 'suspended' ? 'unban_user' : 'ban_user')} className={`p-4 rounded-2xl transition-all border group/btn ${u.status === 'suspended' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20'}`}>
+                        {u.status === 'suspended' ? <RefreshCw className="w-5 h-5 group-hover/btn:rotate-180 transition-transform duration-700" /> : <Ban className="w-5 h-5 group-hover/btn:scale-110 transition-transform" />}
                       </button>
                     </div>
                   </motion.div>
