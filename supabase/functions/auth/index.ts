@@ -88,6 +88,40 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized / Invalid Signature. Hacking attempt blocked." }), { status: 401, headers: corsHeaders });
     }
 
+    // Proxy / VPN Check
+    try {
+      const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('cf-connecting-ip');
+      const PROXYCHECK_KEY = Deno.env.get("PROXYCHECK_KEY");
+      const IPAPI_KEY = Deno.env.get("IPAPI_KEY");
+      
+      let isVpn = false;
+      
+      if (clientIp) {
+          if (PROXYCHECK_KEY) {
+            const proxyRes = await fetch(`https://proxycheck.io/v2/${clientIp}?key=${PROXYCHECK_KEY}&vpn=1`);
+            const proxyData = await proxyRes.json();
+            
+            if (proxyData[clientIp] && proxyData[clientIp].proxy === "yes") {
+                isVpn = true;
+            }
+          }
+          
+          if (!isVpn && IPAPI_KEY) {
+              const ipapiRes = await fetch(`http://api.ipapi.com/api/${clientIp}?access_key=${IPAPI_KEY}&security=1`);
+              const ipapiData = await ipapiRes.json();
+              if (ipapiData.security && (ipapiData.security.is_proxy || ipapiData.security.is_tor)) {
+                  isVpn = true;
+              }
+          }
+          
+          if (isVpn) {
+              return new Response(JSON.stringify({ error: "VPN Blocked", isVpnBlock: true }), { status: 403, headers: corsHeaders });
+          }
+      }
+    } catch (e) {
+      console.error("Proxy checking failed: ", e);
+    }
+
     // UPSERT USER SECURELY IN DB
     // If user doesn't exist, create them. If they do, update names.
     const { data: userRow, error: dbError } = await supabase
@@ -95,8 +129,7 @@ serve(async (req) => {
       .upsert({
         telegram_id: tgUser.id,
         username: tgUser.username,
-        first_name: tgUser.first_name,
-        last_name: tgUser.last_name
+        first_name: tgUser.first_name
       }, { onConflict: 'telegram_id' })
       .select('id, status, level')
       .single();

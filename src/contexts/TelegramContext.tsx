@@ -57,7 +57,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         }, { onConflict: 'telegram_id' }).select().maybeSingle();
         
         if (upsertError) {
-          console.error("Upsert error in TelegramContext:", upsertError);
+          console.error("Upsert error in TelegramContext:", JSON.stringify(upsertError, null, 2));
         } else if (newData) {
           console.log("Upsert success:", newData);
           setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
@@ -96,7 +96,36 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           };
           setUser(userObj);
           
-          // Direct SQL Registration bypassing the Edge Function
+          try {
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
+            const authController = new AbortController();
+            const authTimeoutId = setTimeout(() => authController.abort(), 4000);
+            const res = await fetch(`${baseUrl}/functions/v1/auth`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ initData: tg.initData }),
+              signal: authController.signal
+            });
+            clearTimeout(authTimeoutId);
+            const authData = await res.json();
+            
+            if (authData.error === "VPN Blocked" || authData.isVpnBlock) {
+              setIsVpnBlock(true);
+              setIsReady(true);
+              return;
+            }
+
+            if (authData.success) {
+              if (authData.access_token) {
+                setSupabaseToken(authData.access_token);
+              }
+              userObj.uuid = authData.user_uuid;
+              setUser({...userObj});
+            }
+          } catch(e) {
+            console.error("Edge function auth failed", e);
+          }
+          
           await fetchUserData(tgUser.id);
         }
       }
