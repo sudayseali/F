@@ -123,9 +123,9 @@ export function Wallet() {
             </header>
 
             {/* Main Balance - Luxury Card */}
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#1a0f0a] to-[#0a0502] p-1 shadow-2xl border border-white/5 group">
+            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#111827] to-[#0A0E1A] p-1 shadow-2xl border border-white/5 group">
               <div className="absolute inset-0 bg-gradient-to-bl from-brand/10 to-transparent opacity-50 group-hover:opacity-100 transition-opacity duration-1000" />
-              <div className="relative h-full w-full rounded-[2.5rem] bg-[#0a0502]/80 backdrop-blur-2xl p-10 overflow-hidden shadow-inner flex flex-col items-center text-center sm:items-start sm:text-left">
+              <div className="relative h-full w-full rounded-[2.5rem] bg-[#0A0E1A]/80 backdrop-blur-2xl p-10 overflow-hidden shadow-inner flex flex-col items-center text-center sm:items-start sm:text-left">
                 <div className="absolute -top-32 -right-32 w-[30rem] h-[30rem] bg-gradient-radial from-brand/20 to-transparent blur-3xl opacity-40 pointer-events-none"></div>
                 
                 <div className="relative z-10 w-full">
@@ -163,14 +163,14 @@ export function Wallet() {
               </div>
 
               {/* Filters - Glass */}
-              <div className="bg-[#1a0f0a]/30 rounded-[2rem] p-6 flex flex-col md:flex-row gap-6 border border-white/5 backdrop-blur-md">
+              <div className="bg-[#111827]/30 rounded-[2rem] p-6 flex flex-col md:flex-row gap-6 border border-white/5 backdrop-blur-md">
                 <div className="w-full md:w-auto flex-1">
                   <label className="block text-[10px] font-bold text-white/30 mb-3 uppercase tracking-[0.2em] font-mono ml-2">Transaction Type</label>
                   <div className="relative">
                     <select
                       value={txTypeFilter}
                       onChange={(e) => setTxTypeFilter(e.target.value)}
-                      className="w-full px-6 py-4 bg-[#0a0502]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner"
+                      className="w-full px-6 py-4 bg-[#0A0E1A]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner"
                     >
                       <option value="all">All Operations</option>
                       <option value="reward">Bounty Rewards</option>
@@ -186,7 +186,7 @@ export function Wallet() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#0a0502]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner [color-scheme:dark]"
+                    className="w-full px-6 py-4 bg-[#0A0E1A]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner [color-scheme:dark]"
                   />
                 </div>
 
@@ -196,12 +196,12 @@ export function Wallet() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-6 py-4 bg-[#0a0502]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner [color-scheme:dark]"
+                    className="w-full px-6 py-4 bg-[#0A0E1A]/80 rounded-[1.5rem] text-sm text-white/70 font-medium focus:outline-none focus:border-brand/40 border border-white/5 appearance-none backdrop-blur-md shadow-inner [color-scheme:dark]"
                   />
                 </div>
               </div>
               
-              <div className="bg-[#1a0f0a]/20 rounded-[2.5rem] border border-white/5 overflow-hidden backdrop-blur-xl">
+              <div className="bg-[#111827]/20 rounded-[2.5rem] border border-white/5 overflow-hidden backdrop-blur-xl">
                 {loading ? (
                   <div className="p-16 text-center text-white/30 font-bold tracking-[0.3em] font-mono animate-pulse uppercase">Synchronizing Ledger...</div>
                 ) : filteredTransactions.length === 0 ? (
@@ -252,7 +252,7 @@ export function Wallet() {
             className="space-y-10"
           >
             <header className="flex items-center space-x-6 pt-4 border-b border-white/5 pb-8">
-              <button onClick={() => setView('main')} className="p-4 bg-[#1a0f0a] hover:bg-[#2a1a10] rounded-full transition-colors border border-white/5 flex items-center justify-center group active:scale-95 shadow-inner">
+              <button onClick={() => setView('main')} className="p-4 bg-[#111827] hover:bg-[#1E293B] rounded-full transition-colors border border-white/5 flex items-center justify-center group active:scale-95 shadow-inner">
                 <ArrowLeft className="w-6 h-6 text-white/70 group-hover:text-brand transition-colors" />
               </button>
               <div>
@@ -262,7 +262,7 @@ export function Wallet() {
             </header>
 
             {successMsg ? (
-               <div className="bg-[#1a0f0a]/50 rounded-[2.5rem] p-16 flex flex-col items-center text-center border border-emerald-500/20 backdrop-blur-xl shadow-[0_0_50px_rgba(16,185,129,0.05)]">
+               <div className="bg-[#111827]/50 rounded-[2.5rem] p-16 flex flex-col items-center text-center border border-emerald-500/20 backdrop-blur-xl shadow-[0_0_50px_rgba(16,185,129,0.05)]">
                  <div className="w-24 h-24 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-8 border border-emerald-500/20 shadow-inner">
                    <CheckCircle2 className="w-12 h-12" />
                  </div>
@@ -283,7 +283,7 @@ export function Wallet() {
                       <div 
                         key={m.id}
                         onClick={() => selectMethod(m.id as PaymentMethod)} 
-                        className={`group relative bg-[#0a0502]/80 rounded-[2rem] p-6 flex items-center justify-between cursor-pointer transition-all duration-300 border backdrop-blur-md overflow-hidden ${method === m.id ? 'border-brand shadow-[0_0_30px_rgba(255,78,0,0.1)]' : 'border-white/5 hover:border-white/20 hover:bg-[#1a0f0a]/80'}`}
+                        className={`group relative bg-[#0A0E1A]/80 rounded-[2rem] p-6 flex items-center justify-between cursor-pointer transition-all duration-300 border backdrop-blur-md overflow-hidden ${method === m.id ? 'border-brand shadow-[0_0_30px_rgba(59,130,246,0.1)]' : 'border-white/5 hover:border-white/20 hover:bg-[#111827]/80'}`}
                       >
                         {method === m.id && <div className="absolute inset-0 bg-brand/5 pointer-events-none" />}
                         <div className="flex items-center space-x-6 relative z-10">
@@ -310,7 +310,7 @@ export function Wallet() {
                       initial={{ opacity: 0, height: 0 }} 
                       animate={{ opacity: 1, height: 'auto' }} 
                       exit={{ opacity: 0, height: 0 }}
-                      className="space-y-6 bg-[#1a0f0a]/30 rounded-[2.5rem] p-8 sm:p-10 border border-white/5 backdrop-blur-xl"
+                      className="space-y-6 bg-[#111827]/30 rounded-[2.5rem] p-8 sm:p-10 border border-white/5 backdrop-blur-xl"
                     >
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-[0.3em] font-mono text-white/40 mb-3 ml-2">Transfer Value (USD)</label>
@@ -324,7 +324,7 @@ export function Wallet() {
                             placeholder="0.00"
                             min="1"
                             step="0.01"
-                            className="w-full pl-12 pr-6 py-5 bg-[#0a0502]/80 rounded-[1.5rem] border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 font-display font-medium text-2xl transition-all shadow-inner"
+                            className="w-full pl-12 pr-6 py-5 bg-[#0A0E1A]/80 rounded-[1.5rem] border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 font-display font-medium text-2xl transition-all shadow-inner"
                           />
                         </div>
                       </div>
@@ -340,7 +340,7 @@ export function Wallet() {
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                             placeholder={method === 'payeer' ? 'P...' : method === 'zaad' ? '063...' : 'T...'}
-                            className="w-full px-6 py-5 bg-[#0a0502]/80 rounded-[1.5rem] border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 font-mono text-base transition-all shadow-inner"
+                            className="w-full px-6 py-5 bg-[#0A0E1A]/80 rounded-[1.5rem] border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/50 font-mono text-base transition-all shadow-inner"
                           />
                         </div>
                       )}

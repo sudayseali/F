@@ -62,7 +62,7 @@ export function Referrals() {
       className="space-y-12 pb-24"
     >
       <header className="text-center lg:text-left relative pt-4">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-[#1a0f0a] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
+        <span className="inline-block px-4 py-1.5 rounded-full bg-[#111827] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
           Affiliate Architecture
         </span>
         <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-6 flex flex-col md:flex-row md:items-baseline gap-2">
@@ -75,8 +75,8 @@ export function Referrals() {
 
       {/* Hero Card */}
       <div className="relative group perspective">
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand/40 to-[#ff7638]/40 rounded-[3rem] blur-2xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
-        <div className="relative premium-card overflow-hidden !p-12 !rounded-[2.5rem] border-white/10 bg-gradient-to-br from-[#1a0f0a] to-[#0a0502]">
+        <div className="absolute -inset-1 bg-gradient-to-r from-brand/40 to-brand-light/40 rounded-[3rem] blur-2xl opacity-30 group-hover:opacity-50 transition duration-1000"></div>
+        <div className="relative premium-card overflow-hidden !p-12 !rounded-[2.5rem] border-white/10 bg-gradient-to-br from-[#111827] to-[#0A0E1A]">
           <div className="absolute top-0 right-0 p-12 opacity-5 mix-blend-overlay pointer-events-none group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-1000 origin-center">
             <Network className="w-96 h-96 text-brand" />
           </div>
@@ -92,7 +92,7 @@ export function Referrals() {
             
             <div className="w-full space-y-6 max-w-xl mx-auto">
               <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 bg-[#0a0502]/80 border border-white/10 rounded-[1.5rem] p-5 flex items-center shadow-inner group-hover:border-brand/30 transition-colors">
+                <div className="flex-1 bg-[#0A0E1A]/80 border border-white/10 rounded-[1.5rem] p-5 flex items-center shadow-inner group-hover:border-brand/30 transition-colors">
                   <LinkIcon className="w-5 h-5 text-white/30 mr-4 shrink-0" />
                   <p className="text-sm font-mono text-white/60 truncate flex-1 text-left select-all">
                     {refLink}
@@ -154,7 +154,7 @@ export function Referrals() {
           <span className="ml-6 h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
         </h3>
         
-        <div className="premium-card !p-0 border-white/5 overflow-hidden !rounded-[2rem] bg-[#0f0805]/80 backdrop-blur-3xl">
+        <div className="premium-card !p-0 border-white/5 overflow-hidden !rounded-[2rem] bg-[#111827]/80 backdrop-blur-3xl">
           {loading ? (
              <div className="p-16 text-center text-white/30 font-bold uppercase tracking-[0.3em] font-mono animate-pulse">Scanning Telemetry...</div>
           ) : referrals.length === 0 ? (

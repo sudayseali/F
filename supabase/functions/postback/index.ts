@@ -145,20 +145,33 @@ serve(async (req) => {
     const newBalance = Number(userRecord.balance) + rewardAmount;
 
     // 3. Update User Balance
-    const { error: profileError } = await supabaseAdmin
-      .from('users')
-      .update({ balance: newBalance })
-      .eq('id', userRecord.id);
+    const { error: rpcError } = await supabaseAdmin.rpc("reward_user", {
+      user_id: userRecord.id,
+      amount: rewardAmount,
+    });
 
-    if (profileError) throw profileError;
+    if (rpcError) throw rpcError;
 
-    // 4. Record the specific transaction
+    // 4. Note: reward_user already records the transaction, but if we need a specific reference_id,
+    // we might have to update the transaction table, or modify the RPC.
+    // To preserve transactionId logic without changing RPC immediately:
+    // Actually, `reward_user` records a generic transaction. Let's record the reference_id manually
+    // by updating the newly created transaction if we want, or just insert the tapjoy transaction
+    // and rely on reward_user for balance.
+    // For now, reward_user creates a transaction with type 'task_reward'.
+    // If we want to record the transactionId specifically for postbacks, 
+    // let's insert it just to be safe so duplicate checks work.
+    
+    // We already recorded transaction in reward_user but it lacks reference_id.
+    // Let's insert a tracking record with amount=0 or just the reference_id if needed,
+    // OR we change the RPC. But let's just use `transactions` table with 0 amount to mark it tracked 
+    // or just leave it as is and use the txError insert. Wait, if we use reward_user, it gives balance.
     const { error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
         user_id: userRecord.id,
-        amount: rewardAmount,
-        type: 'reward',
+        amount: 0, // already credited in reward_user, this is just to prevent duplicates
+        type: 'postback_reference',
         status: 'completed',
         reference_id: transactionId,
       });

@@ -41,7 +41,7 @@ serve(async (req) => {
     // Fetch user
     const { data: user, error: uErr } = await supabaseAdmin
       .from("users")
-      .select("balance")
+      .select("id")
       .eq("id", userId)
       .single();
 
@@ -62,23 +62,9 @@ serve(async (req) => {
       }
     }
 
-    const newBal = Number(user.balance) + payout;
-
-    // Update user balance
-    const { error: updateErr } = await supabaseAdmin
-      .from("users")
-      .update({ balance: newBal })
-      .eq("id", userId);
-
-    if (updateErr) throw updateErr;
-
-    // Record the transaction
-    await supabaseAdmin.from("transactions").insert({
+    await supabaseAdmin.rpc("reward_user", {
       user_id: userId,
       amount: payout,
-      type: "reward",
-      status: "completed",
-      reference_id: transactionId ? `tapjoy_${transactionId}` : `tapjoy_${Date.now()}`,
     });
 
     // Tapjoy expects a 200 OK response with a specific body format in some cases, 

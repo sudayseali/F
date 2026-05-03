@@ -18,8 +18,8 @@ export function Profile() {
     >
       <header className="flex flex-col items-center justify-center text-center pt-8">
         <div className="relative group perspective">
-          <div className="absolute -inset-2 bg-gradient-to-br from-brand/40 via-brand text-transparent to-[#ff7638]/40 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-70 transition duration-1000"></div>
-          <div className="relative w-40 h-40 rounded-[2.5rem] bg-gradient-to-b from-[#1a0f0a] to-[#0a0502] text-brand flex items-center justify-center font-display font-black text-6xl border border-white/10 shadow-inner mb-8 transform group-hover:-translate-y-2 transition-transform duration-700">
+          <div className="absolute -inset-2 bg-gradient-to-br from-brand/40 via-brand text-transparent to-brand-light/40 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-70 transition duration-1000"></div>
+          <div className="relative w-40 h-40 rounded-[2.5rem] bg-gradient-to-b from-[#111827] to-[#0A0E1A] text-brand flex items-center justify-center font-display font-black text-6xl border border-white/10 shadow-inner mb-8 transform group-hover:-translate-y-2 transition-transform duration-700">
             {initial}
             <div className="absolute inset-0 rounded-[2.5rem] border border-white/5 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
           </div>
@@ -52,9 +52,9 @@ export function Profile() {
             label: "Affiliate Network",
             desc: "Access your 10% perpetual commission stream",
             icon: Gift,
-            color: "text-[#ff7638]",
-            bg: "bg-[#ff7638]/5",
-            border: "border-[#ff7638]/20",
+            color: "text-brand-light",
+            bg: "bg-brand-light/5",
+            border: "border-brand-light/20",
             path: "/referrals"
           },
           {
@@ -73,7 +73,7 @@ export function Profile() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1 }}
             onClick={() => !item.disabled && navigate(item.path || "/")}
-            className={`premium-card !p-8 !rounded-[2rem] flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-all duration-500 group ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-brand/40 bg-[#1a0f0a]/30'}`}
+            className={`premium-card !p-8 !rounded-[2rem] flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-all duration-500 group ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-brand/40 bg-[#111827]/30'}`}
           >
             <div className="flex items-center space-x-6 mb-4 sm:mb-0">
               <div className={`w-16 h-16 rounded-[1.2rem] ${item.bg} ${item.color} flex items-center justify-center border ${item.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shadow-inner`}>
@@ -85,7 +85,7 @@ export function Profile() {
               </div>
             </div>
             {!item.disabled && (
-              <div className="w-12 h-12 rounded-[1rem] bg-[#0a0502] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-2 duration-500 shadow-inner">
+              <div className="w-12 h-12 rounded-[1rem] bg-[#0A0E1A] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-2 duration-500 shadow-inner">
                 <ChevronRight className="w-6 h-6" />
               </div>
             )}

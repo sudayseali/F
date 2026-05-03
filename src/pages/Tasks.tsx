@@ -109,7 +109,7 @@ export function Tasks() {
       <header className="mb-12 text-center lg:text-left pt-4">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
           <div>
-            <span className="inline-block px-4 py-1.5 rounded-full bg-[#1a0f0a] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-[#111827] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
               Task Matrix
             </span>
             <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-4 flex flex-col gap-2">
@@ -174,7 +174,7 @@ export function Tasks() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Initialize query parameters..." 
-            className="w-full bg-[#1a0f0a]/50 border border-white/10 rounded-[2rem] pl-14 pr-6 py-5 text-sm focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/40 text-white transition-all shadow-inner backdrop-blur-md placeholder:text-white/20 placeholder:font-serif placeholder:italic"
+            className="w-full bg-[#111827]/50 border border-white/10 rounded-[2rem] pl-14 pr-6 py-5 text-sm focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/40 text-white transition-all shadow-inner backdrop-blur-md placeholder:text-white/20 placeholder:font-serif placeholder:italic"
           />
         </div>
         
@@ -182,7 +182,7 @@ export function Tasks() {
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full bg-[#0a0502]/80 border border-white/10 rounded-[2rem] px-6 py-5 text-sm focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/40 appearance-none text-white/70 shadow-inner font-medium backdrop-blur-md"
+            className="w-full bg-[#0A0E1A]/80 border border-white/10 rounded-[2rem] px-6 py-5 text-sm focus:outline-none focus:border-brand/40 focus:ring-1 focus:ring-brand/40 appearance-none text-white/70 shadow-inner font-medium backdrop-blur-md"
           >
             <option value="all">All Statuses</option>
             <option value="active">Active Sequence</option>
@@ -200,11 +200,11 @@ export function Tasks() {
       </div>
 
       <div className="lg:hidden mb-8 relative">
-          <label className="absolute -top-2.5 left-6 z-10 bg-[#0a0502] px-2 text-[9px] font-bold text-brand uppercase tracking-[0.2em]">Target Sector</label>
+          <label className="absolute -top-2.5 left-6 z-10 bg-[#0A0E1A] px-2 text-[9px] font-bold text-brand uppercase tracking-[0.2em]">Target Sector</label>
           <select 
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full bg-[#1a0f0a]/50 border border-white/10 rounded-[2rem] px-6 py-5 text-sm focus:outline-none focus:border-brand/40 appearance-none text-white/80 shadow-inner font-medium backdrop-blur-md"
+            className="w-full bg-[#111827]/50 border border-white/10 rounded-[2rem] px-6 py-5 text-sm focus:outline-none focus:border-brand/40 appearance-none text-white/80 shadow-inner font-medium backdrop-blur-md"
           >
             <option value="all">All Sectors</option>
             {categories.map(c => (
@@ -217,11 +217,11 @@ export function Tasks() {
       {/* Tasks Grid */}
       <AnimatePresence mode="popLayout">
         {loading ? (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-32 premium-card !p-12 border-white/5 bg-[#0a0502]/80 backdrop-blur-xl">
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-32 premium-card !p-12 border-white/5 bg-[#0A0E1A]/80 backdrop-blur-xl">
             <p className="text-white/30 font-bold uppercase tracking-[0.3em] font-mono animate-pulse">Synchronizing Ledgers...</p>
           </motion.div>
         ) : filteredJobs.length === 0 ? (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-32 premium-card border-white/5 flex flex-col items-center bg-[#0a0502]/80 backdrop-blur-xl">
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="text-center py-32 premium-card border-white/5 flex flex-col items-center bg-[#0A0E1A]/80 backdrop-blur-xl">
             <div className="p-8 bg-white/[0.02] rounded-[2rem] mb-8 border border-white/5 shadow-inner">
               <Filter className="w-12 h-12 text-white/20" />
             </div>
@@ -239,7 +239,7 @@ export function Tasks() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.5, delay: index * 0.05, ease: [0.23, 1, 0.32, 1] }}
-                className="premium-card group cursor-pointer flex flex-col !p-8 !rounded-[2rem] bg-gradient-to-br from-[#1a0f0a]/80 to-[#0a0502]/80 backdrop-blur-2xl"
+                className="premium-card group cursor-pointer flex flex-col !p-8 !rounded-[2rem] bg-gradient-to-br from-[#111827]/80 to-[#0A0E1A]/80 backdrop-blur-2xl"
               >
                 <div className="flex justify-between items-start mb-8">
                   <div className="px-4 py-2 bg-brand/5 rounded-full border border-brand/10 group-hover:bg-brand/10 group-hover:border-brand/20 transition-all duration-500 shadow-inner">
@@ -273,7 +273,7 @@ export function Tasks() {
                       <span className="text-white/30">Network Capacity</span>
                       <span className="text-brand">{job.available} Left</span>
                     </div>
-                    <div className="h-2 w-full bg-[#0a0502] border border-white/5 rounded-full overflow-hidden shadow-inner flex">
+                    <div className="h-2 w-full bg-[#0A0E1A] border border-white/5 rounded-full overflow-hidden shadow-inner flex">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: job.percentage }}

@@ -89,7 +89,7 @@ export function Navigation() {
       </nav>
 
       {/* Desktop Sidebar - Enterprise Class */}
-      <aside className="hidden md:flex flex-col w-80 h-screen fixed left-0 top-0 bg-[#0a0502]/80 backdrop-blur-3xl border-r border-white/5 shadow-2xl">
+      <aside className="hidden md:flex flex-col w-80 h-screen fixed left-0 top-0 bg-[#0A0E1A]/80 backdrop-blur-3xl border-r border-white/5 shadow-2xl">
         <div className="p-10 flex items-center justify-between relative z-10">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-brand/10 rounded-2xl border border-brand/20 shadow-[0_0_20px_rgba(255,78,0,0.2)]">

@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.users(id),
     amount NUMERIC(10, 2) NOT NULL,
-    type TEXT NOT NULL, -- reward, withdrawal
+    type TEXT NOT NULL, -- reward, withdrawal, task_reward, referral_commission
+    status TEXT DEFAULT 'completed',
+    reference_id TEXT UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

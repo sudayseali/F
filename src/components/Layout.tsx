@@ -7,7 +7,7 @@ export function Layout() {
       {/* Immersive background elements */}
       <div className="fixed inset-0 pointer-events-none -z-10">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[40%] rounded-full bg-[#ff7638]/5 blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[40%] rounded-full bg-brand-light/5 blur-[100px]" />
       </div>
 
       <Navigation />

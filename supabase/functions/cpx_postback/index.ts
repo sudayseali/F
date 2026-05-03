@@ -22,24 +22,14 @@ serve(async (req) => {
     if (payout > 0) {
       const { data: user, error: uErr } = await supabaseAdmin
         .from("users")
-        .select("balance")
+        .select("id")
         .eq("id", userId)
         .single();
       if (uErr || !user) throw new Error("User not found");
 
-      const newBal = Number(user.balance) + payout;
-
-      await supabaseAdmin
-        .from("users")
-        .update({ balance: newBal })
-        .eq("id", userId);
-
-      await supabaseAdmin.from("transactions").insert({
+      await supabaseAdmin.rpc("reward_user", {
         user_id: userId,
         amount: payout,
-        type: "reward",
-        status: "completed",
-        reference_id: `cpx_${Date.now()}`,
       });
     }
 

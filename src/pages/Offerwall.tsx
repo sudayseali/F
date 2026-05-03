@@ -154,7 +154,7 @@ export function Offerwall() {
           </span>
         </div>
         
-        <div className="flex-1 overflow-y-auto w-full p-4 md:p-6 bg-[#0a0502]">
+        <div className="flex-1 overflow-y-auto w-full p-4 md:p-6 bg-[#0A0E1A]">
           {loadingAyet ? (
             <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
               <Loader2 className="w-8 h-8 text-brand animate-spin" />
@@ -258,7 +258,7 @@ export function Offerwall() {
       className="space-y-12 pb-24"
     >
       <header className="text-center lg:text-left relative pt-4">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-[#1a0f0a] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
+        <span className="inline-block px-4 py-1.5 rounded-full bg-[#111827] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
           Task Matrix
         </span>
         <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-6 hidden md:block">
@@ -279,8 +279,8 @@ export function Offerwall() {
         transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
         className="relative group cursor-pointer perspective"
       >
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand/30 to-[#ff7638]/30 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition duration-1000" />
-        <div className="relative premium-card overflow-hidden !p-12 !rounded-[2.5rem] border-white/10 flex flex-col justify-center bg-gradient-to-br from-[#1a0f0a] to-[#0a0502]">
+        <div className="absolute -inset-1 bg-gradient-to-r from-brand/30 to-brand-light/30 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition duration-1000" />
+        <div className="relative premium-card overflow-hidden !p-12 !rounded-[2.5rem] border-white/10 flex flex-col justify-center bg-gradient-to-br from-[#111827] to-[#0A0E1A]">
           <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none" />
           <div className="absolute top-0 right-10 p-12 opacity-5 group-hover:scale-110 transition-transform duration-1000">
             <Globe className="w-64 h-64 -rotate-12 text-brand" />
@@ -318,7 +318,7 @@ export function Offerwall() {
                   transition={{ delay: 0.1 + (i * 0.05) + (catIndex * 0.1) }}
                   whileHover={{ scale: 1.02 }}
                   onClick={() => handleProviderClick(provider.id)}
-                  className="premium-card !p-8 !rounded-[2rem] border-white/5 flex items-center space-x-6 group cursor-pointer hover:border-brand/30 transition-all duration-500 bg-[#1a0f0a]/30"
+                  className="premium-card !p-8 !rounded-[2rem] border-white/5 flex items-center space-x-6 group cursor-pointer hover:border-brand/30 transition-all duration-500 bg-[#111827]/30"
                 >
                   <div className={`w-16 h-16 rounded-[1.2rem] ${provider.bg} ${provider.color} flex items-center justify-center border ${provider.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shrink-0 shadow-inner`}>
                     <provider.icon className="w-8 h-8" />
@@ -328,14 +328,14 @@ export function Offerwall() {
                       <h4 className="text-xl font-display font-bold text-white group-hover:text-brand transition-colors truncate">
                         {provider.name}
                       </h4>
-                      <span className="text-[10px] font-black bg-[#0a0502] text-white/50 px-3 py-1 rounded-xl border border-white/10 uppercase tracking-widest shadow-inner group-hover:border-brand/30 group-hover:text-brand transition-colors">
+                      <span className="text-[10px] font-black bg-[#0A0E1A] text-white/50 px-3 py-1 rounded-xl border border-white/10 uppercase tracking-widest shadow-inner group-hover:border-brand/30 group-hover:text-brand transition-colors">
                         {provider.reward}
                       </span>
                     </div>
                     <p className="text-[10px] text-brand/70 font-bold uppercase tracking-[0.2em] mb-2">{provider.type}</p>
                     <p className="text-white/40 text-sm line-clamp-2 font-serif italic leading-relaxed">{provider.desc}</p>
                   </div>
-                  <div className="w-12 h-12 rounded-[1rem] bg-[#0a0502] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand group-hover:border-brand/30 transition-colors shadow-inner">
+                  <div className="w-12 h-12 rounded-[1rem] bg-[#0A0E1A] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand group-hover:border-brand/30 transition-colors shadow-inner">
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </motion.div>

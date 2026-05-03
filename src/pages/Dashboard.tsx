@@ -93,11 +93,11 @@ export function Dashboard() {
         <div className="flex items-center p-2 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] backdrop-blur-md">
           <div className="flex -space-x-3 px-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="w-10 h-10 rounded-full border-2 border-[#0a0502] bg-[#1a0f0a] flex items-center justify-center">
+              <div key={i} className="w-10 h-10 rounded-full border-2 border-[#0A0E1A] bg-[#111827] flex items-center justify-center">
                 <Shield className="w-4 h-4 text-brand/50" />
               </div>
             ))}
-            <div className="w-10 h-10 rounded-full border-2 border-[#0a0502] bg-[#1a0f0a] flex items-center justify-center text-[10px] font-bold text-white/50">
+            <div className="w-10 h-10 rounded-full border-2 border-[#0A0E1A] bg-[#111827] flex items-center justify-center text-[10px] font-bold text-white/50">
               +99
             </div>
           </div>
@@ -111,7 +111,7 @@ export function Dashboard() {
       {/* Balance Card - Ultra Premium */}
       <motion.div variants={itemVariants} className="relative group">
         <div className="absolute -inset-1 bg-gradient-to-r from-brand/20 to-white/5 rounded-[3rem] blur-xl opacity-50 group-hover:opacity-70 transition duration-1000"></div>
-        <div className="relative premium-card !rounded-[2.5rem] !p-12 border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-12 bg-gradient-to-br from-[#1a0f0a]/90 to-[#0a0502]/90 backdrop-blur-3xl">
+        <div className="relative premium-card !rounded-[2.5rem] !p-12 border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-12 bg-gradient-to-br from-[#111827]/90 to-[#0A0E1A]/90 backdrop-blur-3xl">
           
           <div className="absolute top-0 right-0 p-12 opacity-5 mix-blend-overlay pointer-events-none group-hover:scale-110 transition-transform duration-1000">
             <TrendingUp className="w-96 h-96 -rotate-12 text-white" />
@@ -130,7 +130,7 @@ export function Dashboard() {
               </span>
               <span className="text-3xl font-bold font-serif text-white/30 uppercase tracking-widest">Paycoin</span>
             </div>
-            <div className="flex items-center space-x-3 bg-[#1a0f0a] w-fit px-4 py-2 rounded-xl border border-white/5 shadow-inner">
+            <div className="flex items-center space-x-3 bg-[#111827] w-fit px-4 py-2 rounded-xl border border-white/5 shadow-inner">
               <TrendingUp className="w-4 h-4 text-emerald-500" />
               <span className="text-emerald-500 text-[11px] font-bold uppercase tracking-[0.15em]">Market Outperforming +12.5%</span>
             </div>
@@ -164,20 +164,20 @@ export function Dashboard() {
         
         <div className="premium-card flex flex-col justify-between group hover-lift !p-10 !rounded-[2.5rem]">
           <div className="flex items-center justify-between mb-8">
-            <div className="w-16 h-16 rounded-[1.2rem] bg-[#ff7638]/5 flex items-center justify-center text-[#ff7638] border border-[#ff7638]/10 group-hover:scale-110 transition-transform duration-700">
+            <div className="w-16 h-16 rounded-[1.2rem] bg-brand-light/5 flex items-center justify-center text-brand-light border border-brand-light/10 group-hover:scale-110 transition-transform duration-700">
               <Clock className="w-8 h-8" />
             </div>
             <span className="text-white/20 text-4xl font-serif italic font-light">02</span>
           </div>
           <div>
             <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-2">Pending Audits</p>
-            <h4 className="text-5xl font-display font-black text-white group-hover:text-[#ff7638] transition-colors">{loading ? "-" : stats.pending}</h4>
+            <h4 className="text-5xl font-display font-black text-white group-hover:text-brand-light transition-colors">{loading ? "-" : stats.pending}</h4>
           </div>
         </div>
       </motion.div>
 
       {/* Offerwall CTA */}
-      <motion.div variants={itemVariants} className="premium-card bg-[#1a0f0a]/50 border-brand/20 !p-12 !rounded-[2.5rem] group overflow-hidden relative">
+      <motion.div variants={itemVariants} className="premium-card bg-[#111827]/50 border-brand/20 !p-12 !rounded-[2.5rem] group overflow-hidden relative">
         <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-brand/10 to-transparent pointer-events-none"></div>
         <div className="absolute top-0 right-10 p-12 opacity-10 mix-blend-overlay pointer-events-none group-hover:scale-110 group-hover:rotate-12 transition-transform duration-1000">
           <TrendingUp className="w-64 h-64 text-brand" />
@@ -189,7 +189,7 @@ export function Dashboard() {
               Integrate with tier-1 partner networks to unlock bespoke, high-yield bounty operations. Only accessible via the Global Offerwall structure.
             </p>
           </div>
-          <Link to="/offerwall" className="btn-primary !px-12 !py-6 whitespace-nowrap !rounded-[1.5rem] bg-white text-[#0a0502] hover:bg-white/90 shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)]">
+          <Link to="/offerwall" className="btn-primary !px-12 !py-6 whitespace-nowrap !rounded-[1.5rem] bg-white text-[#0A0E1A] hover:bg-white/90 shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)]">
             <span className="relative z-10 flex items-center font-display tracking-widest text-sm uppercase">
               Initialize Portal
             </span>
