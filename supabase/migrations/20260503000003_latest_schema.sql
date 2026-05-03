@@ -130,6 +130,15 @@ BEGIN
     END IF;
 END;
 $$;
+DROP POLICY IF EXISTS "Allow all select" ON public.users;
+DROP POLICY IF EXISTS "Allow all insert" ON public.users;
+DROP POLICY IF EXISTS "Allow all update" ON public.users;
+DROP POLICY IF EXISTS "Allow all select transactions" ON public.transactions;
+DROP POLICY IF EXISTS "Allow all select withdrawals" ON public.withdrawals;
+DROP POLICY IF EXISTS "Allow all select referrals" ON public.referrals;
+DROP POLICY IF EXISTS "Allow all select tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Allow all select submissions" ON public.submissions;
+
 CREATE POLICY "Allow all select" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Allow all insert" ON public.users FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow all update" ON public.users FOR UPDATE USING (true);
