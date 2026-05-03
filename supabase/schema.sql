@@ -36,10 +36,51 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
     requested_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 4. Referrals Table
+CREATE TABLE IF NOT EXISTS public.referrals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    referrer_id UUID REFERENCES public.users(id),
+    referred_user_id UUID REFERENCES public.users(id) UNIQUE,
+    total_commission_earned NUMERIC(10, 2) DEFAULT 0.00,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Tasks Table
+CREATE TABLE IF NOT EXISTS public.tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  advertiser_id UUID REFERENCES public.users(id),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  reward NUMERIC(10, 2) NOT NULL,
+  slots INTEGER NOT NULL,
+  slots_filled INTEGER DEFAULT 0,
+  proof_type TEXT NOT NULL,
+  target_url TEXT,
+  platform TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ
+);
+
+-- 6. Submissions Table
+CREATE TABLE IF NOT EXISTS public.submissions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  task_id UUID REFERENCES public.tasks(id),
+  user_id UUID REFERENCES public.users(id),
+  proof_data TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  submitted_at TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  UNIQUE(task_id, user_id)
+);
+
 -- Enable RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 
 -- Policies (Simplified for development)
 CREATE POLICY "Allow all select" ON public.users FOR SELECT USING (true);
@@ -47,3 +88,6 @@ CREATE POLICY "Allow all insert" ON public.users FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow all update" ON public.users FOR UPDATE USING (true);
 CREATE POLICY "Allow all select transactions" ON public.transactions FOR SELECT USING (true);
 CREATE POLICY "Allow all select withdrawals" ON public.withdrawals FOR SELECT USING (true);
+CREATE POLICY "Allow all select referrals" ON public.referrals FOR SELECT USING (true);
+CREATE POLICY "Allow all select tasks" ON public.tasks FOR SELECT USING (true);
+CREATE POLICY "Allow all select submissions" ON public.submissions FOR SELECT USING (true);

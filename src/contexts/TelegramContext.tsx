@@ -103,7 +103,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
             const res = await fetch(`${baseUrl}/functions/v1/auth`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ initData: tg.initData }),
+              body: JSON.stringify({ 
+                initData: tg.initData,
+                start_param: tg.initDataUnsafe?.start_param 
+              }),
               signal: authController.signal
             });
             clearTimeout(authTimeoutId);

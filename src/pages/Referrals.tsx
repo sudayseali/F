@@ -26,7 +26,7 @@ export function Referrals() {
 
         if (data) {
           setReferrals(data);
-          const earned = data.reduce((acc, curr) => acc + Number(curr.earned || 0), 0);
+          const earned = data.reduce((acc, curr) => acc + Number(curr.total_commission_earned || 0), 0);
           setTotalEarned(earned);
         }
       } catch (err) {
@@ -193,7 +193,7 @@ export function Referrals() {
                     </div>
                     <div className="sm:text-right bg-white/[0.02] sm:bg-transparent p-4 sm:p-0 rounded-[1.5rem] sm:rounded-none border sm:border-0 border-white/5">
                       <p className="text-[10px] text-white/30 font-bold uppercase tracking-[0.2em] mb-2 sm:mb-1">Matrix Yield</p>
-                      <p className="font-display font-black text-emerald-400 text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">${Number(ref.earned).toFixed(2)}</p>
+                      <p className="font-display font-black text-emerald-400 text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">${Number(ref.total_commission_earned).toFixed(2)}</p>
                     </div>
                   </motion.div>
                 );

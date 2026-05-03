@@ -76,7 +76,7 @@ serve(async (req) => {
   }
 
   try {
-    const { initData } = await req.json();
+    const { initData, start_param } = await req.json();
 
     if (!initData) {
       return new Response(JSON.stringify({ error: "Missing initData" }), { status: 400, headers: corsHeaders });
@@ -122,6 +122,15 @@ serve(async (req) => {
       console.error("Proxy checking failed: ", e);
     }
 
+    // Check if user exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('telegram_id', tgUser.id)
+      .maybeSingle();
+      
+    const isNewUser = !existingUser;
+
     // UPSERT USER SECURELY IN DB
     // If user doesn't exist, create them. If they do, update names.
     const { data: userRow, error: dbError } = await supabase
@@ -135,6 +144,37 @@ serve(async (req) => {
       .single();
 
     if (dbError) throw dbError;
+
+    // Process Referral if new user and has start_param
+    if (isNewUser && start_param) {
+      try {
+        const referrerId = parseInt(start_param.toString().replace('ref_', ''), 10);
+        if (!isNaN(referrerId) && referrerId !== tgUser.id) {
+          // Find referrer UUID
+          const { data: referrerUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('telegram_id', referrerId)
+            .maybeSingle();
+            
+          if (referrerUser) {
+            // Create referral
+            const { error: referralError } = await supabase
+              .from('referrals')
+              .insert({
+                referrer_id: referrerUser.id,
+                referred_user_id: userRow.id
+              });
+              
+            if (referralError) {
+              console.error("Failed to create referral record:", referralError);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error processing referral:", err);
+      }
+    }
 
     // Check if user is banned
     if (userRow.status === 'suspended') {
