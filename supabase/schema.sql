@@ -82,7 +82,52 @@ ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
 
--- Policies (Simplified for development)
+-- 7. Functions
+CREATE OR REPLACE FUNCTION public.reward_user(user_id UUID, amount NUMERIC)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_referrer_id UUID;
+    v_commission NUMERIC;
+BEGIN
+    -- 1. Reward the user
+    UPDATE public.users 
+    SET wallet_balance = wallet_balance + amount,
+        total_earned = total_earned + amount
+    WHERE id = user_id;
+
+    -- 2. Record transaction for the user
+    INSERT INTO public.transactions (user_id, amount, type)
+    VALUES (user_id, amount, 'task_reward');
+
+    -- 3. Check for referral
+    SELECT referrer_id INTO v_referrer_id
+    FROM public.referrals
+    WHERE referred_user_id = user_id;
+
+    -- 4. Reward the referrer (10%)
+    IF v_referrer_id IS NOT NULL THEN
+        v_commission := amount * 0.10;
+        
+        -- Update referrer's balance
+        UPDATE public.users 
+        SET wallet_balance = wallet_balance + v_commission,
+            total_earned = total_earned + v_commission
+        WHERE id = v_referrer_id;
+
+        -- Record transaction for referrer
+        INSERT INTO public.transactions (user_id, amount, type)
+        VALUES (v_referrer_id, v_commission, 'referral_commission');
+
+        -- Update total commission earned in referrals table
+        UPDATE public.referrals
+        SET total_commission_earned = total_commission_earned + v_commission
+        WHERE referrer_id = v_referrer_id AND referred_user_id = user_id;
+    END IF;
+END;
+$$;
 CREATE POLICY "Allow all select" ON public.users FOR SELECT USING (true);
 CREATE POLICY "Allow all insert" ON public.users FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow all update" ON public.users FOR UPDATE USING (true);
