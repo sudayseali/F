@@ -130,9 +130,15 @@ export function Offerwall() {
         setLoadingAyet(false);
       }
     } else if (providerId === "cpx") {
-      const appId = import.meta.env.VITE_CPX_APP_ID || "1"; // Fallback to 1 or prompt for it
-      const url = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user.id}`;
-      setActiveOfferwall(url);
+      try {
+        const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
+        if (error || !data?.url) {
+          throw new Error(error?.message || "Failed to load CPX URL.");
+        }
+        setActiveOfferwall(data.url);
+      } catch (err: any) {
+        alert("Error loading CPX Research: " + err.message);
+      }
     } else {
       alert(`Provider ${providerId} setup logic coming soon.`);
     }
