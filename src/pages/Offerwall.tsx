@@ -2,6 +2,7 @@ import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRigh
 import React, { useState } from "react";
 import { motion } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
+import { supabase } from "../lib/supabase";
 
 const CATEGORIES = [
   {
