@@ -129,6 +129,10 @@ export function Offerwall() {
       } finally {
         setLoadingAyet(false);
       }
+    } else if (providerId === "cpx") {
+      const appId = import.meta.env.VITE_CPX_APP_ID || "1"; // Fallback to 1 or prompt for it
+      const url = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${user.id}`;
+      setActiveOfferwall(url);
     } else {
       alert(`Provider ${providerId} setup logic coming soon.`);
     }
