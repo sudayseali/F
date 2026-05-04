@@ -133,8 +133,14 @@ export function Offerwall() {
     } else if (providerId === "cpx") {
       try {
         const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
-        if (error || !data?.url) {
-          throw new Error(error?.message || "Failed to load CPX URL.");
+        if (error) {
+          throw new Error(error.message || "Failed to load CPX URL.");
+        }
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+        if (!data?.url) {
+          throw new Error("No URL returned from server.");
         }
         setActiveOfferwall(data.url);
       } catch (err: any) {

@@ -38,9 +38,9 @@ serve(async (req) => {
     const appId = Deno.env.get('CPX_APP_ID');
 
     if (!appId) {
-      return new Response(JSON.stringify({ error: 'CPX App ID not configured' }), {
+      return new Response(JSON.stringify({ error: 'CPX App ID not configured in Supabase Secrets. Please run: supabase secrets set CPX_APP_ID=your_id' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 200,
       });
     }
 
@@ -55,7 +55,7 @@ serve(async (req) => {
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: 200,
     });
   }
 });
