@@ -5,13 +5,14 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
 
-    // CPX Research usually sends: subid=?, payout=?
-    // Adjust these based on actual CPX documentation
-    const userId = url.searchParams.get("subid");
-    let payout = parseFloat(url.searchParams.get("payout") || "0");
+    const status = url.searchParams.get("status");
+    const transId = url.searchParams.get("trans_id");
+    const userId = url.searchParams.get("user_id") || url.searchParams.get("sub_id");
+    const amountLocal = parseFloat(url.searchParams.get("amount_local") || "0");
+    const secureHash = url.searchParams.get("hash");
 
     if (!userId) {
-      return new Response("Missing SubID (User ID)", { status: 400 });
+      return new Response("Missing User ID", { status: 400 });
     }
 
     const supabaseAdmin = createClient(
@@ -19,7 +20,8 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    if (payout > 0) {
+    // Only reward for complete status (usually 1 for CPX)
+    if (status === "1" && amountLocal > 0) {
       const { data: user, error: uErr } = await supabaseAdmin
         .from("users")
         .select("id")
@@ -29,8 +31,19 @@ serve(async (req) => {
 
       await supabaseAdmin.rpc("reward_user", {
         user_id: userId,
-        amount: payout,
+        amount: amountLocal,
       });
+
+      // To prevent duplicate credits, record the transaction ID in the transactions table
+      if (transId) {
+        await supabaseAdmin.from("transactions").insert({
+          user_id: userId,
+          amount: 0,
+          type: "postback_reference",
+          status: "completed",
+          reference_id: `cpx_${transId}`,
+        });
+      }
     }
 
     return new Response("CPX Postback Success", { status: 200 });
