@@ -3,10 +3,31 @@ project_id = "gwggirbuaewcmntnzjpp"
 [functions.auth]
 verify_jwt = false
 
-[functions.telegram-webhook]
+[functions.withdraw]
+verify_jwt = false
+
+[functions.submit_task]
+verify_jwt = false
+
+[functions.get_cpx_url]
+verify_jwt = false
+
+[functions.cpx_postback]
+verify_jwt = false
+
+[functions.cpa_postback]
+verify_jwt = false
+
+[functions.postback]
 verify_jwt = false
 
 [functions.tapjoy_webhook]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false
+
+[functions.verify_task_submission]
 verify_jwt = false
 
 [functions.admin_api]
@@ -14,5 +35,3 @@ verify_jwt = false
 
 [functions.admin_action]
 verify_jwt = false
-
-

@@ -8,6 +8,7 @@ on:
 
 jobs:
   deploy:
+    name: Deploy Database & Edge Functions
     runs-on: ubuntu-latest
 
     env:
@@ -15,47 +16,75 @@ jobs:
       PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Validate Secrets
+      - name: Validate GitHub Secrets
         run: |
+          echo "=========================================="
+          echo "Validating Required GitHub Action Secrets"
+          echo "=========================================="
+          MISSING=0
           if [ -z "$PROJECT_ID" ]; then
-            echo "Error: SUPABASE_PROJECT_ID secret is missing or empty."
-            exit 1
+            echo "❌ Missing Secret: SUPABASE_PROJECT_ID"
+            MISSING=$((MISSING+1))
           fi
           if [ -z "${{ secrets.SUPABASE_DB_PASSWORD }}" ]; then
-            echo "Error: SUPABASE_DB_PASSWORD secret is missing or empty."
-            exit 1
+            echo "❌ Missing Secret: SUPABASE_DB_PASSWORD"
+            MISSING=$((MISSING+1))
           fi
           if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
-            echo "Error: SUPABASE_ACCESS_TOKEN secret is missing or empty."
-            exit 1
+            echo "❌ Missing Secret: SUPABASE_ACCESS_TOKEN"
+            MISSING=$((MISSING+1))
           fi
 
-      - name: Set Supabase Secrets
-        run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env.func
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.func
-          echo "SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> .env.func
-          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env.func
-          echo "AYET_SECRET=${{ secrets.AYET_SECRET }}" >> .env.func
-          echo "TOROX_SECRET=${{ secrets.TOROX_SECRET }}" >> .env.func
-          echo "ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}" >> .env.func
-          echo "LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}" >> .env.func
-          echo "CPX_SECRET=${{ secrets.CPX_SECRET }}" >> .env.func
-          supabase secrets set --env-file .env.func --project-ref ${{ env.PROJECT_ID }} || true
+          if [ $MISSING -gt 0 ]; then
+            echo "------------------------------------------"
+            echo "Error: Required GitHub Secrets are missing."
+            echo "Please go to your GitHub repository -> Settings -> Secrets and variables -> Actions"
+            echo "and set SUPABASE_PROJECT_ID, SUPABASE_DB_PASSWORD, and SUPABASE_ACCESS_TOKEN."
+            echo "------------------------------------------"
+            exit 1
+          fi
+          echo "✅ All required secrets present."
 
-      - name: Deploy Database Schema 
+      - name: Set Environment Secrets on Supabase
+        run: |
+          echo "Configuring environment variables on remote Supabase project..."
+          cat << 'EOF' > .env.func
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          AYET_SECRET=${{ secrets.AYET_SECRET }}
+          TOROX_SECRET=${{ secrets.TOROX_SECRET }}
+          ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}
+          LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}
+          CPX_SECRET=${{ secrets.CPX_SECRET }}
+          EOF
+          supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID" || echo "Warning: Failed to set remote secrets, continuing..."
+
+      - name: Link Project and Deploy Database Migrations
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase link --project-ref "${{ env.PROJECT_ID }}" -p "$SUPABASE_DB_PASSWORD"
-          supabase db push -p "$SUPABASE_DB_PASSWORD"
+          echo "Linking Supabase CLI to project $PROJECT_ID..."
+          supabase link --project-ref "$PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+          echo "Pushing database migrations..."
+          supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all --non-interactive || supabase db push -p "$SUPABASE_DB_PASSWORD"
 
-      - name: Deploy all Edge Functions
-        run: supabase functions deploy --project-ref ${{ env.PROJECT_ID }} --no-verify-jwt || true
+      - name: Deploy Edge Functions
+        run: |
+          echo "Deploying all Edge Functions to Supabase..."
+          for func in auth withdraw submit_task get_cpx_url cpx_postback cpa_postback postback tapjoy_webhook telegram-webhook verify_task_submission admin_api admin_action; do
+            if [ -d "supabase/functions/$func" ]; then
+              echo "Deploying Edge Function: $func"
+              supabase functions deploy "$func" --project-ref "$PROJECT_ID" --no-verify-jwt || echo "Failed to deploy function $func"
+            fi
+          done
+          echo "✅ Edge Function deployment step completed."
