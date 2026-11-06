@@ -1,22 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   
-  --color-brand: #2481cc;
-  --color-brand-light: #38bdf8;
-  --color-brand-dark: #1a6cb3;
-  --color-tg-blue: #2481cc;
-  --color-tg-bg: #0e1621;
-  --color-tg-surface: #17212b;
-  --color-tg-surface-elevated: #202b36;
-  --color-tg-border: rgba(255, 255, 255, 0.08);
-  --color-tg-text-primary: #f5f5f5;
-  --color-tg-text-secondary: #7e8c9b;
-  --color-tg-gold: #f59e0b;
-  --color-tg-green: #10b981;
+  --color-brand: #0284c7;
+  --color-brand-cyan: #38bdf8;
+  --color-brand-purple: #8b5cf6;
+  --color-tg-bg: #030712;
+  --color-tg-card: #0b1329;
+  --color-tg-card-elevated: #111e3b;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -24,11 +18,12 @@
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
   }
   
   body {
-    background-color: var(--tg-theme-bg-color, #0e1621);
-    color: var(--tg-theme-text-color, #f5f5f5);
+    background-color: #030712;
+    color: #f8fafc;
     font-family: var(--font-sans);
     antialiased: true;
     user-select: none;
@@ -38,46 +33,72 @@
   }
 }
 
-/* Telegram Mini App Surface & Card styling */
-.tg-card {
-  background: #17212b;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 1rem;
+/* Glass & Glow Card Styles matching Screenshot */
+.card-glass-dark {
+  background: rgba(11, 19, 41, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
 }
 
-.tg-card-elevated {
-  background: #202b36;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1rem;
+.card-glow-blue {
+  background: linear-gradient(145deg, rgba(14, 30, 68, 0.9) 0%, rgba(7, 15, 34, 0.95) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(2, 132, 199, 0.25);
+  border-radius: 1.5rem;
 }
 
-.tg-primary-btn {
-  background: linear-gradient(135deg, #2481cc 0%, #1a6cb3 100%);
-  color: #ffffff;
-  font-weight: 600;
-  border-radius: 0.875rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(36, 129, 204, 0.35);
+.card-glow-purple {
+  background: linear-gradient(145deg, rgba(35, 14, 69, 0.9) 0%, rgba(12, 7, 34, 0.95) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(147, 51, 234, 0.25);
+  border-radius: 1.5rem;
 }
 
-.tg-primary-btn:active {
-  transform: scale(0.97);
+.hero-balance-card {
+  background: linear-gradient(135deg, #0284c7 0%, #1e40af 55%, #4c1d95 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px -12px rgba(2, 132, 199, 0.45);
+  border-radius: 1.75rem;
+}
+
+.btn-cyan-glow {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.45);
+}
+
+.btn-cyan-glow:active {
+  transform: scale(0.96);
   opacity: 0.92;
 }
 
-.glass-panel {
-  background: rgba(23, 33, 43, 0.85);
+.nav-dock {
+  background: rgba(6, 11, 25, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #ffffff 30%, #94a3b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.badge-green-pill {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
+.badge-hot-pill {
+  background: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+.badge-games-pill {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Custom mini scrollbar */
 ::-webkit-scrollbar {
   width: 3px;
   height: 3px;
@@ -88,7 +109,6 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
-

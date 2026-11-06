@@ -1,9 +1,10 @@
-import { Copy, Users, Gift, Share2, CheckCircle2, ChevronLeft, ArrowLeft } from "lucide-react";
+import { Copy, Users, Gift, Share2, CheckCircle2, ChevronLeft, ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { tgHaptics, openTgLink, tgBackButton } from "../lib/telegram";
+import { GiftBoxGraphic } from "../components/TelegramWalletGraphic";
 
 export function Referrals() {
   const navigate = useNavigate();
@@ -65,34 +66,38 @@ export function Referrals() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Top back nav */}
+      {/* Top Back Nav */}
       <button
         onClick={() => {
           tgHaptics.impact("light");
           navigate(-1);
         }}
-        className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc] active:opacity-70"
+        className="flex items-center gap-1.5 text-xs font-bold text-[#38bdf8] active:opacity-70"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back</span>
       </button>
 
-      {/* Hero Invite Card */}
-      <div className="relative rounded-2xl bg-gradient-to-b from-[#1c2733] to-[#141d27] border border-white/10 p-5 text-center shadow-xl overflow-hidden">
-        <div className="w-14 h-14 rounded-2xl bg-purple-500/15 text-purple-400 flex items-center justify-center mx-auto mb-3 border border-purple-500/20 shadow-md">
-          <Gift className="w-7 h-7" />
+      {/* Hero Invite Card matching Screenshot Style */}
+      <div className="relative rounded-3xl bg-gradient-to-r from-[#4c1d95] via-[#3b0764] to-[#1e1b4b] border border-purple-500/40 p-5 text-center shadow-2xl overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="mx-auto mb-2 flex justify-center">
+          <GiftBoxGraphic className="w-16 h-16" />
         </div>
 
-        <h2 className="text-lg font-bold text-white mb-1">Invite Friends & Earn</h2>
-        <p className="text-xs text-[#7e8c9b] max-w-xs mx-auto mb-4">
-          Receive a <span className="text-white font-semibold">10% bonus</span> on every offer and task your invited friends complete.
+        <h2 className="text-xl font-black text-white tracking-tight mb-1">
+          Invite Friends & Earn
+        </h2>
+        <p className="text-xs text-purple-200/90 max-w-xs mx-auto mb-4 leading-relaxed">
+          Receive a <span className="text-white font-extrabold">10% lifetime bonus</span> on every survey, task, and offer your friends complete.
         </p>
 
         {/* Share buttons */}
         <div className="flex gap-2">
           <button
             onClick={shareToTelegram}
-            className="flex-1 py-3 px-4 rounded-xl bg-[#2481cc] hover:bg-[#1a6cb3] text-white font-bold text-xs shadow-md shadow-[#2481cc]/25 transition active:scale-98 flex items-center justify-center gap-2"
+            className="flex-1 py-3 px-4 rounded-xl btn-cyan-glow text-white font-extrabold text-xs shadow-lg transition active:scale-98 flex items-center justify-center gap-2"
           >
             <Share2 className="w-4 h-4" />
             <span>Invite Friends</span>
@@ -100,7 +105,7 @@ export function Referrals() {
 
           <button
             onClick={copyToClipboard}
-            className="py-3 px-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs border border-white/10 transition active:scale-98 flex items-center justify-center gap-1.5"
+            className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/15 transition active:scale-98 flex items-center justify-center gap-1.5"
           >
             {copied ? (
               <>
@@ -109,7 +114,7 @@ export function Referrals() {
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4 text-[#7e8c9b]" />
+                <Copy className="w-4 h-4 text-purple-200" />
                 <span>Copy Link</span>
               </>
             )}
@@ -118,30 +123,30 @@ export function Referrals() {
       </div>
 
       {/* Referral Stats */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="tg-card p-3">
-          <div className="text-[10px] text-[#7e8c9b] font-medium mb-0.5">Friends Invited</div>
-          <div className="text-lg font-bold text-white tabular-nums">{referrals.length}</div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="card-glass-dark p-3.5 rounded-2xl">
+          <div className="text-[11px] text-slate-400 font-medium mb-0.5">Friends Invited</div>
+          <div className="text-2xl font-black text-white tabular-nums">{referrals.length}</div>
         </div>
 
-        <div className="tg-card p-3">
-          <div className="text-[10px] text-[#7e8c9b] font-medium mb-0.5">Commission Earned</div>
-          <div className="text-lg font-bold text-emerald-400 tabular-nums">
+        <div className="card-glass-dark p-3.5 rounded-2xl">
+          <div className="text-[11px] text-slate-400 font-medium mb-0.5">Commission Earned</div>
+          <div className="text-2xl font-black text-emerald-400 tabular-nums">
             ${totalEarned.toFixed(2)}
           </div>
         </div>
       </div>
 
       {/* Friends List */}
-      <div className="tg-card p-4 space-y-3">
-        <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[#7e8c9b]">
+      <div className="card-glass-dark p-4 space-y-3 rounded-2xl">
+        <h3 className="text-xs font-bold text-white uppercase tracking-wider text-slate-400">
           My Referrals ({referrals.length})
         </h3>
 
         {loading ? (
-          <div className="py-6 text-center text-xs text-[#7e8c9b]">Loading referrals...</div>
+          <div className="py-6 text-center text-xs text-slate-400">Loading referrals...</div>
         ) : referrals.length === 0 ? (
-          <div className="py-6 text-center text-xs text-[#7e8c9b]">
+          <div className="py-6 text-center text-xs text-slate-400">
             No referrals yet. Share your invite link to start earning!
           </div>
         ) : (
@@ -149,22 +154,22 @@ export function Referrals() {
             {referrals.map((ref) => (
               <div
                 key={ref.id}
-                className="p-2.5 rounded-xl bg-[#0e1621] border border-white/5 flex items-center justify-between"
+                className="p-3 rounded-xl bg-[#0c162e] border border-white/5 flex items-center justify-between"
               >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-[#2481cc]/20 text-[#2481cc] flex items-center justify-center font-bold text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-purple-500/20 text-[#c084fc] flex items-center justify-center font-bold text-xs">
                     {(ref.referred?.first_name || "U")[0]}
                   </div>
                   <div>
-                    <div className="text-xs font-semibold text-white">
+                    <div className="text-xs font-bold text-white">
                       {ref.referred?.first_name || "Telegram User"}
                     </div>
-                    <div className="text-[10px] text-[#7e8c9b]">
+                    <div className="text-[10px] text-slate-400">
                       Joined {new Date(ref.created_at).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
-                <div className="text-xs font-semibold text-emerald-400">
+                <div className="badge-green-pill text-xs font-bold px-2 py-0.5 rounded-full">
                   +${Number(ref.total_commission_earned || 0).toFixed(2)}
                 </div>
               </div>

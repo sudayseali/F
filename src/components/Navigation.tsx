@@ -1,10 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Coins, Sparkles } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Coins, Sparkles, Check, Home } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
 
 const navItems = [
-  { label: "Home", icon: LayoutDashboard, path: "/" },
+  { label: "Home", icon: Home, path: "/" },
   { label: "Offers", icon: Layers, path: "/offerwall" },
   { label: "Tasks", icon: CheckSquare, path: "/tasks" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
@@ -14,7 +14,7 @@ const navItems = [
 export function Navigation() {
   const location = useLocation();
   const { user } = useTelegram();
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Payvora User";
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Cabdl";
   const initial = displayName.charAt(0).toUpperCase();
   const balance = user?.balance ?? 0;
 
@@ -24,52 +24,54 @@ export function Navigation() {
 
   return (
     <>
-      {/* Telegram Native Top App Bar */}
-      <header className="sticky top-0 left-0 right-0 z-40 bg-[#0e1621]/95 backdrop-blur-md border-b border-white/[0.08] px-4 py-3 flex items-center justify-between">
+      {/* Telegram Native Top App Bar matching Screenshot */}
+      <header className="sticky top-0 left-0 right-0 z-40 bg-[#030712]/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-white/[0.06]">
+        {/* Left: User Avatar & Name */}
         <div className="flex items-center gap-3">
-          {/* Telegram User Avatar */}
           <Link to="/profile" onClick={handleTabClick} className="relative group">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#2481cc] to-[#1a6cb3] flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/10 group-active:scale-95 transition-transform">
+            {/* Avatar circle with electric cyan/blue gradient */}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#0284c7] via-[#0088cc] to-[#38bdf8] flex items-center justify-center text-white font-black text-base shadow-lg shadow-sky-500/30 group-active:scale-95 transition-transform">
               {initial}
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0e1621]" />
+            {/* Green Online Dot at bottom-right */}
+            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#10b981] border-2 border-[#030712] shadow-sm" />
           </Link>
 
-          {/* User Details */}
+          {/* Name & Subtitle */}
           <div className="leading-tight">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-white max-w-[120px] sm:max-w-[180px] truncate">
+              <span className="text-base font-bold text-white tracking-tight">
                 {displayName}
               </span>
-              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#2481cc] text-[9px] text-white">
-                ✓
-              </span>
+              {/* Telegram Verified Badge */}
+              <div className="w-4 h-4 rounded-full bg-[#0088cc] flex items-center justify-center text-white shadow-sm">
+                <Check className="w-2.5 h-2.5 stroke-[3.5]" />
+              </div>
             </div>
-            <span className="text-[11px] text-[#7e8c9b]">
-              {user?.username ? `@${user.username}` : "Telegram Member"}
+            <span className="text-xs text-[#94a3b8] font-medium">
+              Telegram Member
             </span>
           </div>
         </div>
 
-        {/* Telegram Coin / Balance Pill */}
+        {/* Right: Golden Coin Pill ($0.00) */}
         <Link
           to="/wallet"
           onClick={handleTabClick}
-          className="flex items-center gap-2 bg-[#17212b] border border-white/10 px-3 py-1.5 rounded-full shadow-sm hover:border-[#2481cc]/40 transition active:scale-95"
+          className="flex items-center gap-2 bg-[#0c162e] border border-amber-500/40 px-3.5 py-1.5 rounded-full shadow-lg hover:border-amber-400 transition active:scale-95"
         >
-          <div className="w-5 h-5 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center">
-            <Coins className="w-3.5 h-3.5" />
+          {/* Golden Mascot Coin */}
+          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-amber-600 flex items-center justify-center text-amber-950 font-black text-[10px] shadow-sm">
+            $
           </div>
-          <div className="text-right">
-            <div className="text-xs font-bold text-white tabular-nums">
-              ${balance.toFixed(2)}
-            </div>
-          </div>
+          <span className="text-sm font-extrabold text-white tracking-tight tabular-nums">
+            ${balance.toFixed(2)}
+          </span>
         </Link>
       </header>
 
-      {/* Telegram Native Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#17212b]/95 backdrop-blur-xl border-t border-white/[0.08] pb-safe pt-1.5 px-2">
+      {/* Telegram Native Bottom Navigation Bar matching Screenshot */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#050b18]/95 backdrop-blur-2xl border-t border-white/[0.08] pb-safe pt-2 px-2 shadow-2xl">
         <div className="max-w-md mx-auto grid grid-cols-5 items-center">
           {navItems.map((item) => {
             const isActive =
@@ -83,26 +85,28 @@ export function Navigation() {
                 to={item.path}
                 onClick={handleTabClick}
                 className={`relative flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-90 ${
-                  isActive ? "text-[#2481cc]" : "text-[#7e8c9b] hover:text-white/80"
+                  isActive ? "text-[#38bdf8]" : "text-[#64748b] hover:text-[#94a3b8]"
                 }`}
               >
-                <div className="relative">
+                <div className="relative flex flex-col items-center">
                   <Icon
                     className={`w-6 h-6 transition-transform duration-200 ${
-                      isActive ? "scale-110 drop-shadow-[0_2px_8px_rgba(36,129,204,0.6)]" : ""
+                      isActive ? "scale-110 drop-shadow-[0_2px_10px_rgba(56,189,248,0.7)]" : ""
                     }`}
                   />
+                  <span
+                    className={`text-[11px] mt-1 tracking-tight ${
+                      isActive ? "font-bold text-[#38bdf8]" : "font-medium text-[#64748b]"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+
+                  {/* Active Glowing Neon Pill underneath icon */}
                   {isActive && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#2481cc]" />
+                    <div className="h-0.5 w-6 rounded-full bg-gradient-to-r from-sky-400 to-blue-500 shadow-[0_0_8px_#38bdf8] mt-1" />
                   )}
                 </div>
-                <span
-                  className={`text-[10px] mt-1 font-medium tracking-tight ${
-                    isActive ? "font-semibold text-white" : "text-[#7e8c9b]"
-                  }`}
-                >
-                  {item.label}
-                </span>
               </Link>
             );
           })}

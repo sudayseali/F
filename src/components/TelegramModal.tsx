@@ -58,7 +58,7 @@ export function TelegramModal({
             tgHaptics.impact("light");
             onClose();
           }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/70 backdrop-blur-md"
         />
 
         {/* Modal Sheet */}
@@ -67,21 +67,21 @@ export function TelegramModal({
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
           transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-sm rounded-2xl bg-[#17212b] border border-white/10 p-5 shadow-2xl text-center z-10 overflow-hidden"
+          className="relative w-full max-w-sm rounded-3xl bg-[#0c162e] border border-white/15 p-5 shadow-2xl text-center z-10 overflow-hidden"
         >
           {/* Top drag handle indicator for mobile sheet feel */}
           <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-4" />
 
           {/* Icon */}
-          <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-white/5 border border-white/10">
+          <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-white/5 border border-white/10 shadow-inner">
             {type === "error" && <AlertCircle className="w-6 h-6 text-rose-400" />}
             {type === "success" && <CheckCircle className="w-6 h-6 text-emerald-400" />}
-            {type === "info" && <Info className="w-6 h-6 text-[#2481cc]" />}
+            {type === "info" && <Info className="w-6 h-6 text-[#38bdf8]" />}
           </div>
 
           {/* Title & Message */}
-          <h3 className="text-base font-bold text-white mb-1.5">{title}</h3>
-          <p className="text-xs text-[#7e8c9b] leading-relaxed mb-5 px-2">
+          <h3 className="text-base font-extrabold text-white mb-1.5 tracking-tight">{title}</h3>
+          <p className="text-xs text-slate-300 leading-relaxed mb-5 px-2">
             {message}
           </p>
 
@@ -91,7 +91,7 @@ export function TelegramModal({
               <button
                 type="button"
                 onClick={handleSecondary}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-semibold transition active:scale-95"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 text-xs font-bold transition active:scale-95"
               >
                 {secondaryText}
               </button>
@@ -99,7 +99,7 @@ export function TelegramModal({
             <button
               type="button"
               onClick={handleAction}
-              className="flex-1 py-2.5 px-3 rounded-xl bg-[#2481cc] hover:bg-[#1a6cb3] text-white text-xs font-semibold shadow-md shadow-[#2481cc]/25 transition active:scale-95"
+              className="flex-1 py-2.5 px-3 rounded-xl btn-cyan-glow text-white text-xs font-extrabold shadow-md transition active:scale-95"
             >
               {actionText}
             </button>

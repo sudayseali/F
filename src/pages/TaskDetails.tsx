@@ -88,7 +88,7 @@ export function TaskDetails() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Verification submitted for manual review.');
-      setStatus('success'); // allow user to proceed
+      setStatus('success');
     }
   };
 
@@ -100,17 +100,17 @@ export function TaskDetails() {
           tgHaptics.impact("light");
           navigate('/tasks');
         }}
-        className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc] active:opacity-70"
+        className="flex items-center gap-1.5 text-xs font-bold text-[#38bdf8] active:opacity-70"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to Tasks</span>
       </button>
 
       {/* Task Info Card */}
-      <div className="tg-card p-4 space-y-3">
+      <div className="card-glass-dark p-4.5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-[#2481cc] bg-[#2481cc]/15 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-bold text-[#38bdf8] bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
               Telegram Task
             </span>
             <h2 className="text-base font-bold text-white mt-1.5 leading-snug">
@@ -118,46 +118,46 @@ export function TaskDetails() {
             </h2>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg">
+            <span className="badge-green-pill text-xs font-extrabold px-2.5 py-1 rounded-full">
               +$0.15
             </span>
           </div>
         </div>
 
-        <p className="text-xs text-[#7e8c9b] leading-relaxed">
+        <p className="text-xs text-slate-400 leading-relaxed">
           Join our official channel, stay active, and upload a screenshot proof of membership.
         </p>
 
-        <div className="flex items-center gap-3 text-[11px] text-[#7e8c9b] pt-1 border-t border-white/5">
+        <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-2 border-t border-white/5">
           <div className="flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-[#2481cc]" />
+            <Users className="w-3.5 h-3.5 text-[#38bdf8]" />
             <span>450/500 Slots</span>
           </div>
           <span>·</span>
           <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-[#2481cc]" />
+            <Clock className="w-3.5 h-3.5 text-[#38bdf8]" />
             <span>Instant review</span>
           </div>
         </div>
       </div>
 
       {/* Instructions & Submission */}
-      <div className="tg-card p-4 space-y-4">
-        <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[#7e8c9b]">
+      <div className="card-glass-dark p-4.5 space-y-4">
+        <h3 className="text-xs font-bold text-white uppercase tracking-wider text-slate-400">
           Instructions
         </h3>
 
-        <ol className="space-y-2 text-xs text-white/80">
+        <ol className="space-y-2 text-xs text-slate-200">
           <li className="flex items-start gap-2">
-            <span className="w-4 h-4 rounded-full bg-[#2481cc]/20 text-[#2481cc] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+            <span className="w-4 h-4 rounded-full bg-sky-500/20 text-[#38bdf8] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
             <span>Open the channel and tap <b>Join</b>.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="w-4 h-4 rounded-full bg-[#2481cc]/20 text-[#2481cc] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+            <span className="w-4 h-4 rounded-full bg-sky-500/20 text-[#38bdf8] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
             <span>Take a screenshot showing you are a member.</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="w-4 h-4 rounded-full bg-[#2481cc]/20 text-[#2481cc] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+            <span className="w-4 h-4 rounded-full bg-sky-500/20 text-[#38bdf8] font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
             <span>Upload the screenshot proof below.</span>
           </li>
         </ol>
@@ -167,30 +167,30 @@ export function TaskDetails() {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => tgHaptics.impact("light")}
-          className="block w-full py-2.5 rounded-xl bg-[#2481cc]/15 hover:bg-[#2481cc]/25 text-[#2481cc] font-bold text-xs text-center border border-[#2481cc]/30 transition active:scale-98"
+          className="block w-full py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-[#38bdf8] font-bold text-xs text-center border border-sky-500/30 transition active:scale-98 shadow-sm"
         >
           Open Telegram Channel →
         </a>
 
         {status === 'success' ? (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
+          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 text-center">
             <CheckCircle className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
             <h4 className="text-sm font-bold text-white mb-0.5">Proof Submitted!</h4>
-            <p className="text-xs text-[#7e8c9b]">
+            <p className="text-xs text-slate-300">
               Your proof has been received. Reward will be added to your balance shortly.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-white/5">
             {error && (
-              <div className="bg-rose-500/10 text-rose-400 px-3 py-2 text-xs rounded-lg border border-rose-500/20 flex items-center gap-1.5">
+              <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
                 <ShieldAlert className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-[#7e8c9b] mb-1">
+              <label className="block text-xs font-semibold text-slate-400 mb-1">
                 Your Telegram Username
               </label>
               <input 
@@ -199,12 +199,12 @@ export function TaskDetails() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="@username" 
-                className="w-full px-3 py-2 rounded-xl border border-white/10 bg-[#0e1621] text-xs text-white focus:outline-none focus:border-[#2481cc]"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#0c162e] text-xs text-white focus:outline-none focus:border-sky-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#7e8c9b] mb-1">
+              <label className="block text-xs font-semibold text-slate-400 mb-1">
                 Screenshot Proof
               </label>
               <input 
@@ -217,7 +217,7 @@ export function TaskDetails() {
               />
               
               {previewUrl ? (
-                <div className="relative border border-white/10 rounded-xl overflow-hidden bg-[#0e1621] aspect-video flex items-center justify-center">
+                <div className="relative border border-white/10 rounded-2xl overflow-hidden bg-[#0c162e] aspect-video flex items-center justify-center">
                   <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
                   <button 
                     type="button"
@@ -230,11 +230,11 @@ export function TaskDetails() {
               ) : (
                 <label 
                   htmlFor="screenshot-upload"
-                  className="border border-dashed border-white/15 rounded-xl p-5 flex flex-col items-center justify-center text-[#7e8c9b] hover:border-[#2481cc] hover:text-[#2481cc] transition cursor-pointer active:scale-98"
+                  className="border border-dashed border-white/15 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-300 transition cursor-pointer active:scale-98 bg-[#0c162e]/50"
                 >
-                  <Upload className="w-6 h-6 mb-1.5" />
-                  <span className="text-xs font-semibold">Tap to select screenshot</span>
-                  <span className="text-[10px] text-[#7e8c9b] mt-0.5">PNG, JPG up to 5MB</span>
+                  <Upload className="w-6 h-6 mb-1.5 text-sky-400" />
+                  <span className="text-xs font-semibold text-white">Tap to select screenshot</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG up to 5MB</span>
                 </label>
               )}
             </div>
@@ -242,7 +242,7 @@ export function TaskDetails() {
             <button 
               type="submit" 
               disabled={status === 'submitting'}
-              className="w-full py-3 bg-[#2481cc] hover:bg-[#1a6cb3] text-white text-center rounded-xl font-bold text-xs transition active:scale-98 disabled:opacity-50 shadow-md shadow-[#2481cc]/25 flex items-center justify-center gap-1.5"
+              className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5 mt-2"
             >
               {status === 'submitting' ? (
                 <>

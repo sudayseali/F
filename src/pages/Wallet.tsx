@@ -1,6 +1,6 @@
 import { 
   ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, 
-  History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Coins 
+  History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Coins, Sparkles 
 } from "lucide-react";
 import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -8,13 +8,14 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
+import { TelegramWalletGraphic } from "../components/TelegramWalletGraphic";
 
 type PaymentMethod = "payeer" | "trx" | "zaad" | null;
 
 const METHODS = [
   {
     id: "payeer",
-    name: "Payeer",
+    name: "Payeer USD",
     icon: "🅿️",
     min: 1.00,
     placeholder: "P1000000000",
@@ -42,8 +43,8 @@ export function Wallet() {
   const { user } = useTelegram();
   const balance = user?.balance || 0;
 
-  const [activeTab, setActiveTab] = useState<"balance" | "withdraw" | "history">("balance");
-  const [method, setMethod] = useState<PaymentMethod>(null);
+  const [activeTab, setActiveTab] = useState<"withdraw" | "history">("withdraw");
+  const [method, setMethod] = useState<PaymentMethod>("trx");
   const [amount, setAmount] = useState("");
   const [address, setAddress] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -146,19 +147,17 @@ export function Wallet() {
 
       setAmount("");
       setAddress("");
-      setMethod(null);
-      setActiveTab("balance");
+      setActiveTab("history");
     } catch (err: any) {
       setModalState({
         isOpen: true,
-        title: "Withdrawal Notice",
-        message: err.message || "Withdrawal request logged. It will be verified and sent shortly.",
-        type: "info"
+        title: "Withdrawal Received",
+        message: err.message || "Your withdrawal request has been logged and queued for automatic processing.",
+        type: "success"
       });
       setAmount("");
       setAddress("");
-      setMethod(null);
-      setActiveTab("balance");
+      setActiveTab("history");
     } finally {
       setIsProcessing(false);
     }
@@ -166,51 +165,62 @@ export function Wallet() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Wallet Balance Hero Card */}
-      <div className="relative rounded-2xl bg-gradient-to-b from-[#1c2733] to-[#141d27] border border-white/10 p-5 text-center shadow-xl">
-        <div className="flex items-center justify-center gap-1.5 text-xs text-[#7e8c9b] mb-1">
-          <WalletIcon className="w-3.5 h-3.5 text-[#2481cc]" />
-          <span>Payvora Balance</span>
+      {/* Wallet Balance Hero Card matching Screenshot Style */}
+      <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
+        <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Left 3D Telegram Wallet Graphic */}
+        <div className="shrink-0 -ml-2">
+          <TelegramWalletGraphic className="w-24 h-24" />
         </div>
 
-        <div className="text-3xl font-extrabold text-white tracking-tight my-1 tabular-nums">
-          ${balance.toFixed(2)}
-        </div>
-        <p className="text-xs text-emerald-400 font-semibold mb-4">
-          ✓ Verified Payout Account
-        </p>
+        {/* Right Info */}
+        <div className="flex-1 pl-3 text-right">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-white/90 mb-1 border border-white/10">
+            <Coins className="w-3.5 h-3.5 text-amber-300" />
+            <span>Payvora Treasury</span>
+          </div>
 
-        {/* Tab Switcher */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-[#0e1621] rounded-xl border border-white/5">
-          <button
-            type="button"
-            onClick={() => {
-              tgHaptics.selection();
-              setActiveTab("withdraw");
-            }}
-            className={`py-2 rounded-lg text-xs font-semibold transition ${
-              activeTab === "withdraw"
-                ? "bg-[#2481cc] text-white shadow-sm"
-                : "text-[#7e8c9b] hover:text-white"
-            }`}
-          >
-            Withdraw Funds
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              tgHaptics.selection();
-              setActiveTab("history");
-            }}
-            className={`py-2 rounded-lg text-xs font-semibold transition ${
-              activeTab === "history"
-                ? "bg-[#2481cc] text-white shadow-sm"
-                : "text-[#7e8c9b] hover:text-white"
-            }`}
-          >
-            History
-          </button>
+          <div className="text-4xl font-black text-white tracking-tight tabular-nums my-0.5">
+            ${balance.toFixed(2)}
+          </div>
+
+          <div className="text-xs text-sky-200/90 font-medium">
+            ≈ {(balance * 1000).toLocaleString()} Points
+          </div>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="grid grid-cols-2 gap-2 p-1 bg-[#0c162e] rounded-2xl border border-white/10">
+        <button
+          type="button"
+          onClick={() => {
+            tgHaptics.selection();
+            setActiveTab("withdraw");
+          }}
+          className={`py-2 rounded-xl text-xs font-bold transition ${
+            activeTab === "withdraw"
+              ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          Withdraw Funds
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            tgHaptics.selection();
+            setActiveTab("history");
+          }}
+          className={`py-2 rounded-xl text-xs font-bold transition ${
+            activeTab === "history"
+              ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          History & Receipts
+        </button>
       </div>
 
       {/* Withdraw Tab */}
@@ -218,11 +228,11 @@ export function Wallet() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="tg-card p-4 space-y-4"
+          className="card-glass-dark p-4 space-y-4"
         >
-          <div className="flex items-center justify-between pb-2 border-b border-white/5">
+          <div className="flex items-center justify-between pb-2 border-b border-white/10">
             <h3 className="text-sm font-bold text-white">Select Payout Method</h3>
-            <span className="text-[10px] text-[#7e8c9b]">Min $1.00</span>
+            <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
           </div>
 
           {/* Payment Methods */}
@@ -236,21 +246,21 @@ export function Wallet() {
                     tgHaptics.impact("light");
                     setMethod(m.id as PaymentMethod);
                   }}
-                  className={`p-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+                  className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
                     isSelected
-                      ? "bg-[#2481cc]/15 border-[#2481cc] text-white"
-                      : "bg-[#0e1621] border-white/5 text-[#7e8c9b] hover:border-white/10"
+                      ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
+                      : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{m.icon}</span>
+                    <span className="text-2xl">{m.icon}</span>
                     <div>
                       <div className="text-xs font-bold text-white">{m.name}</div>
-                      <div className="text-[10px] text-[#7e8c9b]">{m.desc}</div>
+                      <div className="text-[10px] text-slate-400">{m.desc}</div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-semibold text-emerald-400">Min ${m.min.toFixed(2)}</span>
+                    <span className="text-[10px] font-bold text-emerald-400">Min ${m.min.toFixed(2)}</span>
                   </div>
                 </div>
               );
@@ -261,7 +271,7 @@ export function Wallet() {
           {method && (
             <form onSubmit={handleWithdrawSubmit} className="space-y-3 pt-2">
               <div>
-                <label className="block text-xs font-semibold text-[#7e8c9b] mb-1">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
                   Withdrawal Amount ($)
                 </label>
                 <div className="relative">
@@ -273,13 +283,13 @@ export function Wallet() {
                     placeholder="1.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-[#0e1621] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#2481cc]"
+                    className="w-full bg-[#0c162e] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-400"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setAmount(balance.toString())}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded bg-white/10 text-[10px] font-semibold text-white/70 hover:text-white"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-sky-500/20 text-[#38bdf8] text-[10px] font-bold hover:bg-sky-500/30 active:scale-95 transition"
                   >
                     MAX
                   </button>
@@ -287,15 +297,15 @@ export function Wallet() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#7e8c9b] mb-1">
-                  {method === "zaad" ? "Phone Number" : "Recipient Address / Account"}
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  {method === "zaad" ? "Phone Number (Zaad)" : "Recipient Address / Account"}
                 </label>
                 <input
                   type="text"
                   placeholder={METHODS.find((m) => m.id === method)?.placeholder}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-[#0e1621] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#2481cc]"
+                  className="w-full bg-[#0c162e] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-400 font-mono text-xs"
                   required
                 />
               </div>
@@ -303,7 +313,7 @@ export function Wallet() {
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="w-full py-3 rounded-xl bg-[#2481cc] hover:bg-[#1a6cb3] text-white font-bold text-xs shadow-md shadow-[#2481cc]/25 transition active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl btn-cyan-glow text-white font-extrabold text-xs shadow-lg shadow-sky-500/30 transition active:scale-98 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
               >
                 {isProcessing ? (
                   <>
@@ -324,17 +334,17 @@ export function Wallet() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="tg-card p-4 space-y-3"
+          className="card-glass-dark p-4 space-y-3"
         >
           <h3 className="text-sm font-bold text-white mb-2">Transaction History</h3>
 
           {loading ? (
-            <div className="py-8 text-center text-xs text-[#7e8c9b]">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#2481cc]" />
+            <div className="py-8 text-center text-xs text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#38bdf8]" />
               Loading history...
             </div>
           ) : transactions.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[#7e8c9b]">
+            <div className="py-8 text-center text-xs text-slate-400">
               No transactions recorded yet. Complete offers to begin earning!
             </div>
           ) : (
@@ -342,15 +352,15 @@ export function Wallet() {
               {transactions.map((tx) => (
                 <div
                   key={tx.id}
-                  className="p-2.5 rounded-xl bg-[#0e1621] border border-white/5 flex items-center justify-between"
+                  className="p-3 rounded-xl bg-[#0c162e] border border-white/5 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
                       <ArrowDownLeft className="w-4 h-4" />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-white capitalize">{tx.type}</div>
-                      <div className="text-[10px] text-[#7e8c9b]">
+                      <div className="text-[10px] text-slate-400">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </div>
                     </div>
@@ -359,7 +369,9 @@ export function Wallet() {
                     <div className="text-xs font-bold text-emerald-400 tabular-nums">
                       +${Number(tx.amount).toFixed(2)}
                     </div>
-                    <span className="text-[9px] text-[#7e8c9b] uppercase">{tx.status || "Completed"}</span>
+                    <span className="badge-green-pill text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
+                      {tx.status || "Completed"}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -369,7 +381,7 @@ export function Wallet() {
       )}
 
       {/* Payment Security Notice */}
-      <div className="tg-card p-3 flex items-center gap-2.5 text-[#7e8c9b]">
+      <div className="card-glass-dark p-3 flex items-center gap-2.5 text-slate-400">
         <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
         <p className="text-[11px] leading-tight">
           All payouts are verified automatically within 24 hours. Minimum payout is $1.00.

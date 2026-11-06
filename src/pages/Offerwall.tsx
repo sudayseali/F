@@ -1,6 +1,6 @@
 import { 
   Layers, Zap, Globe, Shield, Star, Play, Gift, 
-  ChevronRight, ArrowLeft, Loader2, ExternalLink, RotateCw, Sparkles 
+  ChevronRight, ArrowLeft, Loader2, ExternalLink, RotateCw, Sparkles, BarChart3 
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -18,7 +18,7 @@ interface Provider {
   iconBg: string;
   iconColor: string;
   badge: string;
-  badgeColor: string;
+  badgeType: "hot" | "games" | "blue" | "green";
   description: string;
   payoutRange: string;
 }
@@ -29,39 +29,39 @@ const PROVIDERS: Provider[] = [
     name: "CPX Research",
     category: "Surveys",
     rewardType: "Instant Crediting",
-    icon: Star,
-    iconBg: "bg-blue-500/15",
-    iconColor: "text-blue-400",
-    badge: "Most Popular",
-    badgeColor: "bg-blue-500/20 text-blue-300",
-    description: "Paid market research surveys with instant token payouts upon completion.",
-    payoutRange: "$0.40 - $4.50"
+    icon: BarChart3,
+    iconBg: "bg-sky-500/20",
+    iconColor: "text-[#38bdf8]",
+    badge: "🔥 Hot",
+    badgeType: "hot",
+    description: "Paid market research surveys with instant token payouts.",
+    payoutRange: "Up to $4.50"
   },
   {
     id: "ayet",
-    name: "ayeT-Studios",
+    name: "ayeT - Studios",
     category: "Games",
     rewardType: "High Payouts",
     icon: Play,
-    iconBg: "bg-emerald-500/15",
-    iconColor: "text-emerald-400",
-    badge: "Top Rewards",
-    badgeColor: "bg-emerald-500/20 text-emerald-300",
-    description: "Level progression and gaming milestone rewards across iOS and Android.",
-    payoutRange: "$1.00 - $35.00"
+    iconBg: "bg-purple-500/20",
+    iconColor: "text-[#c084fc]",
+    badge: "🎮 Games",
+    badgeType: "games",
+    description: "Level progression and gaming milestone rewards across iOS & Android.",
+    payoutRange: "Up to $35.00"
   },
   {
     id: "torox",
-    name: "Torox",
+    name: "Torox Offers",
     category: "Games",
     rewardType: "Tiered Offers",
     icon: Zap,
-    iconBg: "bg-amber-500/15",
-    iconColor: "text-amber-400",
-    badge: "Fast Track",
-    badgeColor: "bg-amber-500/20 text-amber-300",
+    iconBg: "bg-amber-500/20",
+    iconColor: "text-[#fbbf24]",
+    badge: "⚡ Fast Track",
+    badgeType: "blue",
     description: "Multi-stage game achievements and premium brand trials.",
-    payoutRange: "$0.80 - $22.00"
+    payoutRange: "Up to $22.00"
   },
   {
     id: "lootably",
@@ -69,12 +69,12 @@ const PROVIDERS: Provider[] = [
     category: "Apps",
     rewardType: "Interactive",
     icon: Shield,
-    iconBg: "bg-cyan-500/15",
-    iconColor: "text-cyan-400",
-    badge: "Verified",
-    badgeColor: "bg-cyan-500/20 text-cyan-300",
+    iconBg: "bg-cyan-500/20",
+    iconColor: "text-[#22d3ee]",
+    badge: "✓ Verified",
+    badgeType: "green",
     description: "Engage with mobile apps, quiz tests, and interactive campaigns.",
-    payoutRange: "$0.25 - $8.00"
+    payoutRange: "Up to $8.00"
   },
   {
     id: "adgate",
@@ -82,12 +82,12 @@ const PROVIDERS: Provider[] = [
     category: "Apps",
     rewardType: "Discovery",
     icon: Layers,
-    iconBg: "bg-purple-500/15",
-    iconColor: "text-purple-400",
+    iconBg: "bg-indigo-500/20",
+    iconColor: "text-[#818cf8]",
     badge: "Global",
-    badgeColor: "bg-purple-500/20 text-purple-300",
+    badgeType: "blue",
     description: "Wide variety of global app installs, videos, and subscription offers.",
-    payoutRange: "$0.30 - $12.00"
+    payoutRange: "Up to $12.00"
   },
   {
     id: "cpa",
@@ -95,12 +95,12 @@ const PROVIDERS: Provider[] = [
     category: "Quick",
     rewardType: "Micro-Tasks",
     icon: Gift,
-    iconBg: "bg-rose-500/15",
-    iconColor: "text-rose-400",
-    badge: "Instant",
-    badgeColor: "bg-rose-500/20 text-rose-300",
+    iconBg: "bg-rose-500/20",
+    iconColor: "text-[#fb7185]",
+    badge: "⚡ Instant",
+    badgeType: "hot",
     description: "Fast email submissions, single-field signups, and rapid rewards.",
-    payoutRange: "$0.15 - $2.50"
+    payoutRange: "Up to $2.50"
   }
 ];
 
@@ -158,7 +158,6 @@ export function Offerwall() {
     if (provider.id === "cpx") {
       setLoadingProvider("cpx");
       try {
-        // First try the Edge function
         let urlToUse: string | null = null;
         try {
           const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
@@ -166,10 +165,9 @@ export function Offerwall() {
             urlToUse = data.url;
           }
         } catch {
-          // Edge function failed or not deployed yet, proceed to robust fallback
+          // Fallback to direct link
         }
 
-        // If Edge function didn't provide a URL, construct direct CPX link
         if (!urlToUse) {
           const appId = import.meta.env.VITE_CPX_APP_ID || "24128";
           urlToUse = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${userId}`;
@@ -204,21 +202,11 @@ export function Offerwall() {
       setIframeLoading(true);
       setLoadingProvider(null);
     } else {
-      // General provider launching
-      setModalState({
-        isOpen: true,
-        title: `${provider.name}`,
-        message: `${provider.name} offerwall integration is active. Postback rewards will be credited automatically to your Payvora balance.`,
-        type: "info",
-        actionText: "Launch Offerwall",
-        onAction: () => {
-          setModalState(prev => ({ ...prev, isOpen: false }));
-          const demoUrl = `https://offers.cpx-research.com/index.php?app_id=24128&ext_user_id=${userId}`;
-          setActiveProviderName(provider.name);
-          setActiveOfferwallUrl(demoUrl);
-          setIframeLoading(true);
-        }
-      });
+      // General provider launcher
+      const demoUrl = `https://offers.cpx-research.com/index.php?app_id=24128&ext_user_id=${userId}`;
+      setActiveProviderName(provider.name);
+      setActiveOfferwallUrl(demoUrl);
+      setIframeLoading(true);
     }
   };
 
@@ -229,29 +217,29 @@ export function Offerwall() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Telegram Banner Header */}
-      <div className="relative rounded-2xl bg-gradient-to-br from-[#1c2a38] to-[#131d27] border border-white/10 p-4 overflow-hidden shadow-lg">
-        <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-[#2481cc]/15 rounded-full blur-2xl pointer-events-none" />
+      {/* Telegram Hero Banner matching Screenshot */}
+      <div className="hero-balance-card p-4.5 relative overflow-hidden flex items-center justify-between">
+        <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none" />
         
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc]">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-200 mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Verified Postbacks</span>
+            <span>Verified Offerwalls</span>
           </div>
-          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20">
-            Active 24/7
-          </span>
+          <h2 className="text-xl font-black text-white tracking-tight">
+            Partner Networks
+          </h2>
+          <p className="text-xs text-sky-100/80 mt-0.5 max-w-[240px]">
+            High-yield surveys, gaming rewards, and instant token payouts.
+          </p>
         </div>
 
-        <h2 className="text-lg font-bold text-white mb-1">
-          Partner Offerwalls
-        </h2>
-        <p className="text-xs text-[#7e8c9b] leading-relaxed">
-          Complete high-paying surveys, try new mobile games, and earn direct token credits.
-        </p>
+        <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-lg">
+          <Layers className="w-6 h-6 text-sky-200" />
+        </div>
       </div>
 
-      {/* Category Pills / Segmented Selector */}
+      {/* Category Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {CATEGORY_TABS.map((tab) => {
           const isActive = activeTab === tab;
@@ -262,10 +250,10 @@ export function Offerwall() {
                 tgHaptics.selection();
                 setActiveTab(tab);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${
                 isActive
-                  ? "bg-[#2481cc] text-white shadow-md shadow-[#2481cc]/30"
-                  : "bg-[#17212b] text-[#7e8c9b] hover:text-white border border-white/5"
+                  ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+                  : "bg-[#0c162e] text-slate-400 hover:text-white border border-white/5"
               }`}
             >
               {tab}
@@ -274,7 +262,7 @@ export function Offerwall() {
         })}
       </div>
 
-      {/* Providers Grouped List */}
+      {/* Providers Grid / List */}
       <div className="space-y-2.5">
         {filteredProviders.map((provider) => {
           const Icon = provider.icon;
@@ -285,12 +273,12 @@ export function Offerwall() {
               key={provider.id}
               whileTap={{ scale: 0.98 }}
               onClick={() => handleProviderClick(provider)}
-              className="tg-card p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-[#2481cc]/30 transition-all duration-200 group active:bg-[#1c2733]"
+              className="card-glass-dark p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-sky-500/40 transition-all duration-200 group active:bg-[#0f1d3d]"
             >
               {/* Provider Logo / Badge */}
-              <div className={`w-11 h-11 rounded-xl ${provider.iconBg} ${provider.iconColor} flex items-center justify-center shrink-0 border border-white/5 shadow-inner`}>
+              <div className={`w-11 h-11 rounded-xl ${provider.iconBg} ${provider.iconColor} flex items-center justify-center shrink-0 border border-white/10 shadow-sm`}>
                 {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-[#2481cc]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#38bdf8]" />
                 ) : (
                   <Icon className="w-5 h-5" />
                 )}
@@ -299,28 +287,33 @@ export function Offerwall() {
               {/* Provider Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <h3 className="text-sm font-bold text-white truncate group-hover:text-[#2481cc] transition-colors">
+                  <h3 className="text-sm font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
                     {provider.name}
                   </h3>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${provider.badgeColor}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    provider.badgeType === "hot" ? "badge-hot-pill" :
+                    provider.badgeType === "games" ? "badge-games-pill" :
+                    "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                  }`}>
                     {provider.badge}
                   </span>
                 </div>
                 
-                <p className="text-[11px] text-[#7e8c9b] truncate">
+                <p className="text-[11px] text-slate-400 truncate">
                   {provider.description}
                 </p>
 
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-white/50">
-                  <span className="text-emerald-400 font-semibold">{provider.payoutRange}</span>
-                  <span>·</span>
-                  <span>{provider.rewardType}</span>
+                <div className="mt-1">
+                  <span className="badge-green-pill text-[11px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <span>{provider.payoutRange}</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
                 </div>
               </div>
 
               {/* Action Button */}
               <div className="shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#2481cc]/20 group-hover:text-[#2481cc] text-[#7e8c9b] flex items-center justify-center transition-colors">
+                <div className="w-8 h-8 rounded-xl bg-white/5 group-hover:bg-[#0284c7]/20 group-hover:text-[#38bdf8] text-slate-400 flex items-center justify-center transition-colors">
                   <ChevronRight className="w-4 h-4" />
                 </div>
               </div>
@@ -337,13 +330,13 @@ export function Offerwall() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-[#0e1621] flex flex-col"
+            className="fixed inset-0 z-50 bg-[#030712] flex flex-col"
           >
             {/* Telegram In-App Top Bar */}
-            <div className="h-12 bg-[#17212b] border-b border-white/10 px-3 flex items-center justify-between shrink-0">
+            <div className="h-12 bg-[#0c162e] border-b border-white/10 px-3 flex items-center justify-between shrink-0">
               <button
                 onClick={closeOfferwall}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc] active:opacity-70 py-1.5 px-2 rounded-lg"
+                className="flex items-center gap-1.5 text-xs font-bold text-[#38bdf8] active:opacity-70 py-1.5 px-2 rounded-lg"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
@@ -361,14 +354,14 @@ export function Offerwall() {
                     const iframe = document.getElementById("offerwall-frame") as HTMLIFrameElement;
                     if (iframe) iframe.src = activeOfferwallUrl;
                   }}
-                  className="p-1.5 text-[#7e8c9b] hover:text-white rounded-lg active:scale-95"
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg active:scale-95"
                   title="Reload"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => openTgLink(activeOfferwallUrl)}
-                  className="p-1.5 text-[#7e8c9b] hover:text-[#2481cc] rounded-lg active:scale-95"
+                  className="p-1.5 text-slate-400 hover:text-[#38bdf8] rounded-lg active:scale-95"
                   title="Open in Browser"
                 >
                   <ExternalLink className="w-4 h-4" />
@@ -379,9 +372,9 @@ export function Offerwall() {
             {/* Iframe Container */}
             <div className="flex-1 relative bg-white">
               {iframeLoading && (
-                <div className="absolute inset-0 bg-[#0e1621] z-10 flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#2481cc]" />
-                  <p className="text-xs text-[#7e8c9b]">Connecting to {activeProviderName}...</p>
+                <div className="absolute inset-0 bg-[#030712] z-10 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#38bdf8]" />
+                  <p className="text-xs text-slate-400">Connecting to {activeProviderName}...</p>
                 </div>
               )}
               <iframe
@@ -397,15 +390,12 @@ export function Offerwall() {
         )}
       </AnimatePresence>
 
-      {/* In-app Telegram Modal for feedback */}
       <TelegramModal
         isOpen={modalState.isOpen}
         onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
         title={modalState.title}
         message={modalState.message}
         type={modalState.type}
-        actionText={modalState.actionText || "OK"}
-        onAction={modalState.onAction}
       />
     </div>
   );
