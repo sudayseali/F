@@ -1,103 +1,109 @@
 import React from "react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { Users, History, Settings, LogOut, ChevronRight, Gift, Shield, CheckCircle } from "lucide-react";
+import { Users, History, Settings, ExternalLink, ChevronRight, Gift, Shield, CheckCircle, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
+import { tgHaptics, openTgLink } from "../lib/telegram";
 
 export function Profile() {
   const { user } = useTelegram();
   const navigate = useNavigate();
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "User";
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Payvora Member";
   const initial = displayName.charAt(0).toUpperCase();
 
+  const menuItems = [
+    {
+      label: "Invite Friends & Earn",
+      subtitle: "Get 10% commission on referrals",
+      icon: Users,
+      iconColor: "text-purple-400 bg-purple-500/15",
+      action: () => navigate("/referrals")
+    },
+    {
+      label: "Withdrawal History",
+      subtitle: "View transactions and receipts",
+      icon: History,
+      iconColor: "text-amber-400 bg-amber-500/15",
+      action: () => navigate("/wallet")
+    },
+    {
+      label: "Join Telegram Community",
+      subtitle: "Official announcements and bonuses",
+      icon: Send,
+      iconColor: "text-[#2481cc] bg-[#2481cc]/15",
+      action: () => openTgLink("https://t.me/PayvoraCommunity")
+    }
+  ];
+
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-12 pb-24"
-    >
-      <header className="flex flex-col items-center justify-center text-center pt-8">
-        <div className="relative group perspective">
-          <div className="absolute -inset-2 bg-gradient-to-br from-brand/40 via-brand text-transparent to-brand-light/40 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-70 transition duration-1000"></div>
-          <div className="relative w-40 h-40 rounded-[2.5rem] bg-gradient-to-b from-[#111827] to-[#0A0E1A] text-brand flex items-center justify-center font-display font-black text-6xl border border-white/10 shadow-inner mb-8 transform group-hover:-translate-y-2 transition-transform duration-700">
-            {initial}
-            <div className="absolute inset-0 rounded-[2.5rem] border border-white/5 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+    <div className="space-y-4 pb-6">
+      {/* Profile Card */}
+      <div className="tg-card p-5 text-center relative overflow-hidden">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#2481cc] to-[#1a6cb3] flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3 shadow-lg ring-4 ring-white/5">
+          {initial}
+        </div>
+
+        <div className="flex items-center justify-center gap-1.5 mb-1">
+          <h2 className="text-base font-bold text-white">{displayName}</h2>
+          <span className="w-3.5 h-3.5 rounded-full bg-[#2481cc] text-[9px] text-white flex items-center justify-center">
+            ✓
+          </span>
+        </div>
+
+        <p className="text-xs text-[#7e8c9b] mb-3">
+          {user?.username ? `@${user.username}` : `Telegram ID: ${user?.id}`}
+        </p>
+
+        <div className="inline-flex items-center gap-2 bg-[#0e1621] border border-white/5 px-3 py-1.5 rounded-full text-[11px] text-[#7e8c9b]">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Telegram Verified Account</span>
+        </div>
+      </div>
+
+      {/* Account Info Stats */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="tg-card p-3">
+          <div className="text-[10px] text-[#7e8c9b] font-medium mb-0.5">Account ID</div>
+          <div className="text-xs font-mono font-bold text-white truncate">
+            {user?.id || "N/A"}
           </div>
         </div>
-        
-        <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-2 drop-shadow-md">
-          {displayName}
-        </h1>
-        
-        <div className="flex items-center space-x-4 mt-4 bg-white/[0.02] py-2 px-6 rounded-full border border-white/5 backdrop-blur-md">
-          <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
-            Identity Verified
-          </span>
-          <div className="w-1 h-1 rounded-full bg-white/20" />
-          <span className="text-sm font-mono text-brand font-medium tracking-widest">
-            ID: {user?.id?.toString().slice(-6) || "000000"}
-          </span>
+
+        <div className="tg-card p-3">
+          <div className="text-[10px] text-[#7e8c9b] font-medium mb-0.5">Wallet Status</div>
+          <div className="text-xs font-bold text-emerald-400">
+            Active · Verified
+          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="space-y-4">
-        <h3 className="text-3xl font-serif font-light text-white flex items-center mb-6 pl-2">
-          Ecosystem <span className="font-bold ml-2">Protocols</span>
-          <span className="ml-6 h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-        </h3>
-
-        {[
-          {
-            label: "Affiliate Network",
-            desc: "Access your 10% perpetual commission stream",
-            icon: Gift,
-            color: "text-brand-light",
-            bg: "bg-brand-light/5",
-            border: "border-brand-light/20",
-            path: "/referrals"
-          },
-          {
-            label: "Security Settings",
-            desc: "Manage authentication and encrypted sessions",
-            icon: Settings,
-            color: "text-white/30",
-            bg: "bg-white/[0.02]",
-            border: "border-white/5",
-            disabled: true
-          }
-        ].map((item, i) => (
-          <motion.div 
-            key={item.label}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.1 }}
-            onClick={() => !item.disabled && navigate(item.path || "/")}
-            className={`premium-card !p-8 !rounded-[2rem] flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-all duration-500 group ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-brand/40 bg-[#111827]/30'}`}
-          >
-            <div className="flex items-center space-x-6 mb-4 sm:mb-0">
-              <div className={`w-16 h-16 rounded-[1.2rem] ${item.bg} ${item.color} flex items-center justify-center border ${item.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shadow-inner`}>
-                <item.icon className="w-8 h-8" />
+      {/* Menu Items List */}
+      <div className="tg-card divide-y divide-white/5 overflow-hidden">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              onClick={() => {
+                tgHaptics.impact("light");
+                item.action();
+              }}
+              className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-white/5 transition active:bg-white/10"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${item.iconColor}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">{item.label}</div>
+                  <div className="text-[10px] text-[#7e8c9b]">{item.subtitle}</div>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-display font-bold text-white group-hover:text-brand transition-colors tracking-tight">{item.label}</h3>
-                <p className="text-sm text-white/40 font-serif italic">{item.desc}</p>
-              </div>
+              <ChevronRight className="w-4 h-4 text-[#7e8c9b]" />
             </div>
-            {!item.disabled && (
-              <div className="w-12 h-12 rounded-[1rem] bg-[#0A0E1A] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-2 duration-500 shadow-inner">
-                <ChevronRight className="w-6 h-6" />
-              </div>
-            )}
-          </motion.div>
-        ))}
+          );
+        })}
       </div>
-      
-      <div className="pt-16 pb-8 flex justify-center">
-        <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] font-mono">
-          Payvora v3.0.0 • Enterprise Edition
-        </p>
-      </div>
-    </motion.div>
+    </div>
   );
 }

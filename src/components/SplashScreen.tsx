@@ -6,12 +6,12 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onComplete();
-    }, 3000);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050505] text-white overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0e1621] text-white overflow-hidden">
       
       {/* Dynamic Background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#050505_0%,_#050505_100%)]" />

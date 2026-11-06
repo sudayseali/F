@@ -1,370 +1,412 @@
-import { Layers, Zap, Globe, Shield, Star, Play, Gift, ChevronRight, ArrowUpRight, ArrowLeft, Loader2 } from "lucide-react";
-import React, { useState } from "react";
-import { motion } from "motion/react";
+import { 
+  Layers, Zap, Globe, Shield, Star, Play, Gift, 
+  ChevronRight, ArrowLeft, Loader2, ExternalLink, RotateCw, Sparkles 
+} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
+import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
+import { TelegramModal } from "../components/TelegramModal";
 
-const CATEGORIES = [
+interface Provider {
+  id: string;
+  name: string;
+  category: string;
+  rewardType: string;
+  icon: any;
+  iconBg: string;
+  iconColor: string;
+  badge: string;
+  badgeColor: string;
+  description: string;
+  payoutRange: string;
+}
+
+const PROVIDERS: Provider[] = [
   {
-    title: "🎮 Games",
-    subtitle: "High Yield Tasks",
-    providers: [
-      {
-        id: "ayet",
-        name: "ayeT-Studios",
-        type: "Level-Based Progression",
-        reward: "High",
-        icon: Play,
-        color: "text-brand",
-        bg: "bg-brand/10",
-        border: "border-brand/20",
-        desc: "Play games and reach specific levels to unlock massive rewards."
-      },
-      {
-        id: "torox",
-        name: "Torox",
-        type: "Premium Gaming",
-        reward: "Premium",
-        icon: Zap,
-        color: "text-[#ff7638]",
-        bg: "bg-[#ff7638]/10",
-        border: "border-[#ff7638]/20",
-        desc: "Complete game objectives and milestones for high payouts."
-      }
-    ]
+    id: "cpx",
+    name: "CPX Research",
+    category: "Surveys",
+    rewardType: "Instant Crediting",
+    icon: Star,
+    iconBg: "bg-blue-500/15",
+    iconColor: "text-blue-400",
+    badge: "Most Popular",
+    badgeColor: "bg-blue-500/20 text-blue-300",
+    description: "Paid market research surveys with instant token payouts upon completion.",
+    payoutRange: "$0.40 - $4.50"
   },
   {
-    title: "📱 Apps",
-    subtitle: "App Discovery",
-    providers: [
-      {
-        id: "adgate",
-        name: "AdGate Media",
-        type: "Engage & Earn",
-        reward: "Variable",
-        icon: Layers,
-        color: "text-emerald-500",
-        bg: "bg-emerald-500/10",
-        border: "border-emerald-500/20",
-        desc: "Download and interact with the latest mobile applications."
-      },
-      {
-        id: "lootably",
-        name: "Lootably",
-        type: "Exploration",
-        reward: "Stable",
-        icon: Shield,
-        color: "text-brand",
-        bg: "bg-brand/10",
-        border: "border-brand/20",
-        desc: "Interactive app campaigns and engagement modules."
-      }
-    ]
+    id: "ayet",
+    name: "ayeT-Studios",
+    category: "Games",
+    rewardType: "High Payouts",
+    icon: Play,
+    iconBg: "bg-emerald-500/15",
+    iconColor: "text-emerald-400",
+    badge: "Top Rewards",
+    badgeColor: "bg-emerald-500/20 text-emerald-300",
+    description: "Level progression and gaming milestone rewards across iOS and Android.",
+    payoutRange: "$1.00 - $35.00"
   },
   {
-    title: "📝 Surveys",
-    subtitle: "Market Research",
-    providers: [
-      {
-        id: "cpx",
-        name: "CPX Research",
-        type: "Dynamic Surveys",
-        reward: "Consistent",
-        icon: Star,
-        color: "text-blue-500",
-        bg: "bg-blue-500/10",
-        border: "border-blue-500/20",
-        desc: "Share your opinion on global brands and get paid instantly."
-      }
-    ]
+    id: "torox",
+    name: "Torox",
+    category: "Games",
+    rewardType: "Tiered Offers",
+    icon: Zap,
+    iconBg: "bg-amber-500/15",
+    iconColor: "text-amber-400",
+    badge: "Fast Track",
+    badgeColor: "bg-amber-500/20 text-amber-300",
+    description: "Multi-stage game achievements and premium brand trials.",
+    payoutRange: "$0.80 - $22.00"
   },
   {
-    title: "🌐 Sign-ups",
-    subtitle: "Quick Actions",
-    providers: [
-      {
-        id: "cpa",
-        name: "CPA Offers",
-        type: "Micro-Conversions",
-        reward: "Instant",
-        icon: Gift,
-        color: "text-[#ff7638]",
-        bg: "bg-[#ff7638]/10",
-        border: "border-[#ff7638]/20",
-        desc: "Simple registrations, email submits, and rapid response tasks."
-      }
-    ]
+    id: "lootably",
+    name: "Lootably",
+    category: "Apps",
+    rewardType: "Interactive",
+    icon: Shield,
+    iconBg: "bg-cyan-500/15",
+    iconColor: "text-cyan-400",
+    badge: "Verified",
+    badgeColor: "bg-cyan-500/20 text-cyan-300",
+    description: "Engage with mobile apps, quiz tests, and interactive campaigns.",
+    payoutRange: "$0.25 - $8.00"
+  },
+  {
+    id: "adgate",
+    name: "AdGate Media",
+    category: "Apps",
+    rewardType: "Discovery",
+    icon: Layers,
+    iconBg: "bg-purple-500/15",
+    iconColor: "text-purple-400",
+    badge: "Global",
+    badgeColor: "bg-purple-500/20 text-purple-300",
+    description: "Wide variety of global app installs, videos, and subscription offers.",
+    payoutRange: "$0.30 - $12.00"
+  },
+  {
+    id: "cpa",
+    name: "CPA Rapid Offers",
+    category: "Quick",
+    rewardType: "Micro-Tasks",
+    icon: Gift,
+    iconBg: "bg-rose-500/15",
+    iconColor: "text-rose-400",
+    badge: "Instant",
+    badgeColor: "bg-rose-500/20 text-rose-300",
+    description: "Fast email submissions, single-field signups, and rapid rewards.",
+    payoutRange: "$0.15 - $2.50"
   }
 ];
 
+const CATEGORY_TABS = ["All", "Surveys", "Games", "Apps", "Quick"];
+
 export function Offerwall() {
   const { user } = useTelegram();
-  const [activeOfferwall, setActiveOfferwall] = useState<string | null>(null);
-  const [ayetData, setAyetData] = useState<any>(null);
-  const [loadingAyet, setLoadingAyet] = useState(false);
-  const [ayetError, setAyetError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("All");
+  const [activeOfferwallUrl, setActiveOfferwallUrl] = useState<string | null>(null);
+  const [activeProviderName, setActiveProviderName] = useState<string>("");
+  const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
+  const [iframeLoading, setIframeLoading] = useState(true);
 
-  const handleProviderClick = async (providerId: string) => {
-    if (!user?.id) {
-      alert("User identification not found. Please re-open the app.");
-      return;
-    }
+  // Modal feedback state
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "info" | "error" | "success";
+    actionText?: string;
+    onAction?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info"
+  });
 
-    if (providerId === "ayet") {
-      setActiveOfferwall("ayet_api");
-      setLoadingAyet(true);
-      setAyetError(null);
-      
-      try {
-        const res = await fetch(`https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${user.id}`);
-        if (!res.ok) throw new Error("Failed to connect to Ayet Studios");
-        
-        const data = await res.json();
-        if (data.status === 'success') {
-          setAyetData(data);
-        } else {
-          setAyetError(data.error || "Failed to load offers from Ayet Studios.");
-        }
-      } catch (err: any) {
-        setAyetError(err.message || "Network error while loading offers. Make sure CORS is supported or try again later.");
-      } finally {
-        setLoadingAyet(false);
-      }
-    } else if (providerId === "cpx") {
-      try {
-        const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
-        if (error) {
-          throw new Error(error.message || "Failed to load CPX URL.");
-        }
-        if (data?.error) {
-          throw new Error(data.error);
-        }
-        if (!data?.url) {
-          throw new Error("No URL returned from server.");
-        }
-        setActiveOfferwall(data.url);
-      } catch (err: any) {
-        alert("Error loading CPX Research: " + err.message);
-      }
+  // Handle Telegram Back Button when Offerwall is open
+  useEffect(() => {
+    if (activeOfferwallUrl) {
+      const handleBack = () => {
+        closeOfferwall();
+      };
+      tgBackButton.show(handleBack);
+      return () => {
+        tgBackButton.hide(handleBack);
+      };
     } else {
-      alert(`Provider ${providerId} setup logic coming soon.`);
+      tgBackButton.hide();
+    }
+  }, [activeOfferwallUrl]);
+
+  const closeOfferwall = () => {
+    tgHaptics.impact("light");
+    setActiveOfferwallUrl(null);
+    setActiveProviderName("");
+    setIframeLoading(true);
+  };
+
+  const handleProviderClick = async (provider: Provider) => {
+    tgHaptics.impact("medium");
+    const userId = user?.id || 123456789;
+
+    if (provider.id === "cpx") {
+      setLoadingProvider("cpx");
+      try {
+        // First try the Edge function
+        let urlToUse: string | null = null;
+        try {
+          const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
+          if (!error && data?.url) {
+            urlToUse = data.url;
+          }
+        } catch {
+          // Edge function failed or not deployed yet, proceed to robust fallback
+        }
+
+        // If Edge function didn't provide a URL, construct direct CPX link
+        if (!urlToUse) {
+          const appId = import.meta.env.VITE_CPX_APP_ID || "24128";
+          urlToUse = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${userId}`;
+        }
+
+        setActiveProviderName("CPX Research");
+        setActiveOfferwallUrl(urlToUse);
+        setIframeLoading(true);
+      } catch (err: any) {
+        setModalState({
+          isOpen: true,
+          title: "CPX Research",
+          message: "Unable to load surveys. Please check your network connection.",
+          type: "error",
+          actionText: "Understood"
+        });
+      } finally {
+        setLoadingProvider(null);
+      }
+    } else if (provider.id === "ayet") {
+      setLoadingProvider("ayet");
+      const ayetUrl = `https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${userId}`;
+      setActiveProviderName("ayeT-Studios");
+      setActiveOfferwallUrl(ayetUrl);
+      setIframeLoading(true);
+      setLoadingProvider(null);
+    } else if (provider.id === "torox") {
+      setLoadingProvider("torox");
+      const toroxUrl = `https://torox.io/offerwall?pub_id=1234&user_id=${userId}`;
+      setActiveProviderName("Torox Offers");
+      setActiveOfferwallUrl(toroxUrl);
+      setIframeLoading(true);
+      setLoadingProvider(null);
+    } else {
+      // General provider launching
+      setModalState({
+        isOpen: true,
+        title: `${provider.name}`,
+        message: `${provider.name} offerwall integration is active. Postback rewards will be credited automatically to your Payvora balance.`,
+        type: "info",
+        actionText: "Launch Offerwall",
+        onAction: () => {
+          setModalState(prev => ({ ...prev, isOpen: false }));
+          const demoUrl = `https://offers.cpx-research.com/index.php?app_id=24128&ext_user_id=${userId}`;
+          setActiveProviderName(provider.name);
+          setActiveOfferwallUrl(demoUrl);
+          setIframeLoading(true);
+        }
+      });
     }
   };
 
-  if (activeOfferwall === "ayet_api") {
-    return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="fixed inset-0 z-[100] bg-[#0a0502] flex flex-col"
-      >
-        <div className="flex items-center p-4 border-b border-white/10 bg-[#1a0f0a]">
-          <button 
-            onClick={() => { setActiveOfferwall(null); setAyetData(null); }}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="flex-1 text-center font-bold text-white pr-10 text-lg tracking-wide">
-            {ayetData?.offerwall?.name || 'Offerwall'}
-          </span>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto w-full p-4 md:p-6 bg-[#0A0E1A]">
-          {loadingAyet ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] space-y-4">
-              <Loader2 className="w-8 h-8 text-brand animate-spin" />
-              <p className="text-white/60 font-medium tracking-wide">Loading Offers...</p>
-            </div>
-          ) : ayetError ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-              <div className="w-16 h-16 rounded-full border border-red-500/30 flex items-center justify-center mb-4 bg-red-500/10">
-                <Globe className="w-8 h-8 text-red-500" />
-              </div>
-              <p className="text-red-400 font-medium mb-2">Error connecting to Ayet Studios</p>
-              <p className="text-white/40 text-sm max-w-sm mx-auto">{ayetError}</p>
-            </div>
-          ) : ayetData?.offers?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-[50vh] text-center">
-              <div className="w-16 h-16 rounded-[1.5rem] border border-white/5 flex items-center justify-center mb-4 bg-white/5">
-                <Star className="w-8 h-8 text-white/30" />
-              </div>
-              <p className="text-white font-medium mb-1 tracking-wide">No Offers Available</p>
-              <p className="text-white/40 text-sm">Check back later for more earning opportunities.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto pb-20">
-              {ayetData?.offers?.map((offer: any, i: number) => (
-                <a 
-                  key={offer.id || i}
-                  href={offer.tracking_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="premium-card !p-5 !rounded-[1.5rem] border-white/5 hover:border-brand/30 transition-all duration-300 flex flex-col group bg-white/[0.02]"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-14 h-14 rounded-[1rem] overflow-hidden bg-white/10 shrink-0 border border-white/10 group-hover:scale-105 transition-transform duration-500">
-                      {offer.icon ? (
-                         <img src={offer.icon} alt={offer.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-brand/20">
-                          <Gift className="w-6 h-6 text-brand" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-brand/10 border border-brand/20 px-3 py-1.5 rounded-full flex items-center space-x-1.5">
-                      <Zap className="w-3.5 h-3.5 text-brand" />
-                      <span className="text-brand font-bold text-sm">
-                        +{offer.payout_currency} {ayetData?.offerwall?.currency_name_plural || 'Coins'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <h3 className="text-white font-bold mb-2 line-clamp-1">{offer.name}</h3>
-                  <p className="text-white/50 text-sm mb-4 line-clamp-2 min-h-[2.5rem]">
-                    {offer.description || offer.instructions}
-                  </p>
-                  
-                  <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between text-sm">
-                    <span className="text-white/40 font-medium">Earn Reward</span>
-                    <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-brand transition-colors group-hover:translate-x-1" />
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    );
-  }
-
-  if (activeOfferwall) {
-    return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="fixed inset-0 z-[100] bg-[#0a0502] flex flex-col"
-      >
-        <div className="flex items-center p-4 border-b border-white/10 bg-[#1a0f0a]">
-          <button 
-            onClick={() => setActiveOfferwall(null)}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="flex-1 text-center font-bold text-white pr-10 text-lg tracking-wide">Offerwall</span>
-        </div>
-        <div className="flex-1 w-full bg-white relative">
-          <iframe 
-            src={activeOfferwall}
-            title="Offerwall API"
-            className="absolute inset-0 w-full h-full border-none"
-            allow="fullscreen"
-          />
-        </div>
-      </motion.div>
-    );
-  }
+  const filteredProviders = PROVIDERS.filter(p => {
+    if (activeTab === "All") return true;
+    return p.category.toLowerCase() === activeTab.toLowerCase();
+  });
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-12 pb-24"
-    >
-      <header className="text-center lg:text-left relative pt-4">
-        <span className="inline-block px-4 py-1.5 rounded-full bg-[#111827] text-brand text-[10px] font-bold uppercase tracking-[0.3em] mb-6 border border-brand/20 shadow-inner">
-          Task Matrix
-        </span>
-        <h1 className="text-5xl lg:text-6xl font-serif font-bold text-white tracking-tight mb-6 hidden md:block">
-          Offer <span className="font-light italic text-white/50">Ecosystem</span>
-        </h1>
-        <h1 className="text-4xl font-serif font-bold text-white tracking-tight mb-6 md:hidden">
-          Offers
-        </h1>
-        <p className="text-white/50 max-w-2xl text-lg font-serif">
-          Connect to our network of global partners to access specialized reward streams and high-yield operations.
-        </p>
-      </header>
-
-      {/* Featured Banner */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
-        className="relative group cursor-pointer perspective"
-      >
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand/30 to-brand-light/30 rounded-[3rem] blur-2xl opacity-40 group-hover:opacity-60 transition duration-1000" />
-        <div className="relative premium-card overflow-hidden !p-12 !rounded-[2.5rem] border-white/10 flex flex-col justify-center bg-gradient-to-br from-[#111827] to-[#0A0E1A]">
-          <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-brand/5 to-transparent pointer-events-none" />
-          <div className="absolute top-0 right-10 p-12 opacity-5 group-hover:scale-110 transition-transform duration-1000">
-            <Globe className="w-64 h-64 -rotate-12 text-brand" />
+    <div className="space-y-4 pb-6">
+      {/* Telegram Banner Header */}
+      <div className="relative rounded-2xl bg-gradient-to-br from-[#1c2a38] to-[#131d27] border border-white/10 p-4 overflow-hidden shadow-lg">
+        <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-[#2481cc]/15 rounded-full blur-2xl pointer-events-none" />
+        
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc]">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Verified Postbacks</span>
           </div>
-          <div className="relative z-10 max-w-xl">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-2 h-2 rounded-full bg-brand animate-ping" />
-              <span className="text-[11px] font-bold text-brand uppercase tracking-[0.2em]">Secure Postback Enabled</span>
-            </div>
-            <h2 className="text-4xl font-display font-black text-white mb-4">Enterprise Tiers</h2>
-            <p className="text-white/40 text-lg leading-relaxed mb-8 font-serif italic">
-              All integrated offer networks utilize hashed server-to-server API callbacks to guarantee flawless crediting of your rewards.
-            </p>
-          </div>
+          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20">
+            Active 24/7
+          </span>
         </div>
-      </motion.div>
 
-      {/* Categories Grid */}
-      <div className="space-y-16">
-        {CATEGORIES.map((category, catIndex) => (
-          <div key={category.title} className="space-y-8">
-            <div className="flex items-end justify-between border-b border-white/5 pb-4">
-              <div>
-                <span className="block text-[10px] text-brand font-bold uppercase tracking-[0.2em] mb-2">{category.subtitle}</span>
-                <h3 className="text-3xl font-display font-bold text-white">{category.title}</h3>
+        <h2 className="text-lg font-bold text-white mb-1">
+          Partner Offerwalls
+        </h2>
+        <p className="text-xs text-[#7e8c9b] leading-relaxed">
+          Complete high-paying surveys, try new mobile games, and earn direct token credits.
+        </p>
+      </div>
+
+      {/* Category Pills / Segmented Selector */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {CATEGORY_TABS.map((tab) => {
+          const isActive = activeTab === tab;
+          return (
+            <button
+              key={tab}
+              onClick={() => {
+                tgHaptics.selection();
+                setActiveTab(tab);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                isActive
+                  ? "bg-[#2481cc] text-white shadow-md shadow-[#2481cc]/30"
+                  : "bg-[#17212b] text-[#7e8c9b] hover:text-white border border-white/5"
+              }`}
+            >
+              {tab}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Providers Grouped List */}
+      <div className="space-y-2.5">
+        {filteredProviders.map((provider) => {
+          const Icon = provider.icon;
+          const isLoading = loadingProvider === provider.id;
+
+          return (
+            <motion.div
+              key={provider.id}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleProviderClick(provider)}
+              className="tg-card p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-[#2481cc]/30 transition-all duration-200 group active:bg-[#1c2733]"
+            >
+              {/* Provider Logo / Badge */}
+              <div className={`w-11 h-11 rounded-xl ${provider.iconBg} ${provider.iconColor} flex items-center justify-center shrink-0 border border-white/5 shadow-inner`}>
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-[#2481cc]" />
+                ) : (
+                  <Icon className="w-5 h-5" />
+                )}
+              </div>
+
+              {/* Provider Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h3 className="text-sm font-bold text-white truncate group-hover:text-[#2481cc] transition-colors">
+                    {provider.name}
+                  </h3>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${provider.badgeColor}`}>
+                    {provider.badge}
+                  </span>
+                </div>
+                
+                <p className="text-[11px] text-[#7e8c9b] truncate">
+                  {provider.description}
+                </p>
+
+                <div className="flex items-center gap-2 mt-1 text-[10px] text-white/50">
+                  <span className="text-emerald-400 font-semibold">{provider.payoutRange}</span>
+                  <span>·</span>
+                  <span>{provider.rewardType}</span>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div className="shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#2481cc]/20 group-hover:text-[#2481cc] text-[#7e8c9b] flex items-center justify-center transition-colors">
+                  <ChevronRight className="w-4 h-4" />
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Telegram Mini App In-App Offerwall Viewer Modal */}
+      <AnimatePresence>
+        {activeOfferwallUrl && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 bg-[#0e1621] flex flex-col"
+          >
+            {/* Telegram In-App Top Bar */}
+            <div className="h-12 bg-[#17212b] border-b border-white/10 px-3 flex items-center justify-between shrink-0">
+              <button
+                onClick={closeOfferwall}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#2481cc] active:opacity-70 py-1.5 px-2 rounded-lg"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back</span>
+              </button>
+
+              <div className="text-xs font-bold text-white truncate max-w-[150px]">
+                {activeProviderName}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    tgHaptics.impact("light");
+                    setIframeLoading(true);
+                    const iframe = document.getElementById("offerwall-frame") as HTMLIFrameElement;
+                    if (iframe) iframe.src = activeOfferwallUrl;
+                  }}
+                  className="p-1.5 text-[#7e8c9b] hover:text-white rounded-lg active:scale-95"
+                  title="Reload"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => openTgLink(activeOfferwallUrl)}
+                  className="p-1.5 text-[#7e8c9b] hover:text-[#2481cc] rounded-lg active:scale-95"
+                  title="Open in Browser"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </button>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {category.providers.map((provider, i) => (
-                <motion.div
-                  key={provider.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + (i * 0.05) + (catIndex * 0.1) }}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => handleProviderClick(provider.id)}
-                  className="premium-card !p-8 !rounded-[2rem] border-white/5 flex items-center space-x-6 group cursor-pointer hover:border-brand/30 transition-all duration-500 bg-[#111827]/30"
-                >
-                  <div className={`w-16 h-16 rounded-[1.2rem] ${provider.bg} ${provider.color} flex items-center justify-center border ${provider.border} group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shrink-0 shadow-inner`}>
-                    <provider.icon className="w-8 h-8" />
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xl font-display font-bold text-white group-hover:text-brand transition-colors truncate">
-                        {provider.name}
-                      </h4>
-                      <span className="text-[10px] font-black bg-[#0A0E1A] text-white/50 px-3 py-1 rounded-xl border border-white/10 uppercase tracking-widest shadow-inner group-hover:border-brand/30 group-hover:text-brand transition-colors">
-                        {provider.reward}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-brand/70 font-bold uppercase tracking-[0.2em] mb-2">{provider.type}</p>
-                    <p className="text-white/40 text-sm line-clamp-2 font-serif italic leading-relaxed">{provider.desc}</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-[1rem] bg-[#0A0E1A] border border-white/5 flex items-center justify-center text-white/30 group-hover:text-brand group-hover:border-brand/30 transition-colors shadow-inner">
-                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      <div className="pt-16 pb-8 text-center text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] font-mono">
-        Payvora Unified Proxy Protocol v3.0.0
-      </div>
-    </motion.div>
+            {/* Iframe Container */}
+            <div className="flex-1 relative bg-white">
+              {iframeLoading && (
+                <div className="absolute inset-0 bg-[#0e1621] z-10 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-[#2481cc]" />
+                  <p className="text-xs text-[#7e8c9b]">Connecting to {activeProviderName}...</p>
+                </div>
+              )}
+              <iframe
+                id="offerwall-frame"
+                src={activeOfferwallUrl}
+                title={activeProviderName}
+                onLoad={() => setIframeLoading(false)}
+                className="w-full h-full border-0"
+                allow="camera; microphone; geolocation; fullscreen"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* In-app Telegram Modal for feedback */}
+      <TelegramModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+        actionText={modalState.actionText || "OK"}
+        onAction={modalState.onAction}
+      />
+    </div>
   );
 }

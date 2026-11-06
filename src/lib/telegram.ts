@@ -1,0 +1,87 @@
+// Telegram WebApp SDK helper and haptic utilities
+
+export interface TelegramWebAppUser {
+  id: number;
+  is_bot?: boolean;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+  photo_url?: string;
+}
+
+export const getTelegramWebApp = () => {
+  if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+    return (window as any).Telegram.WebApp;
+  }
+  return null;
+};
+
+// Haptic feedback triggers
+export const tgHaptics = {
+  impact: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft' = 'light') => {
+    try {
+      const tg = getTelegramWebApp();
+      tg?.HapticFeedback?.impactOccurred(style);
+    } catch {
+      // Ignore if not supported
+    }
+  },
+  notification: (type: 'error' | 'success' | 'warning') => {
+    try {
+      const tg = getTelegramWebApp();
+      tg?.HapticFeedback?.notificationOccurred(type);
+    } catch {
+      // Ignore if not supported
+    }
+  },
+  selection: () => {
+    try {
+      const tg = getTelegramWebApp();
+      tg?.HapticFeedback?.selectionChanged();
+    } catch {
+      // Ignore if not supported
+    }
+  }
+};
+
+// Telegram Back Button management
+export const tgBackButton = {
+  show: (onClick: () => void) => {
+    try {
+      const tg = getTelegramWebApp();
+      if (tg?.BackButton) {
+        tg.BackButton.show();
+        tg.BackButton.onClick(onClick);
+      }
+    } catch {
+      // Ignore
+    }
+  },
+  hide: (callbackToRemove?: () => void) => {
+    try {
+      const tg = getTelegramWebApp();
+      if (tg?.BackButton) {
+        if (callbackToRemove) {
+          tg.BackButton.offClick(callbackToRemove);
+        }
+        tg.BackButton.hide();
+      }
+    } catch {
+      // Ignore
+    }
+  }
+};
+
+// Open external or telegram link
+export const openTgLink = (url: string) => {
+  tgHaptics.impact('light');
+  const tg = getTelegramWebApp();
+  if (tg?.openTelegramLink && url.startsWith('https://t.me/')) {
+    tg.openTelegramLink(url);
+  } else if (tg?.openLink) {
+    tg.openLink(url);
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+};

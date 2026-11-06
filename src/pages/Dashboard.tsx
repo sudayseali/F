@@ -1,59 +1,47 @@
-import { ArrowUpRight, TrendingUp, CheckCircle, Clock, Wallet, Shield } from "lucide-react";
+import { 
+  ArrowUpRight, CheckCircle, Clock, Wallet, Shield, 
+  Coins, Sparkles, Layers, Users, ChevronRight, Gift, Flame, Play, Star
+} from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { motion } from "motion/react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { Link } from "react-router-dom";
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
-interface DashboardStats {
-  completed: number;
-  pending: number;
-  recentSubmissions: any[];
-}
+import { tgHaptics } from "../lib/telegram";
 
 export function Dashboard() {
   const { user } = useTelegram();
-  const displayName = user?.first_name ? `${user?.first_name} ${user?.last_name || ''}`.trim() : 'User';
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Payvora User";
   const balance = user?.balance || 0;
   
-  const [stats, setStats] = useState<DashboardStats>({
+  const [stats, setStats] = useState({
     completed: 0,
     pending: 0,
-    recentSubmissions: []
+    referrals: 0,
   });
   
   const [loading, setLoading] = useState(true);
+  const [dailyClaimed, setDailyClaimed] = useState(false);
 
   useEffect(() => {
     async function fetchStats() {
-      if (!user?.uuid) return;
+      if (!user?.uuid) {
+        setLoading(false);
+        return;
+      }
       
       try {
-        const { data: subs, error } = await supabase
+        const { data: subs } = await supabase
           .from('submissions')
-          .select('*, tasks(title, reward)')
-          .eq('worker_id', user.uuid)
-          .order('created_at', { ascending: false });
+          .select('status')
+          .eq('worker_id', user.uuid);
           
         if (subs) {
-          setStats({
+          setStats(prev => ({
+            ...prev,
             completed: subs.filter(s => s.status === 'approved').length,
             pending: subs.filter(s => s.status === 'pending').length,
-            recentSubmissions: subs.slice(0, 5),
-          });
+          }));
         }
       } catch (err) {
         console.error("Error fetching stats:", err);
@@ -61,142 +49,184 @@ export function Dashboard() {
         setLoading(false);
       }
     }
-    if (user?.uuid !== undefined) {
-      fetchStats();
-    } else if (user) {
-      const timer = setTimeout(() => setLoading(false), 2000);
-      return () => clearTimeout(timer);
-    } else {
-      setLoading(false);
-    }
-  }, [user?.uuid, user]);
+    fetchStats();
+  }, [user?.uuid]);
+
+  const handleClaimDaily = () => {
+    tgHaptics.impact("medium");
+    setDailyClaimed(true);
+  };
 
   return (
-    <motion.div 
-      className="space-y-12 pb-10"
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-    >
-      <motion.header variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-8 pt-4">
-        <div>
-          <div className="flex items-center space-x-3 mb-4">
-            <span className="w-2 h-2 rounded-full bg-brand animate-ping"></span>
-            <span className="text-brand font-bold text-[10px] uppercase tracking-[0.3em]">Network Synchronized</span>
-          </div>
-          <h1 className="text-5xl lg:text-6xl font-serif font-bold gradient-text tracking-tight mb-2">
-            Welcome, {displayName}.
-          </h1>
-          <p className="text-white/40 text-sm font-medium tracking-wide">Secure connection established on encrypted channel.</p>
-        </div>
-        
-        <div className="flex items-center p-2 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] backdrop-blur-md">
-          <div className="flex -space-x-3 px-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-10 h-10 rounded-full border-2 border-[#0A0E1A] bg-[#111827] flex items-center justify-center">
-                <Shield className="w-4 h-4 text-brand/50" />
-              </div>
-            ))}
-            <div className="w-10 h-10 rounded-full border-2 border-[#0A0E1A] bg-[#111827] flex items-center justify-center text-[10px] font-bold text-white/50">
-              +99
-            </div>
-          </div>
-          <div className="ml-4 pr-6 pl-4 border-l border-white/[0.05] flex flex-col justify-center">
-            <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] mb-0.5">Top Tier</span>
-            <span className="text-sm font-bold text-brand">Alpha Status</span>
-          </div>
-        </div>
-      </motion.header>
+    <div className="space-y-4 pb-6">
+      {/* Telegram User Balance Hero Card */}
+      <div className="relative rounded-2xl bg-gradient-to-b from-[#1c2733] to-[#141d27] border border-white/10 p-5 text-center shadow-xl overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[#2481cc]/10 rounded-full blur-2xl pointer-events-none" />
 
-      {/* Balance Card - Ultra Premium */}
-      <motion.div variants={itemVariants} className="relative group">
-        <div className="absolute -inset-1 bg-gradient-to-r from-brand/20 to-white/5 rounded-[3rem] blur-xl opacity-50 group-hover:opacity-70 transition duration-1000"></div>
-        <div className="relative premium-card !rounded-[2.5rem] !p-12 border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-12 bg-gradient-to-br from-[#111827]/90 to-[#0A0E1A]/90 backdrop-blur-3xl">
-          
-          <div className="absolute top-0 right-0 p-12 opacity-5 mix-blend-overlay pointer-events-none group-hover:scale-110 transition-transform duration-1000">
-            <TrendingUp className="w-96 h-96 -rotate-12 text-white" />
-          </div>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-[#7e8c9b] mb-1">
+          <Coins className="w-3.5 h-3.5 text-amber-400" />
+          <span>Available Balance</span>
+        </div>
 
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 rounded-[1.2rem] bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shadow-inner">
-                <Wallet className="w-6 h-6" />
-              </div>
-              <p className="text-white/50 text-[11px] font-bold uppercase tracking-[0.25em]">Liquid Treasury</p>
-            </div>
-            <div className="flex items-baseline space-x-4">
-              <span className="text-7xl lg:text-8xl font-display font-black text-white tracking-tighter drop-shadow-2xl">
-                {(balance * 1000).toLocaleString()}
-              </span>
-              <span className="text-3xl font-bold font-serif text-white/30 uppercase tracking-widest">Paycoin</span>
-            </div>
-            <div className="flex items-center space-x-3 bg-[#111827] w-fit px-4 py-2 rounded-xl border border-white/5 shadow-inner">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              <span className="text-emerald-500 text-[11px] font-bold uppercase tracking-[0.15em]">Market Outperforming +12.5%</span>
-            </div>
-          </div>
-          
-          <div className="relative z-10 flex flex-col sm:flex-row gap-4">
-            <Link to="/wallet" className="btn-primary group !px-12 !py-6 !rounded-[1.5rem] shadow-[0_0_30px_rgba(255,78,0,0.2)] hover:shadow-[0_0_50px_rgba(255,78,0,0.4)]">
-              <span className="relative z-10 flex items-center text-lg font-display tracking-wide uppercase">
-                Access Funds
-                <ArrowUpRight className="w-6 h-6 ml-3 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </span>
-            </Link>
-          </div>
+        {/* Big Balance Number */}
+        <div className="text-3xl font-extrabold text-white tracking-tight my-1 tabular-nums">
+          ${balance.toFixed(2)}
         </div>
-      </motion.div>
+        <div className="text-xs text-[#7e8c9b] font-medium mb-4">
+          ≈ {(balance * 1000).toLocaleString()} Points
+        </div>
 
-      {/* Stats Bento Grid */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="premium-card flex flex-col justify-between group hover-lift !p-10 !rounded-[2.5rem]">
-          <div className="flex items-center justify-between mb-8">
-            <div className="w-16 h-16 rounded-[1.2rem] bg-brand/5 flex items-center justify-center text-brand border border-brand/10 group-hover:scale-110 transition-transform duration-700">
-              <CheckCircle className="w-8 h-8" />
+        {/* 4 Telegram Quick Action Buttons */}
+        <div className="grid grid-cols-4 gap-2 pt-1 border-t border-white/5">
+          <Link
+            to="/offerwall"
+            onClick={() => tgHaptics.selection()}
+            className="flex flex-col items-center gap-1 py-2 rounded-xl bg-white/5 hover:bg-[#2481cc]/15 transition active:scale-95"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#2481cc]/20 text-[#2481cc] flex items-center justify-center">
+              <Layers className="w-4 h-4" />
             </div>
-            <span className="text-white/20 text-4xl font-serif italic font-light">01</span>
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-2">Verified Operations</p>
-            <h4 className="text-5xl font-display font-black text-white group-hover:text-brand transition-colors">{loading ? "-" : stats.completed}</h4>
-          </div>
-        </div>
-        
-        <div className="premium-card flex flex-col justify-between group hover-lift !p-10 !rounded-[2.5rem]">
-          <div className="flex items-center justify-between mb-8">
-            <div className="w-16 h-16 rounded-[1.2rem] bg-brand-light/5 flex items-center justify-center text-brand-light border border-brand-light/10 group-hover:scale-110 transition-transform duration-700">
-              <Clock className="w-8 h-8" />
-            </div>
-            <span className="text-white/20 text-4xl font-serif italic font-light">02</span>
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] mb-2">Pending Audits</p>
-            <h4 className="text-5xl font-display font-black text-white group-hover:text-brand-light transition-colors">{loading ? "-" : stats.pending}</h4>
-          </div>
-        </div>
-      </motion.div>
+            <span className="text-[10px] font-semibold text-white">Offers</span>
+          </Link>
 
-      {/* Offerwall CTA */}
-      <motion.div variants={itemVariants} className="premium-card bg-[#111827]/50 border-brand/20 !p-12 !rounded-[2.5rem] group overflow-hidden relative">
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-brand/10 to-transparent pointer-events-none"></div>
-        <div className="absolute top-0 right-10 p-12 opacity-10 mix-blend-overlay pointer-events-none group-hover:scale-110 group-hover:rotate-12 transition-transform duration-1000">
-          <TrendingUp className="w-64 h-64 text-brand" />
-        </div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
-          <div className="max-w-2xl text-center md:text-left">
-            <h3 className="text-4xl font-display font-bold text-white mb-4 tracking-tight">Expand Operational Scope</h3>
-            <p className="text-white/50 text-lg leading-relaxed font-serif italic">
-              Integrate with tier-1 partner networks to unlock bespoke, high-yield bounty operations. Only accessible via the Global Offerwall structure.
-            </p>
-          </div>
-          <Link to="/offerwall" className="btn-primary !px-12 !py-6 whitespace-nowrap !rounded-[1.5rem] bg-white text-[#0A0E1A] hover:bg-white/90 shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)]">
-            <span className="relative z-10 flex items-center font-display tracking-widest text-sm uppercase">
-              Initialize Portal
-            </span>
+          <Link
+            to="/tasks"
+            onClick={() => tgHaptics.selection()}
+            className="flex flex-col items-center gap-1 py-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 transition active:scale-95"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <CheckCircle className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-semibold text-white">Tasks</span>
+          </Link>
+
+          <Link
+            to="/wallet"
+            onClick={() => tgHaptics.selection()}
+            className="flex flex-col items-center gap-1 py-2 rounded-xl bg-white/5 hover:bg-amber-500/15 transition active:scale-95"
+          >
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-semibold text-white">Withdraw</span>
+          </Link>
+
+          <Link
+            to="/referrals"
+            onClick={() => tgHaptics.selection()}
+            className="flex flex-col items-center gap-1 py-2 rounded-xl bg-white/5 hover:bg-purple-500/15 transition active:scale-95"
+          >
+            <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-semibold text-white">Friends</span>
           </Link>
         </div>
-      </motion.div>
+      </div>
 
-    </motion.div>
+      {/* Daily Reward / Streak Card */}
+      <div className="tg-card p-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20">
+            <Flame className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-white">Daily Check-In</span>
+              <span className="text-[9px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.2 rounded">
+                +50 PTS
+              </span>
+            </div>
+            <p className="text-[11px] text-[#7e8c9b]">Claim daily rewards every 24 hours</p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleClaimDaily}
+          disabled={dailyClaimed}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition active:scale-95 ${
+            dailyClaimed
+              ? "bg-white/10 text-white/40 cursor-not-allowed"
+              : "bg-[#2481cc] hover:bg-[#1a6cb3] text-white shadow-sm"
+          }`}
+        >
+          {dailyClaimed ? "Claimed" : "Claim"}
+        </button>
+      </div>
+
+      {/* Featured Offerwalls / Surveys */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-bold text-white">Featured Offerwalls</span>
+          <Link
+            to="/offerwall"
+            onClick={() => tgHaptics.selection()}
+            className="text-[11px] font-semibold text-[#2481cc] flex items-center gap-0.5"
+          >
+            <span>See All</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {/* CPX Research */}
+          <Link
+            to="/offerwall"
+            onClick={() => tgHaptics.selection()}
+            className="tg-card p-3 flex flex-col justify-between hover:border-[#2481cc]/40 transition active:scale-98"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                <Star className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                Hot
+              </span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">CPX Surveys</div>
+              <p className="text-[10px] text-emerald-400 font-medium">Up to $4.50</p>
+            </div>
+          </Link>
+
+          {/* ayeT Studios */}
+          <Link
+            to="/offerwall"
+            onClick={() => tgHaptics.selection()}
+            className="tg-card p-3 flex flex-col justify-between hover:border-emerald-500/40 transition active:scale-98"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                <Play className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                Games
+              </span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">ayeT-Studios</div>
+              <p className="text-[10px] text-emerald-400 font-medium">Up to $35.00</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* User Stats 2-column cards */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="tg-card p-3">
+          <div className="text-[10px] text-[#7e8c9b] font-medium mb-1">Approved Tasks</div>
+          <div className="text-xl font-bold text-white tabular-nums">
+            {loading ? "-" : stats.completed}
+          </div>
+        </div>
+
+        <div className="tg-card p-3">
+          <div className="text-[10px] text-[#7e8c9b] font-medium mb-1">Pending Review</div>
+          <div className="text-xl font-bold text-amber-400 tabular-nums">
+            {loading ? "-" : stats.pending}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -1,15 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Sun, Moon } from "lucide-react";
-import { cn } from "../lib/utils";
+import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Coins, Sparkles } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { useState, useEffect } from "react";
-import { motion } from "motion/react";
-import { Logo } from "./Logo";
+import { tgHaptics } from "../lib/telegram";
 
-const baseNavItems = [
+const navItems = [
   { label: "Home", icon: LayoutDashboard, path: "/" },
-  { label: "Offers", icon: CheckSquare, path: "/tasks" },
-  { label: "Offerwall", icon: Layers, path: "/offerwall" },
+  { label: "Offers", icon: Layers, path: "/offerwall" },
+  { label: "Tasks", icon: CheckSquare, path: "/tasks" },
   { label: "Wallet", icon: Wallet, path: "/wallet" },
   { label: "Profile", icon: UserIcon, path: "/profile" },
 ];
@@ -17,137 +14,100 @@ const baseNavItems = [
 export function Navigation() {
   const location = useLocation();
   const { user } = useTelegram();
-  const displayName = user?.first_name ? `${user?.first_name} ${user?.last_name || ''}`.trim() : 'User';
+  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Payvora User";
   const initial = displayName.charAt(0).toUpperCase();
+  const balance = user?.balance ?? 0;
 
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.theme === 'dark' || (!('theme' in localStorage) && true); // default to dark
-    }
-    return true;
-  });
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.theme = 'dark';
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.theme = 'light';
-    }
-  }, [isDark]);
-
-  const navItems = [...baseNavItems];
+  const handleTabClick = () => {
+    tgHaptics.selection();
+  };
 
   return (
     <>
-      {/* Mobile Top Bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-20 glass-panel z-40 border-b border-white/[0.05] flex items-center justify-between px-6">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-brand/10 rounded-2xl border border-brand/20 shadow-[0_0_15px_rgba(255,78,0,0.15)]">
-            <Logo className="w-7 h-7 text-brand" />
+      {/* Telegram Native Top App Bar */}
+      <header className="sticky top-0 left-0 right-0 z-40 bg-[#0e1621]/95 backdrop-blur-md border-b border-white/[0.08] px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Telegram User Avatar */}
+          <Link to="/profile" onClick={handleTabClick} className="relative group">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#2481cc] to-[#1a6cb3] flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/10 group-active:scale-95 transition-transform">
+              {initial}
+            </div>
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0e1621]" />
+          </Link>
+
+          {/* User Details */}
+          <div className="leading-tight">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-white max-w-[120px] sm:max-w-[180px] truncate">
+                {displayName}
+              </span>
+              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#2481cc] text-[9px] text-white">
+                ✓
+              </span>
+            </div>
+            <span className="text-[11px] text-[#7e8c9b]">
+              {user?.username ? `@${user.username}` : "Telegram Member"}
+            </span>
           </div>
-          <span className="text-2xl font-serif font-semibold text-white tracking-tight">Payvora</span>
         </div>
-      </div>
 
-      {/* Main content needs padding due to fixed mobile top bar */}
-      <style>{`
-        @media (max-width: 768px) {
-          main { padding-top: 6rem; }
-        }
-      `}</style>
+        {/* Telegram Coin / Balance Pill */}
+        <Link
+          to="/wallet"
+          onClick={handleTabClick}
+          className="flex items-center gap-2 bg-[#17212b] border border-white/10 px-3 py-1.5 rounded-full shadow-sm hover:border-[#2481cc]/40 transition active:scale-95"
+        >
+          <div className="w-5 h-5 rounded-full bg-amber-400/20 text-amber-400 flex items-center justify-center">
+            <Coins className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-right">
+            <div className="text-xs font-bold text-white tabular-nums">
+              ${balance.toFixed(2)}
+            </div>
+          </div>
+        </Link>
+      </header>
 
-      {/* Mobile Bottom Navigation - Centered Floating Dock */}
-      <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm rounded-[2rem] glass-panel pb-safe z-50 flex items-center justify-between px-4 py-3 shadow-[0_30px_60px_rgba(0,0,0,0.6)] border-white/[0.08]">
-        <div className="flex justify-between items-center w-full">
+      {/* Telegram Native Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#17212b]/95 backdrop-blur-xl border-t border-white/[0.08] pb-safe pt-1.5 px-2">
+        <div className="max-w-md mx-auto grid grid-cols-5 items-center">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
+            const isActive =
+              location.pathname === item.path ||
+              (item.path !== "/" && location.pathname.startsWith(item.path));
             const Icon = item.icon;
-            
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={cn(
-                  "relative flex flex-col items-center justify-center w-14 h-14 transition-all duration-500",
-                  isActive ? "text-white" : "text-white/40 hover:text-white/70"
-                )}
+                onClick={handleTabClick}
+                className={`relative flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-90 ${
+                  isActive ? "text-[#2481cc]" : "text-[#7e8c9b] hover:text-white/80"
+                }`}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTabMobile"
-                    className="absolute inset-0 bg-brand/20 rounded-2xl border border-brand/30 shadow-[0_0_20px_rgba(255,78,0,0.3)]"
-                    transition={{ type: "spring", bounce: 0.3, duration: 0.6 }}
+                <div className="relative">
+                  <Icon
+                    className={`w-6 h-6 transition-transform duration-200 ${
+                      isActive ? "scale-110 drop-shadow-[0_2px_8px_rgba(36,129,204,0.6)]" : ""
+                    }`}
                   />
-                )}
-                <Icon className={cn("w-6 h-6 z-10 transition-all duration-500", isActive ? "scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" : "scale-100")} />
+                  {isActive && (
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#2481cc]" />
+                  )}
+                </div>
+                <span
+                  className={`text-[10px] mt-1 font-medium tracking-tight ${
+                    isActive ? "font-semibold text-white" : "text-[#7e8c9b]"
+                  }`}
+                >
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </div>
       </nav>
-
-      {/* Desktop Sidebar - Enterprise Class */}
-      <aside className="hidden md:flex flex-col w-80 h-screen fixed left-0 top-0 bg-[#0A0E1A]/80 backdrop-blur-3xl border-r border-white/5 shadow-2xl">
-        <div className="p-10 flex items-center justify-between relative z-10">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-brand/10 rounded-2xl border border-brand/20 shadow-[0_0_20px_rgba(255,78,0,0.2)]">
-              <Logo className="w-8 h-8 text-brand" />
-            </div>
-            <h1 className="text-3xl font-serif font-semibold text-white tracking-tight">
-              Payvora
-            </h1>
-          </div>
-        </div>
-        
-        <nav className="flex-1 px-8 space-y-3 mt-4 relative z-10">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.path !== "/" && location.pathname.startsWith(item.path));
-            const Icon = item.icon;
-            
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "relative flex items-center space-x-4 px-6 py-4 rounded-[1.5rem] transition-all duration-500 group overflow-hidden",
-                  isActive 
-                    ? "text-white shadow-[0_10px_30px_-10px_rgba(255,78,0,0.3)]" 
-                    : "text-white/50 hover:text-white hover:bg-white/[0.02]"
-                )}
-              >
-                 {isActive && (
-                  <motion.div
-                    layoutId="activeTabDesktop"
-                    className="absolute inset-0 bg-brand/10 border border-brand/20 rounded-[1.5rem]"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <Icon className={cn("w-5 h-5 z-10 transition-all duration-500 group-hover:scale-110", isActive ? "text-brand drop-shadow-[0_0_8px_rgba(255,78,0,0.5)]" : "text-white/30")} />
-                <span className={cn("z-10 text-sm tracking-wide transition-all duration-500", isActive ? "font-bold" : "font-medium")}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-8 relative z-10">
-          <div className="p-1 bg-white/[0.02] rounded-[2rem] border border-white/[0.08] hover-lift cursor-pointer overflow-hidden group">
-            <div className="flex items-center space-x-4 p-4">
-              <div className="w-12 h-12 rounded-[1.2rem] bg-brand/10 flex items-center justify-center text-brand font-display font-black text-xl border border-brand/20 shadow-inner">
-                {initial}
-              </div>
-              <div className="overflow-hidden flex-1">
-                <p className="text-sm font-bold text-white truncate">{displayName}</p>
-                <p className="text-[10px] text-brand/70 font-mono mt-1 uppercase tracking-[0.15em] truncate font-medium">
-                  {user?.username ? `@${user.username}` : `ID: ${user?.id?.toString().slice(0, 8)}`}
-                </p>
-              </div>
-            </div>
-            <div className="h-1 bg-gradient-to-r from-brand to-brand-light transform scale-x-0 group-hover:scale-x-100 transition-transform duration-700 origin-left" />
-          </div>
-        </div>
-      </aside>
     </>
   );
 }
