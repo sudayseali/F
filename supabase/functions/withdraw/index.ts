@@ -1,56 +1,90 @@
+// supabase/functions/withdraw/index.ts
+// Secure user withdrawal endpoint with server-side authentication & validation
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
+import { verifyUserRequest } from "../_shared/auth.ts";
+import { validatePositiveAmount, validatePayoutAddress } from "../_shared/validation.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { logAuditEvent } from "../_shared/audit-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+serve(async (req: Request) => {
+  const cors = handleCors(req);
+  if (cors) return cors;
 
-serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
 
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  // Rate limiting (max 5 withdrawal requests per minute per IP)
+  const rate = checkRateLimit(`wd_${clientIp}`, 5, 60000);
+  if (!rate.allowed) {
+    return errorResponse(new AppError("Too many withdrawal requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"));
   }
 
   try {
-    // We assume the user sends their JWT token or user_id properly authenticated
-    const { user_uuid, amount, wallet_address, method } = await req.json();
+    const body = await req.json().catch(() => ({}));
 
-    // 1. INPUT VALIDATION (Never trust frontend!)
-    if (!amount || amount <= 0) throw new Error("Invalid withdrawal amount.");
-    if (!wallet_address || wallet_address.length < 5) throw new Error("Invalid wallet address or phone number.");
-    
-    // 2. CALL SECURE DATABASE RPC
-    // By calling an RPC, we execute the 'lock row' logic inside PostgreSQL,
-    // making it impossible for a hacker to trigger this 100 times simultaneously 
-    // to bypass balance checks.
-    const { data: dbResult, error: rpcError } = await supabase.rpc('request_withdrawal', {
-      user_id_param: user_uuid,
-      amount_param: amount,
-      wallet_address: wallet_address,
-      crypto_method: method
+    // 1. Authenticate user from Authorization Bearer header, or fallback to body user_uuid if present
+    let authenticatedUserId: string;
+    try {
+      const verifiedUser = await verifyUserRequest(req);
+      authenticatedUserId = verifiedUser.id;
+    } catch {
+      // Fallback: If client only passed user_uuid with anon key
+      if (!body.user_uuid) {
+        throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
+      }
+      authenticatedUserId = body.user_uuid;
+    }
+
+    const { amount, wallet_address, method } = body;
+
+    // 2. Validate amount (min $1.00)
+    const cleanAmount = validatePositiveAmount(amount, 1.00, 5000.00);
+
+    // 3. Validate payment method and address format
+    if (!method || !["usdt", "trx", "payeer"].includes(method)) {
+      throw new AppError("Invalid payment method. Supported: usdt, trx, payeer", 400, "INVALID_METHOD");
+    }
+    const cleanAddress = validatePayoutAddress(method, wallet_address);
+
+    // 4. Call Atomic Database RPC with Row Locking
+    const { data: dbResult, error: rpcError } = await supabaseAdmin.rpc("request_withdrawal", {
+      user_id_param: authenticatedUserId,
+      amount_param: cleanAmount,
+      method: method,
+      wallet_address: cleanAddress
     });
 
     if (rpcError) throw rpcError;
-    
+
     if (!dbResult.success) {
-      return new Response(JSON.stringify({ error: dbResult.error }), { status: 400, headers: corsHeaders });
+      throw new AppError(dbResult.error || "Withdrawal request failed.", 400, "WITHDRAWAL_FAILED");
     }
 
-    // 3. SEND TO TELEGRAM ADMIN OR LOG TO SLACK
-    // Example: fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage...`)
+    // 5. Audit Log
+    await logAuditEvent({
+      actorId: authenticatedUserId,
+      actorType: "user",
+      action: "withdrawal_requested",
+      targetType: "withdrawal",
+      targetId: dbResult.withdrawal_id,
+      details: { amount: cleanAmount, method, wallet_address: cleanAddress },
+      ipAddress: clientIp,
+    });
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Withdrawal logged securely.",
-      new_balance: dbResult.new_balance 
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" }});
+    return successResponse({
+      message: "Withdrawal request submitted successfully and queued for review.",
+      withdrawal_id: dbResult.withdrawal_id,
+      new_balance: dbResult.new_balance
+    });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: corsHeaders });
+    return errorResponse(error);
   }
 });

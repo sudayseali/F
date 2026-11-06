@@ -9,3 +9,10 @@ verify_jwt = false
 [functions.tapjoy_webhook]
 verify_jwt = false
 
+[functions.admin_api]
+verify_jwt = false
+
+[functions.admin_action]
+verify_jwt = false
+
+
