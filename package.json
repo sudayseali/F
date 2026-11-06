@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test:security": "tsx scripts/run-security-tests.ts"
+    "test:security": "tsx scripts/run-security-tests.ts",
+    "deploy:supabase": "bash scripts/deploy-backend.sh"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
