@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { tgHaptics, openTgLink, tgBackButton } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
+import { APP_CONFIG } from "../config/appConfig";
 
 export function Referrals() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export function Referrals() {
   const [loading, setLoading] = useState(true);
 
   const refCode = user?.id ? `ref_${user.id}` : "ref_user";
-  const refLink = `https://t.me/PayvoraBot?start=${refCode}`;
+  const refLink = `${APP_CONFIG.telegram.botUrl}?start=${refCode}`;
 
   useEffect(() => {
     tgBackButton.show(() => navigate(-1));

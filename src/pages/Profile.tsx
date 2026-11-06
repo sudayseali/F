@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { tgHaptics, openTgLink } from "../lib/telegram";
 
 import { ASSETS_3D } from "../lib/assets";
+import { APP_CONFIG } from "../config/appConfig";
 
 export function Profile() {
   const { user } = useTelegram();
@@ -33,7 +34,7 @@ export function Profile() {
       subtitle: "Get latest updates and bonuses",
       icon3D: ASSETS_3D.rocket,
       iconColor: "bg-sky-500/15",
-      action: () => openTgLink("https://t.me/PayvoraCommunity")
+      action: () => openTgLink(APP_CONFIG.telegram.communityUrl)
     },
     {
       label: "Settings",
@@ -49,7 +50,7 @@ export function Profile() {
       subtitle: "Get help anytime",
       icon3D: ASSETS_3D.supportHeadset,
       iconColor: "bg-blue-500/15",
-      action: () => openTgLink("https://t.me/PayvoraSupport")
+      action: () => openTgLink(APP_CONFIG.telegram.supportUrl)
     }
   ];
 

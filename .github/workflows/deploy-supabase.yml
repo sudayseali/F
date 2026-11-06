@@ -43,7 +43,6 @@ jobs:
           echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env.func
           echo "SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> .env.func
           echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env.func
-          echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env.func
           echo "AYET_SECRET=${{ secrets.AYET_SECRET }}" >> .env.func
           echo "TOROX_SECRET=${{ secrets.TOROX_SECRET }}" >> .env.func
           echo "ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}" >> .env.func

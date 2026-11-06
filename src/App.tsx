@@ -5,16 +5,12 @@
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useState } from "react";
-import { Layout } from "./components/Layout";
-import { Dashboard } from "./pages/Dashboard";
-import { Tasks } from "./pages/Tasks";
-import { TaskDetails } from "./pages/TaskDetails";
-import { Wallet } from "./pages/Wallet";
-import { Referrals } from "./pages/Referrals";
-import { Profile } from "./pages/Profile";
-import { Offerwall } from "./pages/Offerwall";
+import { Layout, SplashScreen } from "./components";
+import { 
+  Dashboard, Tasks, TaskDetails, Wallet, 
+  Referrals, Profile, Offerwall 
+} from "./pages";
 import { TelegramProvider } from "./contexts/TelegramContext";
-import { SplashScreen } from "./components/SplashScreen";
 import { AnimatePresence } from "motion/react";
 
 export default function App() {

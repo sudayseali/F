@@ -6,13 +6,14 @@ import { supabase } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
+import type { TaskItem } from "../types";
 
 export function Tasks() {
   const navigate = useNavigate();
   const { location } = useTelegram();
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

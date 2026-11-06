@@ -181,10 +181,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
     }
 
-    // CHECK ADMIN PRIVILEGES SECURELY FROM BACKEND ENV AND DATABASE
-    const ADMIN_TELEGRAM_ID = Deno.env.get("ADMIN_TELEGRAM_ID");
-    const isAdmin = tgUser.id.toString() === ADMIN_TELEGRAM_ID || tgUser.id.toString() === '5806129562' || userRow.level === 'admin';
-
     // GENERATE SECURE CUSTOM JWT
     const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
     const jwt = await new jose.SignJWT({
@@ -192,7 +188,7 @@ serve(async (req) => {
       role: 'authenticated',
       sub: userRow.id,
       email: `${tgUser.id}@telegram.local`,
-      user_metadata: { tg_id: tgUser.id, is_admin: isAdmin }
+      user_metadata: { tg_id: tgUser.id }
     })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -202,7 +198,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       user_uuid: userRow.id,
-      is_admin: isAdmin,
       access_token: jwt,
       message: "Authentication secure & verified" 
     }), {

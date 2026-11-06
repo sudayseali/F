@@ -19,9 +19,8 @@ Tani waxay dhisaysaa rules-ka iyo database-ga:
 Edge functions-ku waa inay ogaadaan Bot Token-kaaga si ay u xaqiijiyaan users-ka.
 1. Supabase Dashboard bidixda uga gal **Edge Functions**.
 2. Samee dhowr functions haddaan loo baahnayn waa caadi in ay madhan yihiin, la soco dhanka kore guji qeybta **Secrets**.
-3. Guji **Add new secret** waxaadna ku dartaa labadan (si sax ah ugu qor far waaweyn):
+3. Guji **Add new secret** waxaadna ku dartaa (si sax ah ugu qor far waaweyn):
    - Name: `TELEGRAM_BOT_TOKEN` | Value: (Geli token-ka dhabta ah ee bot-kaaga)
-   - Name: `ADMIN_TELEGRAM_ID` | Value: `5806129562`
 
 ## Tillaabada 3aad: U Dhoofi Project-gan GitHub (Export)
 Ku noqo meesha aad hadda ila hadlayso (Google AI Studio Preview):

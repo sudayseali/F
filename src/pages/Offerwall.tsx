@@ -9,21 +9,8 @@ import { supabase } from "../lib/supabase";
 import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
 import { ASSETS_3D } from "../lib/assets";
-
-interface Provider {
-  id: string;
-  name: string;
-  category: string;
-  rewardType: string;
-  icon3D?: string;
-  icon?: any;
-  iconBg: string;
-  iconColor: string;
-  badge: string;
-  badgeType: "hot" | "games" | "blue" | "green";
-  description: string;
-  payoutRange: string;
-}
+import { APP_CONFIG } from "../config/appConfig";
+import type { Provider, ModalState } from "../types";
 
 const PROVIDERS: Provider[] = [
   {
@@ -177,8 +164,8 @@ export function Offerwall() {
         }
 
         if (!urlToUse) {
-          const appId = import.meta.env.VITE_CPX_APP_ID || "24128";
-          urlToUse = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${userId}`;
+          const appId = APP_CONFIG.offerwalls.cpx.appId;
+          urlToUse = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${appId}&ext_user_id=${userId}`;
         }
 
         setActiveProviderName("CPX Research");
@@ -197,21 +184,21 @@ export function Offerwall() {
       }
     } else if (provider.id === "ayet") {
       setLoadingProvider("ayet");
-      const ayetUrl = `https://www.ayetstudios.com/offers/offerwall_api/26815?external_identifier=${userId}`;
+      const ayetUrl = `${APP_CONFIG.offerwalls.ayet.baseUrl}?external_identifier=${userId}`;
       setActiveProviderName("ayeT-Studios");
       setActiveOfferwallUrl(ayetUrl);
       setIframeLoading(true);
       setLoadingProvider(null);
     } else if (provider.id === "torox") {
       setLoadingProvider("torox");
-      const toroxUrl = `https://torox.io/offerwall?pub_id=1234&user_id=${userId}`;
+      const toroxUrl = `${APP_CONFIG.offerwalls.torox.baseUrl}?pub_id=${APP_CONFIG.offerwalls.torox.pubId}&user_id=${userId}`;
       setActiveProviderName("Torox Offers");
       setActiveOfferwallUrl(toroxUrl);
       setIframeLoading(true);
       setLoadingProvider(null);
     } else {
       // General provider launcher
-      const demoUrl = `https://offers.cpx-research.com/index.php?app_id=24128&ext_user_id=${userId}`;
+      const demoUrl = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${APP_CONFIG.offerwalls.cpx.appId}&ext_user_id=${userId}`;
       setActiveProviderName(provider.name);
       setActiveOfferwallUrl(demoUrl);
       setIframeLoading(true);

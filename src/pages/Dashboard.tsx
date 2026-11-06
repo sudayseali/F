@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase";
 import { Link, useNavigate } from "react-router-dom";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
+import { APP_CONFIG } from "../config/appConfig";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ export function Dashboard() {
 
           <div className="flex items-center justify-end gap-1 text-xs text-sky-200/90 font-medium">
             <span className="text-amber-300">⭐</span>
-            <span>≈ {(balance * 1000).toLocaleString()} Points</span>
+            <span>≈ {(balance * APP_CONFIG.pointsRatio).toLocaleString()} Points</span>
           </div>
         </div>
 
@@ -181,7 +182,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-white">Daily Check-In</h3>
               <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-extrabold px-1.5 py-0.2 rounded-md">
-                +50 PTS
+                +{APP_CONFIG.rewards.dailyCheckInPoints} PTS
               </span>
             </div>
             <p className="text-[11px] text-sky-100/80 mt-0.5">Claim daily rewards every 24 hours</p>
@@ -338,7 +339,7 @@ export function Dashboard() {
               Invite Friends & Earn
             </h3>
             <p className="text-[11px] text-purple-200/80 mt-0.5">
-              Receive a 10% bonus on every offer!
+              Receive a {APP_CONFIG.rewards.referralBonusPercent}% bonus on every offer!
             </p>
           </div>
         </div>

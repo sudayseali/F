@@ -54,7 +54,6 @@ supabase functions new auth
 supabase functions new submit_task
 supabase functions new withdraw
 supabase functions new deposit
-supabase functions new admin_action
 ```
 
 **Kadib, koobi garee (copy) files-kii aan horay u qornay:**
@@ -62,7 +61,6 @@ supabase functions new admin_action
 2. Fur `supabase_config/edge_functions/submit_task.ts` -> oo gali gudaha `supabase/functions/submit_task/index.ts`
 3. Fur `supabase_config/edge_functions/withdraw.ts` -> oo gali gudaha `supabase/functions/withdraw/index.ts`
 4. Fur `supabase_config/edge_functions/deposit.ts` -> oo gali gudaha `supabase/functions/deposit/index.ts`
-5. Fur `supabase_config/edge_functions/admin_action.ts` -> oo gali gudaha `supabase/functions/admin_action/index.ts`
 
 *(Fiiro gaar ah: Files-ka aad abuurayso waa inay noqdaan `index.ts` oo ku dhex jira folder-ada magaca function-ka wata).*
 
@@ -77,9 +75,6 @@ Edge functions-ku waxay u baahan yihiin `TELEGRAM_BOT_TOKEN` iyo xogaha kale si 
 ```bash
 # Ku dar Telegram Bot Token-kaaga dhabta ah
 supabase secrets set TELEGRAM_BOT_TOKEN="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-
-# Ku dar Telegram ID-gaaga Adminka ah
-supabase secrets set ADMIN_TELEGRAM_ID="5806129562"
 ```
 
 ---
@@ -94,7 +89,6 @@ supabase functions deploy auth
 supabase functions deploy submit_task
 supabase functions deploy withdraw
 supabase functions deploy deposit
-supabase functions deploy admin_action
 ```
 
 Marka aad deploy garayso, Supabase waxay ku siin doontaa URL-lada Functions-ka. (Tusaale: `https://xxxxxxx.supabase.co/functions/v1/auth`).

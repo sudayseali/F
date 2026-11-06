@@ -9,35 +9,10 @@ import { supabase } from "../lib/supabase";
 import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
 import { ASSETS_3D } from "../lib/assets";
+import { APP_CONFIG } from "../config/appConfig";
+import type { PaymentMethod, ModalState } from "../types";
 
-type PaymentMethod = "usdt" | "trx" | "payeer" | null;
-
-const METHODS = [
-  {
-    id: "usdt",
-    name: "USDT (TRC20)",
-    iconImg: ASSETS_3D.coinsStack,
-    min: 1.00,
-    placeholder: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
-    desc: "Direct Tether USD payout to your TRC20 wallet"
-  },
-  {
-    id: "trx",
-    name: "TRON (TRX)",
-    iconImg: ASSETS_3D.walletCrypto,
-    min: 1.00,
-    placeholder: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
-    desc: "Direct crypto payout to your TRON wallet"
-  },
-  {
-    id: "payeer",
-    name: "Payeer USD",
-    iconImg: ASSETS_3D.walletCyan,
-    min: 1.00,
-    placeholder: "P1000000000",
-    desc: "Instant USD transfer to your Payeer account"
-  }
-];
+const METHODS = APP_CONFIG.payouts.supportedMethods;
 
 export function Wallet() {
   const { user } = useTelegram();
