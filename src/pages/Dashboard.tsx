@@ -107,11 +107,11 @@ export function Dashboard() {
           onClick={() => tgHaptics.selection()}
           className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-sky-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+          <div className="w-11 h-11 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform">
             <img
-              src={ASSETS_3D.giftLavender}
-              alt="3D Offers"
-              className="w-8 h-8 object-contain rounded-lg"
+              src={ASSETS_3D.giftBox}
+              alt="3D Offers Gift"
+              className="w-8 h-8 object-contain drop-shadow-sm"
             />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Offers</span>
@@ -122,8 +122,12 @@ export function Dashboard() {
           onClick={() => tgHaptics.selection()}
           className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-emerald-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-[#34d399] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <CheckCircle className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <img
+              src={ASSETS_3D.tasksClipboard}
+              alt="3D Tasks"
+              className="w-8 h-8 object-contain drop-shadow-sm"
+            />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Tasks</span>
         </Link>
@@ -133,11 +137,11 @@ export function Dashboard() {
           onClick={() => tgHaptics.selection()}
           className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-amber-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-sky-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/15 flex items-center justify-center group-hover:scale-105 transition-transform">
             <img
-              src={ASSETS_3D.telegramWallet}
+              src={ASSETS_3D.walletCoins}
               alt="3D Wallet"
-              className="w-8 h-8 object-contain rounded-lg"
+              className="w-8 h-8 object-contain drop-shadow-sm"
             />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Withdraw</span>
@@ -148,29 +152,29 @@ export function Dashboard() {
           onClick={() => tgHaptics.selection()}
           className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-purple-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+          <div className="w-11 h-11 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform">
             <img
-              src={ASSETS_3D.giftPurple}
-              alt="3D Friends Gift"
-              className="w-8 h-8 object-contain rounded-lg"
+              src={ASSETS_3D.communityUsers}
+              alt="3D Friends"
+              className="w-8 h-8 object-contain drop-shadow-sm"
             />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Friends</span>
         </Link>
       </div>
 
-      {/* Daily Check-In Banner with 3D Rocket Icon */}
+      {/* Daily Check-In Banner with 3D Calendar Icon */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0369a1] via-[#1d4ed8] to-[#2563eb] p-3.5 flex items-center justify-between border border-sky-400/30 shadow-lg">
         {/* Subtle sparkle effects */}
         <div className="absolute right-16 top-2 text-sky-200/40 text-xs select-none">✦</div>
         <div className="absolute right-24 bottom-2 text-sky-200/40 text-[10px] select-none">✦</div>
 
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-[#0284c7]/30 border border-sky-400/40 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+          <div className="w-11 h-11 rounded-2xl bg-[#0284c7]/30 border border-sky-400/40 flex items-center justify-center shadow-inner shrink-0">
             <img
-              src={ASSETS_3D.rocket}
-              alt="3D Rocket"
-              className="w-9 h-9 object-contain drop-shadow-md transform -rotate-12"
+              src={ASSETS_3D.calendarCheck}
+              alt="3D Calendar"
+              className="w-9 h-9 object-contain drop-shadow-md"
             />
           </div>
           <div>
@@ -219,14 +223,14 @@ export function Dashboard() {
             onClick={() => tgHaptics.selection()}
             className="card-glow-blue p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-sky-400/50 transition-all active:scale-98"
           >
-            <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-              <BarChart3 className="w-24 h-24 text-sky-400" />
+            <div className="absolute -right-2 -bottom-2 opacity-15 pointer-events-none">
+              <img src={ASSETS_3D.surveyPencil} alt="" className="w-20 h-20 object-contain" />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/20 text-[#38bdf8] flex items-center justify-center border border-sky-500/30 shadow-sm">
-                  <BarChart3 className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center border border-sky-500/30 shadow-sm">
+                  <img src={ASSETS_3D.surveyPencil} alt="Surveys" className="w-7 h-7 object-contain" />
                 </div>
                 <span className="badge-hot-pill text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <span>🔥</span> Hot
@@ -253,14 +257,14 @@ export function Dashboard() {
             onClick={() => tgHaptics.selection()}
             className="card-glow-purple p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-purple-400/50 transition-all active:scale-98"
           >
-            <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-              <Play className="w-24 h-24 text-purple-400" />
+            <div className="absolute -right-2 -bottom-2 opacity-15 pointer-events-none">
+              <img src={ASSETS_3D.gameController} alt="" className="w-20 h-20 object-contain" />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-[#c084fc] flex items-center justify-center border border-purple-500/30 shadow-sm">
-                  <Play className="w-5 h-5 fill-current" />
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30 shadow-sm">
+                  <img src={ASSETS_3D.gameController} alt="Games" className="w-7 h-7 object-contain" />
                 </div>
                 <span className="badge-games-pill text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <span>🎮</span> Games

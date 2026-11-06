@@ -165,7 +165,7 @@ export function Wallet() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Wallet Balance Hero Card with 3D Gold Coins Pyramid */}
+      {/* Wallet Balance Hero Card matching Screen 4 */}
       <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
         <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -178,19 +178,20 @@ export function Wallet() {
           />
         </div>
 
-        {/* Right Info */}
+        {/* Right Info matching Screen 4 */}
         <div className="flex-1 pl-3 text-right">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-white/90 mb-1 border border-white/10">
-            <Coins className="w-3.5 h-3.5 text-amber-300" />
-            <span>Payvora Treasury</span>
+            <WalletIcon className="w-3.5 h-3.5 text-sky-200" />
+            <span>Payvora Balance</span>
           </div>
 
           <div className="text-4xl font-black text-white tracking-tight tabular-nums my-0.5">
             ${balance.toFixed(2)}
           </div>
 
-          <div className="text-xs text-sky-200/90 font-medium">
-            ≈ {(balance * 1000).toLocaleString()} Points
+          <div className="flex items-center justify-end gap-1 text-xs text-emerald-400 font-bold">
+            <span>✓</span>
+            <span>Verified Payout Account</span>
           </div>
         </div>
       </div>
@@ -203,9 +204,9 @@ export function Wallet() {
             tgHaptics.selection();
             setActiveTab("withdraw");
           }}
-          className={`py-2 rounded-xl text-xs font-bold transition ${
+          className={`py-2.5 rounded-xl text-xs font-extrabold transition ${
             activeTab === "withdraw"
-              ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+              ? "btn-cyan-glow text-white shadow-md shadow-sky-500/30"
               : "text-slate-400 hover:text-white"
           }`}
         >
@@ -217,13 +218,13 @@ export function Wallet() {
             tgHaptics.selection();
             setActiveTab("history");
           }}
-          className={`py-2 rounded-xl text-xs font-bold transition ${
+          className={`py-2.5 rounded-xl text-xs font-bold transition ${
             activeTab === "history"
-              ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+              ? "btn-cyan-glow text-white shadow-md shadow-sky-500/30"
               : "text-slate-400 hover:text-white"
           }`}
         >
-          History & Receipts
+          History
         </button>
       </div>
 
@@ -234,45 +235,92 @@ export function Wallet() {
           animate={{ opacity: 1, y: 0 }}
           className="card-glass-dark p-4 space-y-4"
         >
-          <div className="flex items-center justify-between pb-2 border-b border-white/10">
+          <div className="flex items-center justify-between pb-1 border-b border-white/10">
             <h3 className="text-sm font-bold text-white">Select Payout Method</h3>
             <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
           </div>
 
-          {/* Payment Methods with 3D Icons */}
-          <div className="space-y-2">
-            {METHODS.map((m) => {
-              const isSelected = method === m.id;
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => {
-                    tgHaptics.impact("light");
-                    setMethod(m.id as PaymentMethod);
-                  }}
-                  className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                    isSelected
-                      ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
-                      : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={m.iconImg}
-                      alt={m.name}
-                      className="w-10 h-10 object-contain rounded-xl drop-shadow-sm shrink-0"
-                    />
-                    <div>
-                      <div className="text-xs font-bold text-white">{m.name}</div>
-                      <div className="text-[10px] text-slate-400">{m.desc}</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-bold text-emerald-400">Min ${m.min.toFixed(2)}</span>
-                  </div>
+          {/* Payment Methods matching Screen 4 */}
+          <div className="space-y-2.5">
+            {/* Payeer */}
+            <div
+              onClick={() => {
+                tgHaptics.impact("light");
+                setMethod("payeer");
+              }}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                method === "payeer"
+                  ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
+                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0088cc] text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
+                  P
                 </div>
-              );
-            })}
+                <div>
+                  <div className="text-xs font-bold text-white">Payeer</div>
+                  <div className="text-[10px] text-slate-400">Instant USD transfer to your Payeer account</div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
+              </div>
+            </div>
+
+            {/* TRON (TRX) */}
+            <div
+              onClick={() => {
+                tgHaptics.impact("light");
+                setMethod("trx");
+              }}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                method === "trx"
+                  ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
+                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#dc2626] to-[#ef4444] text-white flex items-center justify-center shadow-md shrink-0">
+                  <svg className="w-6 h-6 fill-white" viewBox="0 0 24 24">
+                    <path d="M12 2L2 19.5L12 17L22 19.5L12 2Z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">TRON (TRX)</div>
+                  <div className="text-[10px] text-slate-400">Direct crypto payout to your TRON wallet</div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
+              </div>
+            </div>
+
+            {/* Zaad Mobile */}
+            <div
+              onClick={() => {
+                tgHaptics.impact("light");
+                setMethod("zaad");
+              }}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                method === "zaad"
+                  ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
+                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#059669] to-[#10b981] text-white flex items-center justify-center font-black text-[11px] tracking-tighter shadow-md shrink-0">
+                  ZAAD
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">Zaad Mobile</div>
+                  <div className="text-[10px] text-slate-400">Local mobile money payout</div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
+              </div>
+            </div>
           </div>
 
           {/* Form */}

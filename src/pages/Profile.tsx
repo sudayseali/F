@@ -16,30 +16,46 @@ export function Profile() {
   const menuItems = [
     {
       label: "Invite Friends & Earn",
-      subtitle: "Get a 10% lifetime bonus on referrals",
-      icon3D: ASSETS_3D.giftPurple,
+      subtitle: "Get 10% commission on referrals",
+      icon3D: ASSETS_3D.giftBox,
       iconColor: "bg-purple-500/15",
       action: () => navigate("/referrals")
     },
     {
       label: "Withdrawal History",
-      subtitle: "View payout receipts and requests",
-      icon3D: ASSETS_3D.walletCyan,
-      iconColor: "bg-sky-500/15",
+      subtitle: "View transactions and receipts",
+      icon3D: ASSETS_3D.walletCoins,
+      iconColor: "bg-amber-500/15",
       action: () => navigate("/wallet")
     },
     {
       label: "Join Telegram Community",
-      subtitle: "Official announcements, promos & bonuses",
+      subtitle: "Get latest updates and bonuses",
       icon3D: ASSETS_3D.rocket,
       iconColor: "bg-sky-500/15",
       action: () => openTgLink("https://t.me/PayvoraCommunity")
+    },
+    {
+      label: "Settings",
+      subtitle: "App preferences & notifications",
+      icon3D: ASSETS_3D.shieldVerified,
+      iconColor: "bg-cyan-500/15",
+      action: () => {
+        tgHaptics.impact("light");
+      }
+    },
+    {
+      label: "Help & Support",
+      subtitle: "Get help anytime",
+      icon3D: ASSETS_3D.supportHeadset,
+      iconColor: "bg-blue-500/15",
+      action: () => openTgLink("https://t.me/PayvoraSupport")
     }
   ];
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Profile Card matching Screenshot */}
+      {/* Profile Card matching Screen 5 */}
       <div className="card-glass-dark p-6 text-center relative overflow-hidden">
         <div className="absolute top-0 right-1/2 translate-x-1/2 w-40 h-40 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
 
@@ -57,34 +73,34 @@ export function Profile() {
           </div>
         </div>
 
-        <p className="text-xs text-slate-400 mb-3">
-          {user?.username ? `@${user.username}` : "Telegram Member"}
+        <p className="text-xs text-slate-400 mb-2">
+          Telegram ID: {user?.id || "8804412131"}
         </p>
 
-        <div className="inline-flex items-center gap-2 bg-[#0c162e] border border-white/10 px-3.5 py-1.5 rounded-full text-xs text-slate-300 shadow-sm">
+        <div className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-bold text-emerald-400 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
-          <span>Telegram Verified Account</span>
+          <span>Active · Verified</span>
         </div>
       </div>
 
-      {/* Account Info Stats */}
+      {/* Account Info Stats matching Screen 5 */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="card-glass-dark p-3.5 rounded-2xl">
           <div className="text-[11px] text-slate-400 font-medium mb-0.5">Account ID</div>
-          <div className="text-xs font-mono font-bold text-white truncate">
-            {user?.id || "789456123"}
+          <div className="text-sm font-mono font-bold text-white truncate">
+            {user?.id || "8804412131"}
           </div>
         </div>
 
         <div className="card-glass-dark p-3.5 rounded-2xl">
-          <div className="text-[11px] text-slate-400 font-medium mb-0.5">Account Status</div>
-          <div className="text-xs font-bold text-emerald-400">
-            Active · Verified
+          <div className="text-[11px] text-slate-400 font-medium mb-0.5">Wallet Balance</div>
+          <div className="text-sm font-bold text-emerald-400 tabular-nums">
+            ${(user?.balance || 0).toFixed(2)}
           </div>
         </div>
       </div>
 
-      {/* Menu Items List */}
+      {/* Menu Items List matching Screen 5 */}
       <div className="card-glass-dark divide-y divide-white/5 overflow-hidden rounded-2xl">
         {menuItems.map((item) => {
           return (

@@ -78,23 +78,25 @@ export function Referrals() {
         <span>Back</span>
       </button>
 
-      {/* Hero Invite Card matching Screenshot Style */}
+      {/* Hero Invite Card matching Screen 6 */}
       <div className="relative rounded-3xl bg-gradient-to-r from-[#4c1d95] via-[#3b0764] to-[#1e1b4b] border border-purple-500/40 p-5 text-center shadow-2xl overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
 
         <div className="mx-auto mb-2 flex justify-center">
-          <img
-            src={ASSETS_3D.giftPurple}
-            alt="3D Purple Gift Box"
-            className="w-20 h-20 object-contain drop-shadow-[0_12px_24px_rgba(168,85,247,0.55)]"
-          />
+          <div className="w-16 h-16 rounded-full bg-purple-500/30 border border-purple-400/40 flex items-center justify-center shadow-inner">
+            <img
+              src={ASSETS_3D.giftBox}
+              alt="3D Purple Gift Box"
+              className="w-12 h-12 object-contain drop-shadow-[0_8px_16px_rgba(168,85,247,0.55)]"
+            />
+          </div>
         </div>
 
         <h2 className="text-xl font-black text-white tracking-tight mb-1">
           Invite Friends & Earn
         </h2>
         <p className="text-xs text-purple-200/90 max-w-xs mx-auto mb-4 leading-relaxed">
-          Receive a <span className="text-white font-extrabold">10% lifetime bonus</span> on every survey, task, and offer your friends complete.
+          Receive a <span className="text-white font-extrabold">10% bonus</span> on every offer and task your invited friends complete.
         </p>
 
         {/* Share buttons */}
@@ -126,7 +128,7 @@ export function Referrals() {
         </div>
       </div>
 
-      {/* Referral Stats */}
+      {/* Referral Stats matching Screen 6 */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="card-glass-dark p-3.5 rounded-2xl">
           <div className="text-[11px] text-slate-400 font-medium mb-0.5">Friends Invited</div>
@@ -141,17 +143,24 @@ export function Referrals() {
         </div>
       </div>
 
-      {/* Friends List */}
+      {/* Friends List matching Screen 6 */}
       <div className="card-glass-dark p-4 space-y-3 rounded-2xl">
-        <h3 className="text-xs font-bold text-white uppercase tracking-wider text-slate-400">
+        <h3 className="text-xs font-bold text-white tracking-tight">
           My Referrals ({referrals.length})
         </h3>
 
         {loading ? (
           <div className="py-6 text-center text-xs text-slate-400">Loading referrals...</div>
         ) : referrals.length === 0 ? (
-          <div className="py-6 text-center text-xs text-slate-400">
-            No referrals yet. Share your invite link to start earning!
+          <div className="py-8 text-center space-y-2">
+            <img
+              src={ASSETS_3D.communityUsers}
+              alt="Community"
+              className="w-16 h-16 object-contain mx-auto drop-shadow-md"
+            />
+            <p className="text-xs text-slate-400 max-w-xs mx-auto">
+              No referrals yet. Share your invite link to start earning together!
+            </p>
           </div>
         ) : (
           <div className="space-y-2">

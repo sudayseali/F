@@ -30,85 +30,85 @@ const PROVIDERS: Provider[] = [
     id: "cpx",
     name: "CPX Research",
     category: "Surveys",
-    rewardType: "Instant Crediting",
-    icon3D: ASSETS_3D.coinsStack,
+    rewardType: "Instant Credit",
+    icon3D: ASSETS_3D.surveyPencil,
     icon: BarChart3,
-    iconBg: "bg-amber-500/15",
-    iconColor: "text-amber-400",
-    badge: "🔥 Hot",
-    badgeType: "hot",
-    description: "Paid market research surveys with instant token payouts.",
-    payoutRange: "Up to $4.50"
+    iconBg: "bg-sky-500/15",
+    iconColor: "text-[#38bdf8]",
+    badge: "Most Popular",
+    badgeType: "blue",
+    description: "Paid market research surveys",
+    payoutRange: "$0.40 - $4.50 · Instant Credit"
   },
   {
     id: "ayet",
     name: "ayeT - Studios",
     category: "Games",
     rewardType: "High Payouts",
-    icon3D: ASSETS_3D.rocket,
+    icon3D: ASSETS_3D.gameController,
     icon: Play,
-    iconBg: "bg-purple-500/15",
-    iconColor: "text-[#c084fc]",
-    badge: "🎮 Games",
-    badgeType: "games",
-    description: "Level progression and gaming milestone rewards across iOS & Android.",
-    payoutRange: "Up to $35.00"
+    iconBg: "bg-emerald-500/15",
+    iconColor: "text-emerald-400",
+    badge: "Top Rewards",
+    badgeType: "green",
+    description: "Level progression & gaming",
+    payoutRange: "$1.00 - $35.00 · High Payouts"
   },
   {
     id: "torox",
-    name: "Torox Offers",
+    name: "Torox",
     category: "Games",
     rewardType: "Tiered Offers",
-    icon3D: ASSETS_3D.coinsPyramid,
+    icon3D: ASSETS_3D.trophy,
     icon: Zap,
     iconBg: "bg-amber-500/15",
-    iconColor: "text-[#fbbf24]",
-    badge: "⚡ Fast Track",
-    badgeType: "blue",
-    description: "Multi-stage game achievements and premium brand trials.",
-    payoutRange: "Up to $22.00"
+    iconColor: "text-amber-400",
+    badge: "Fast Track",
+    badgeType: "hot",
+    description: "Multi-stage game achievements",
+    payoutRange: "$0.80 - $22.00 · Tiered Offers"
   },
   {
     id: "lootably",
     name: "Lootably",
     category: "Apps",
     rewardType: "Interactive",
-    icon3D: ASSETS_3D.walletCyan,
+    icon3D: ASSETS_3D.shieldVerified,
     icon: Shield,
     iconBg: "bg-cyan-500/15",
-    iconColor: "text-[#22d3ee]",
-    badge: "✓ Verified",
+    iconColor: "text-cyan-400",
+    badge: "Verified",
     badgeType: "green",
-    description: "Engage with mobile apps, quiz tests, and interactive campaigns.",
-    payoutRange: "Up to $8.00"
+    description: "Engage with mobile apps & quizzes",
+    payoutRange: "$0.25 - $8.00 · Interactive"
   },
   {
     id: "adgate",
     name: "AdGate Media",
     category: "Apps",
     rewardType: "Discovery",
-    icon3D: ASSETS_3D.walletCrypto,
+    icon3D: ASSETS_3D.mobileApps,
     icon: Layers,
-    iconBg: "bg-indigo-500/15",
-    iconColor: "text-[#818cf8]",
+    iconBg: "bg-purple-500/15",
+    iconColor: "text-[#c084fc]",
     badge: "Global",
     badgeType: "blue",
-    description: "Wide variety of global app installs, videos, and subscription offers.",
-    payoutRange: "Up to $12.00"
+    description: "Wide variety of offers",
+    payoutRange: "$0.30 - $12.00 · Discovery"
   },
   {
     id: "cpa",
     name: "CPA Rapid Offers",
     category: "Quick",
     rewardType: "Micro-Tasks",
-    icon3D: ASSETS_3D.giftLavender,
+    icon3D: ASSETS_3D.giftBox,
     icon: Gift,
     iconBg: "bg-rose-500/15",
-    iconColor: "text-[#fb7185]",
-    badge: "⚡ Instant",
+    iconColor: "text-rose-400",
+    badge: "Instant",
     badgeType: "hot",
-    description: "Fast email submissions, single-field signups, and rapid rewards.",
-    payoutRange: "Up to $2.50"
+    description: "Fast email submissions",
+    payoutRange: "$0.15 - $2.50 · Micro-Tasks"
   }
 ];
 
@@ -225,30 +225,26 @@ export function Offerwall() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Telegram Hero Banner matching Screenshot */}
-      <div className="hero-balance-card p-4.5 relative overflow-hidden flex items-center justify-between">
+      {/* Telegram Hero Banner matching Screen 2 */}
+      <div className="hero-balance-card p-4.5 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none" />
         
-        <div>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-200 mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Verified Offerwalls</span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-sky-200 border border-white/10">
+            <Sparkles className="w-3 h-3 text-sky-300" />
+            <span>Verified Postbacks</span>
           </div>
-          <h2 className="text-xl font-black text-white tracking-tight">
-            Partner Networks
-          </h2>
-          <p className="text-xs text-sky-100/80 mt-0.5 max-w-[240px]">
-            High-yield surveys, gaming rewards, and instant token payouts.
-          </p>
+          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+            Active 24/7
+          </span>
         </div>
 
-        <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center shrink-0 shadow-lg overflow-hidden">
-          <img
-            src={ASSETS_3D.rocket}
-            alt="3D Rocket"
-            className="w-10 h-10 object-contain drop-shadow-md transform -rotate-12"
-          />
-        </div>
+        <h2 className="text-xl font-black text-white tracking-tight">
+          Partner Offerwalls
+        </h2>
+        <p className="text-xs text-sky-100/80 mt-1 max-w-sm">
+          Complete high-paying surveys, try new mobile games, and earn direct token credits.
+        </p>
       </div>
 
       {/* Category Pills */}
@@ -295,22 +291,22 @@ export function Offerwall() {
                   <img
                     src={provider.icon3D}
                     alt={provider.name}
-                    className="w-8 h-8 object-contain rounded-lg drop-shadow-sm"
+                    className="w-8 h-8 object-contain drop-shadow-sm"
                   />
                 ) : (
                   <Icon className="w-5 h-5" />
                 )}
               </div>
 
-              {/* Provider Info */}
+              {/* Provider Info matching Mockup Screen 2 */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className="text-sm font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
                     {provider.name}
                   </h3>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    provider.badgeType === "hot" ? "badge-hot-pill" :
-                    provider.badgeType === "games" ? "badge-games-pill" :
+                    provider.badgeType === "hot" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
+                    provider.badgeType === "green" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
                     "bg-sky-500/20 text-sky-300 border border-sky-500/30"
                   }`}>
                     {provider.badge}
@@ -321,11 +317,8 @@ export function Offerwall() {
                   {provider.description}
                 </p>
 
-                <div className="mt-1">
-                  <span className="badge-green-pill text-[11px] font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-                    <span>{provider.payoutRange}</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </span>
+                <div className="mt-1 text-xs font-semibold text-emerald-400 tabular-nums">
+                  {provider.payoutRange}
                 </div>
               </div>
 

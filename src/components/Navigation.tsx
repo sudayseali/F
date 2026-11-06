@@ -58,12 +58,12 @@ export function Navigation() {
         <Link
           to="/wallet"
           onClick={handleTabClick}
-          className="flex items-center gap-2 bg-[#0c162e] border border-amber-500/40 pl-1.5 pr-3 py-1 rounded-full shadow-lg hover:border-amber-400 transition active:scale-95"
+          className="flex items-center gap-1.5 bg-[#0c162e] border border-amber-500/40 pl-1.5 pr-3 py-1 rounded-full shadow-lg hover:border-amber-400 transition active:scale-95"
         >
           <img
-            src={ASSETS_3D.coinsStack}
-            alt="3D Gold Coins"
-            className="w-5 h-5 rounded-full object-cover shadow-sm"
+            src={ASSETS_3D.starCoin}
+            alt="3D Star Coin"
+            className="w-5 h-5 object-contain drop-shadow-sm"
           />
           <span className="text-sm font-extrabold text-white tracking-tight tabular-nums">
             ${balance.toFixed(2)}

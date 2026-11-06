@@ -72,40 +72,7 @@ export function Tasks() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* 3D Bounty Banner */}
-      <div className="hero-balance-card p-4 relative overflow-hidden flex items-center justify-between">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-400/20 rounded-full blur-2xl pointer-events-none" />
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-sky-200 mb-1">
-            <Sparkles className="w-3 h-3" />
-            <span>Fast Bounties</span>
-          </div>
-          <h2 className="text-lg font-black text-white tracking-tight">Active Micro-Tasks</h2>
-          <p className="text-xs text-sky-100/80 mt-0.5">Complete simple tasks & earn instant balance</p>
-        </div>
-
-        <div className="shrink-0">
-          <img
-            src={ASSETS_3D.rocket}
-            alt="3D Rocket"
-            className="w-12 h-12 object-contain drop-shadow-md transform -rotate-12"
-          />
-        </div>
-      </div>
-
-      {/* Header Search with glowing blue border on focus */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search active tasks & bounties..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-[#0c162e] border border-white/10 rounded-2xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400 shadow-md"
-        />
-      </div>
-
-      {/* Category Pills */}
+      {/* Category Pills at top matching Mockup Screen 3 */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
         {["All", "Social", "Reviews", "Other"].map((tab) => {
           const isActive = activeTab === tab;
@@ -128,8 +95,85 @@ export function Tasks() {
         })}
       </div>
 
-      {/* Task List */}
-      <div className="space-y-2.5">
+      {/* Hero Banner: Complete Tasks Earn More! with 3D Rocket */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#1e1b4b] via-[#2e1065] to-[#1e3a8a] border border-sky-400/30 p-5 shadow-2xl">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center gap-4 mb-3">
+          <div className="shrink-0 -ml-1">
+            <img
+              src={ASSETS_3D.rocket}
+              alt="3D Rocket"
+              className="w-16 h-16 object-contain drop-shadow-[0_10px_20px_rgba(56,189,248,0.5)] transform -rotate-12"
+            />
+          </div>
+          <div>
+            <h2 className="text-base font-black text-white tracking-tight leading-snug">
+              Complete Tasks<br />Earn More!
+            </h2>
+            <p className="text-[11px] text-sky-200/80 mt-1 leading-snug">
+              Follow channels, like posts, and complete simple tasks.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            tgHaptics.impact("light");
+            const el = document.getElementById("tasks-list-anchor");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="w-full py-2.5 rounded-xl btn-cyan-glow text-white font-extrabold text-xs shadow-lg transition active:scale-98"
+        >
+          View Tasks
+        </button>
+      </div>
+
+      {/* Task Stats Section matching Screen 3 */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+            <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span>Task Stats</span>
+          </div>
+          <span className="text-xs font-bold text-[#38bdf8] flex items-center gap-0.5 cursor-pointer">
+            <span>See All</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {/* Card 1: Completed */}
+          <div className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+            <div className="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center mb-1">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] text-slate-400 font-medium">Completed</span>
+            <span className="text-sm font-black text-white tabular-nums mt-0.5">12</span>
+          </div>
+
+          {/* Card 2: Earned */}
+          <div className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+            <div className="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-300 flex items-center justify-center mb-1">
+              <img src={ASSETS_3D.starCoin} alt="" className="w-4 h-4 object-contain" />
+            </div>
+            <span className="text-[10px] text-slate-400 font-medium">Earned</span>
+            <span className="text-sm font-black text-white tabular-nums mt-0.5">$24.50</span>
+          </div>
+
+          {/* Card 3: This Week */}
+          <div className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center text-center">
+            <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-300 flex items-center justify-center mb-1">
+              <Clock className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] text-slate-400 font-medium">This Week</span>
+            <span className="text-sm font-black text-emerald-400 tabular-nums mt-0.5">+60%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Task List Anchor */}
+      <div id="tasks-list-anchor" className="space-y-2.5 pt-1">
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-400">
             <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#38bdf8]" />
