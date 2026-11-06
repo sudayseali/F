@@ -10,9 +10,17 @@ import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
 import { ASSETS_3D } from "../lib/assets";
 
-type PaymentMethod = "payeer" | "trx" | "zaad" | null;
+type PaymentMethod = "usdt" | "trx" | "payeer" | null;
 
 const METHODS = [
+  {
+    id: "usdt",
+    name: "USDT (TRC20)",
+    iconImg: ASSETS_3D.coinsStack,
+    min: 1.00,
+    placeholder: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+    desc: "Direct Tether USD payout to your TRC20 wallet"
+  },
   {
     id: "trx",
     name: "TRON (TRX)",
@@ -28,14 +36,6 @@ const METHODS = [
     min: 1.00,
     placeholder: "P1000000000",
     desc: "Instant USD transfer to your Payeer account"
-  },
-  {
-    id: "zaad",
-    name: "Zaad Mobile",
-    iconImg: ASSETS_3D.coinsStack,
-    min: 1.00,
-    placeholder: "063XXXXXXX",
-    desc: "Local mobile money payout"
   }
 ];
 
@@ -44,7 +44,7 @@ export function Wallet() {
   const balance = user?.balance || 0;
 
   const [activeTab, setActiveTab] = useState<"withdraw" | "history">("withdraw");
-  const [method, setMethod] = useState<PaymentMethod>("trx");
+  const [method, setMethod] = useState<PaymentMethod>("usdt");
   const [amount, setAmount] = useState("");
   const [address, setAddress] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -240,27 +240,32 @@ export function Wallet() {
             <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
           </div>
 
-          {/* Payment Methods matching Screen 4 */}
+          {/* Payment Methods matching Screen 4 with USDT replacing Zaad */}
           <div className="space-y-2.5">
-            {/* Payeer */}
+            {/* USDT (TRC20) */}
             <div
               onClick={() => {
                 tgHaptics.impact("light");
-                setMethod("payeer");
+                setMethod("usdt");
               }}
               className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                method === "payeer"
-                  ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
+                method === "usdt"
+                  ? "bg-emerald-500/15 border-emerald-400 text-white shadow-lg shadow-emerald-500/10"
                   : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#0088cc] text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
-                  P
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#059669] via-[#10b981] to-[#26a17b] text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                  ₮
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white">Payeer</div>
-                  <div className="text-[10px] text-slate-400">Instant USD transfer to your Payeer account</div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>USDT (TRC20)</span>
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-extrabold px-1.5 py-0.2 rounded-md">
+                      Stablecoin
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">Direct Tether USD payout to your TRC20 wallet</div>
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -296,25 +301,25 @@ export function Wallet() {
               </div>
             </div>
 
-            {/* Zaad Mobile */}
+            {/* Payeer USD */}
             <div
               onClick={() => {
                 tgHaptics.impact("light");
-                setMethod("zaad");
+                setMethod("payeer");
               }}
               className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                method === "zaad"
+                method === "payeer"
                   ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
                   : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#059669] to-[#10b981] text-white flex items-center justify-center font-black text-[11px] tracking-tighter shadow-md shrink-0">
-                  ZAAD
+                <div className="w-10 h-10 rounded-xl bg-[#0088cc] text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
+                  P
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white">Zaad Mobile</div>
-                  <div className="text-[10px] text-slate-400">Local mobile money payout</div>
+                  <div className="text-xs font-bold text-white">Payeer USD</div>
+                  <div className="text-[10px] text-slate-400">Instant USD transfer to your Payeer account</div>
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -354,7 +359,11 @@ export function Wallet() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
-                  {method === "zaad" ? "Phone Number (Zaad)" : "Recipient Address / Account"}
+                  {method === "usdt"
+                    ? "USDT Address (TRC20)"
+                    : method === "trx"
+                    ? "TRON (TRX) Wallet Address"
+                    : "Payeer Account Number (P...)"}
                 </label>
                 <input
                   type="text"
