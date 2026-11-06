@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase, setSupabaseToken } from '../lib/supabase';
 
-// We will export a real user context with UUID and data
+// Real user context with UUID and data
 interface TelegramUser {
   id: number;
   username?: string;
@@ -36,103 +36,109 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  const fetchUserData = async (telegramId: number) => {
+  // Secure user profile refresh using authenticated session
+  const fetchUserData = async (userUuid: string) => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
-        .eq('telegram_id', telegramId)
+        .select('id, telegram_id, username, first_name, last_name, wallet_balance, status')
+        .eq('id', userUuid)
         .maybeSingle();
       
-      if (data) {
-        setUser(prev => prev ? { ...prev, uuid: data.id, balance: data.wallet_balance } : null);
-      } else {
-        console.log("User not found, attempting fallback upsert for telegram_id:", telegramId);
-        // If user doesn't exist, create it via supbase locally so it works even without edge function
-        const { data: newData, error: upsertError } = await supabase.from('users').upsert({
-           telegram_id: telegramId,
-           username: 'user_' + telegramId,
-           first_name: 'User',
-           wallet_balance: 0
-        }, { onConflict: 'telegram_id' }).select().maybeSingle();
-        
-        if (upsertError) {
-          console.error("Upsert error in TelegramContext:", JSON.stringify(upsertError, null, 2));
-        } else if (newData) {
-          console.log("Upsert success:", newData);
-          setUser(prev => prev ? { ...prev, uuid: newData.id, balance: newData.wallet_balance } : null);
-        }
+      if (data && !error) {
+        setUser(prev => prev ? { 
+          ...prev, 
+          uuid: data.id, 
+          balance: Number(data.wallet_balance || 0),
+          username: data.username || prev.username,
+          first_name: data.first_name || prev.first_name
+        } : null);
       }
     } catch (err) {
-      console.error("Error fetching user data:", err);
+      console.error("Error refreshing user profile:", err);
     }
   };
 
   const refreshUser = async () => {
-    if (user?.id) {
-      await fetchUserData(user.id);
+    if (user?.uuid) {
+      await fetchUserData(user.uuid);
     }
   };
 
   useEffect(() => {
     const initTelegram = async () => {
-      // VPN Check removed for better reliability
       const tg = (window as any).Telegram?.WebApp;
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      // Removed debug backdoor for security.
 
-      if (tg && tg.initDataUnsafe) {
+      if (tg && tg.initData) {
         tg.ready?.();
         tg.expand?.();
         tg.setHeaderColor?.('#0e1621');
         tg.setBackgroundColor?.('#0e1621');
         tg.enableClosingConfirmation?.();
-        const tgUser = tg.initDataUnsafe?.user;
-        
-        if (tgUser) {
-          const userObj: TelegramUser = {
-            id: tgUser.id,
-            username: tgUser.username,
-            first_name: tgUser.first_name,
-            last_name: tgUser.last_name,
-          };
-          setUser(userObj);
-          
-          try {
-            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
-            const authController = new AbortController();
-            const authTimeoutId = setTimeout(() => authController.abort(), 4000);
-            const res = await fetch(`${baseUrl}/functions/v1/auth`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                initData: tg.initData,
-                start_param: tg.initDataUnsafe?.start_param 
-              }),
-              signal: authController.signal
-            });
-            clearTimeout(authTimeoutId);
-            const authData = await res.json();
-            
-            if (authData.error === "VPN Blocked" || authData.isVpnBlock) {
-              setIsVpnBlock(true);
-              setIsReady(true);
-              return;
+
+        const tgUnsafeUser = tg.initDataUnsafe?.user;
+        const initialUserObj: TelegramUser = {
+          id: tgUnsafeUser?.id || 0,
+          username: tgUnsafeUser?.username,
+          first_name: tgUnsafeUser?.first_name,
+          last_name: tgUnsafeUser?.last_name,
+        };
+        setUser(initialUserObj);
+
+        try {
+          const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
+          const authController = new AbortController();
+          const authTimeoutId = setTimeout(() => authController.abort(), 6000);
+
+          // All Telegram authentication MUST pass through the trusted server-side Edge Function
+          const res = await fetch(`${baseUrl}/functions/v1/auth`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              initData: tg.initData,
+              start_param: tg.initDataUnsafe?.start_param 
+            }),
+            signal: authController.signal
+          });
+          clearTimeout(authTimeoutId);
+
+          const authResponse = await res.json();
+
+          if (authResponse.error === "VPN Blocked" || authResponse.isVpnBlock) {
+            setIsVpnBlock(true);
+            setIsReady(true);
+            return;
+          }
+
+          if (authResponse.success && authResponse.data) {
+            const token = authResponse.data.access_token;
+            const verifiedProfile = authResponse.data.user;
+
+            if (token) {
+              setSupabaseToken(token);
             }
 
-            if (authData.success) {
-              if (authData.access_token) {
-                setSupabaseToken(authData.access_token);
-              }
-              userObj.uuid = authData.user_uuid;
-              setUser({...userObj});
+            if (verifiedProfile) {
+              setUser({
+                id: verifiedProfile.telegram_id,
+                uuid: verifiedProfile.id,
+                username: verifiedProfile.username,
+                first_name: verifiedProfile.first_name,
+                last_name: verifiedProfile.last_name,
+                balance: Number(verifiedProfile.wallet_balance || 0)
+              });
             }
-          } catch(e) {
-            console.error("Edge function auth failed", e);
+          } else if (authResponse.success && authResponse.access_token) {
+            // Support flat response structure
+            setSupabaseToken(authResponse.access_token);
+            if (authResponse.user_uuid) {
+              await fetchUserData(authResponse.user_uuid);
+            }
+          } else {
+            console.warn("Telegram authentication response:", authResponse.error || "Unauthenticated");
           }
-          
-          await fetchUserData(tgUser.id);
+        } catch (e) {
+          console.error("Server authentication failed:", e);
         }
       } else {
         // In browser development / preview mode outside Telegram
@@ -187,7 +193,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           Open this app through your Telegram bot or click below to launch preview.
         </p>
         <button
-          onClick={() => setUser({ id: 123456789, first_name: "Demo", username: "user" })}
+          onClick={() => setUser({ id: 123456789, first_name: "Demo", username: "user", balance: 14.50 })}
           className="px-6 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl shadow-md"
         >
           Open Preview Mode

@@ -15,6 +15,23 @@ export interface VerificationResult {
   user?: VerifiedTelegramUser;
   authDate?: Date;
   error?: string;
+  errorCode?: string;
+}
+
+/**
+ * Constant-time string comparison to prevent timing attacks
+ */
+export function constantTimeCompare(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const aLen = a.length;
+  const bLen = b.length;
+  if (aLen !== bLen) return false;
+
+  let mismatch = 0;
+  for (let i = 0; i < aLen; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 /**
@@ -22,18 +39,20 @@ export interface VerificationResult {
  * @param initData Raw query string from window.Telegram.WebApp.initData
  * @param botToken Official bot token issued by BotFather
  * @param maxAgeSeconds Maximum allowed age of auth_date (default: 86400s / 24h)
+ * @param clockToleranceSeconds Allowed future clock drift (default: 60s)
  */
 export async function verifyTelegramInitData(
   initData: string,
   botToken: string,
-  maxAgeSeconds = 86400
+  maxAgeSeconds = 86400,
+  clockToleranceSeconds = 60
 ): Promise<VerificationResult> {
-  if (!initData || typeof initData !== 'string') {
-    return { valid: false, error: 'Missing or empty Telegram initData string' };
+  if (!initData || typeof initData !== 'string' || initData.trim() === '') {
+    return { valid: false, error: 'Missing or empty Telegram initData string', errorCode: 'MISSING_INIT_DATA' };
   }
 
-  if (!botToken) {
-    return { valid: false, error: 'Server TELEGRAM_BOT_TOKEN is not configured' };
+  if (!botToken || typeof botToken !== 'string' || botToken.trim() === '') {
+    return { valid: false, error: 'Server TELEGRAM_BOT_TOKEN is not configured', errorCode: 'SERVER_MISCONFIG' };
   }
 
   try {
@@ -41,24 +60,42 @@ export async function verifyTelegramInitData(
     const hash = urlParams.get('hash');
 
     if (!hash) {
-      return { valid: false, error: 'initData is missing required "hash" parameter' };
+      return { valid: false, error: 'initData is missing required "hash" parameter', errorCode: 'MISSING_HASH' };
     }
 
-    // 1. Check auth_date for expiration (Replay attack defense)
+    if (!/^[a-f0-9]{64}$/i.test(hash)) {
+      return { valid: false, error: 'Invalid hash format. Expected 64-character hexadecimal signature.', errorCode: 'INVALID_HASH_FORMAT' };
+    }
+
+    // 1. Check auth_date
     const authDateStr = urlParams.get('auth_date');
     if (!authDateStr) {
-      return { valid: false, error: 'initData is missing "auth_date" parameter' };
+      return { valid: false, error: 'initData is missing "auth_date" parameter', errorCode: 'MISSING_AUTH_DATE' };
     }
 
     const authDateUnix = parseInt(authDateStr, 10);
     const currentUnix = Math.floor(Date.now() / 1000);
 
     if (isNaN(authDateUnix) || authDateUnix <= 0) {
-      return { valid: false, error: 'Invalid "auth_date" timestamp' };
+      return { valid: false, error: 'Invalid "auth_date" timestamp format', errorCode: 'INVALID_AUTH_DATE' };
     }
 
+    // Reject future timestamps outside clock tolerance
+    if (authDateUnix > currentUnix + clockToleranceSeconds) {
+      return { 
+        valid: false, 
+        error: `Future "auth_date" timestamp rejected (exceeds clock tolerance of ${clockToleranceSeconds}s)`, 
+        errorCode: 'FUTURE_TIMESTAMP' 
+      };
+    }
+
+    // Reject expired session
     if (currentUnix - authDateUnix > maxAgeSeconds) {
-      return { valid: false, error: `Authentication expired. Session was generated over ${maxAgeSeconds / 3600} hours ago.` };
+      return { 
+        valid: false, 
+        error: `Authentication expired. Session was generated over ${maxAgeSeconds / 3600} hours ago.`, 
+        errorCode: 'AUTH_DATE_EXPIRED' 
+      };
     }
 
     // 2. Sort all parameters alphabetically (excluding 'hash')
@@ -108,27 +145,46 @@ export async function verifyTelegramInitData(
     const calculatedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     // Constant-time string comparison to prevent timing attacks
-    if (calculatedHash.toLowerCase() !== hash.toLowerCase()) {
-      return { valid: false, error: 'Cryptographic signature mismatch. Untrusted or tampered initData.' };
+    if (!constantTimeCompare(calculatedHash.toLowerCase(), hash.toLowerCase())) {
+      return { 
+        valid: false, 
+        error: 'Cryptographic signature mismatch. Untrusted or tampered initData.', 
+        errorCode: 'INVALID_SIGNATURE' 
+      };
     }
 
-    // 5. Extract user payload
+    // 5. Extract and validate user payload
     const userStr = urlParams.get('user');
     if (!userStr) {
-      return { valid: false, error: 'initData does not contain user object' };
+      return { valid: false, error: 'initData does not contain user object', errorCode: 'MISSING_USER_OBJECT' };
     }
 
-    const userData: VerifiedTelegramUser = JSON.parse(userStr);
-    if (!userData.id) {
-      return { valid: false, error: 'User data missing required Telegram ID' };
+    let userData: any;
+    try {
+      userData = JSON.parse(userStr);
+    } catch {
+      return { valid: false, error: 'Malformed user object JSON in initData', errorCode: 'MALFORMED_USER_JSON' };
     }
+
+    if (!userData || typeof userData.id !== 'number' || userData.id <= 0) {
+      return { valid: false, error: 'User data missing required positive Telegram ID', errorCode: 'INVALID_TELEGRAM_ID' };
+    }
+
+    const verifiedUser: VerifiedTelegramUser = {
+      id: userData.id,
+      first_name: String(userData.first_name || 'Telegram User').slice(0, 100),
+      last_name: userData.last_name ? String(userData.last_name).slice(0, 100) : undefined,
+      username: userData.username ? String(userData.username).slice(0, 100) : undefined,
+      language_code: userData.language_code ? String(userData.language_code).slice(0, 10) : undefined,
+      is_premium: Boolean(userData.is_premium),
+    };
 
     return {
       valid: true,
-      user: userData,
+      user: verifiedUser,
       authDate: new Date(authDateUnix * 1000),
     };
   } catch (err: any) {
-    return { valid: false, error: `Telegram verification failed: ${err.message}` };
+    return { valid: false, error: `Telegram verification failed: ${err.message}`, errorCode: 'VERIFICATION_EXCEPTION' };
   }
 }

@@ -3,7 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { validatePositiveAmount, validatePayoutAddress } from "../_shared/validation.ts";
@@ -18,7 +18,7 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
   // Rate limiting (max 5 withdrawal requests per minute per IP)
   const rate = checkRateLimit(`wd_${clientIp}`, 5, 60000);
@@ -27,33 +27,60 @@ serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
-
-    // 1. Authenticate user from Authorization Bearer header, or fallback to body user_uuid if present
-    let authenticatedUserId: string;
-    try {
-      const verifiedUser = await verifyUserRequest(req);
-      authenticatedUserId = verifiedUser.id;
-    } catch {
-      // Fallback: If client only passed user_uuid with anon key
-      if (!body.user_uuid) {
-        throw new AppError("Authentication required.", 401, "UNAUTHORIZED");
-      }
-      authenticatedUserId = body.user_uuid;
+    if (req.method !== "POST") {
+      throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
     }
 
-    const { amount, wallet_address, method } = body;
+    // 1. SEC-01: Authenticate user exclusively via verified Supabase JWT
+    // Never trust client-supplied user_uuid fallback
+    const verifiedUser = await verifyUserRequest(req);
+    const authenticatedUserId = verifiedUser.id;
 
-    // 2. Validate amount (min $1.00)
+    const body = await req.json().catch(() => ({}));
+    const { amount, wallet_address, method, user_uuid, idempotency_key } = body;
+
+    // Reject any attempt by client to specify another user's identity
+    if (user_uuid && user_uuid !== authenticatedUserId) {
+      await logAuditEvent({
+        actorId: authenticatedUserId,
+        actorType: "user",
+        action: "suspicious_identity_mismatch_attempt",
+        details: { attemptedUserId: user_uuid, realUserId: authenticatedUserId },
+        ipAddress: clientIp,
+      });
+      throw new AppError("Identity mismatch: Cannot request withdrawal on behalf of another user.", 403, "FORBIDDEN_IDENTITY_MISMATCH");
+    }
+
+    // 2. Validate amount (minimum $1.00, maximum $5,000.00)
     const cleanAmount = validatePositiveAmount(amount, 1.00, 5000.00);
 
     // 3. Validate payment method and address format
     if (!method || !["usdt", "trx", "payeer"].includes(method)) {
-      throw new AppError("Invalid payment method. Supported: usdt, trx, payeer", 400, "INVALID_METHOD");
+      throw new AppError("Invalid payment method. Supported methods: USDT (TRC20), TRX, Payeer.", 400, "INVALID_METHOD");
     }
     const cleanAddress = validatePayoutAddress(method, wallet_address);
 
-    // 4. Call Atomic Database RPC with Row Locking
+    // 4. Prevent Duplicate Requests: Check for existing pending withdrawal
+    const { data: existingPending, error: pendingErr } = await supabaseAdmin
+      .from("withdrawals")
+      .select("id, amount, requested_at")
+      .eq("user_id", authenticatedUserId)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (pendingErr) throw pendingErr;
+
+    if (existingPending) {
+      throw new AppError("You already have an active pending withdrawal in queue. Please wait for it to be processed.", 400, "DUPLICATE_PENDING_WITHDRAWAL");
+    }
+
+    // Check optional idempotency key
+    const safeIdempotencyKey = idempotency_key && typeof idempotency_key === "string" 
+      ? idempotency_key.slice(0, 100) 
+      : `wd_req_${authenticatedUserId}_${Date.now()}`;
+
+    // 5. Call Atomic Database RPC with Row Locking (FOR UPDATE)
+    // Ensures concurrent requests cannot double-spend or create negative balances
     const { data: dbResult, error: rpcError } = await supabaseAdmin.rpc("request_withdrawal", {
       user_id_param: authenticatedUserId,
       amount_param: cleanAmount,
@@ -61,20 +88,24 @@ serve(async (req: Request) => {
       wallet_address: cleanAddress
     });
 
-    if (rpcError) throw rpcError;
-
-    if (!dbResult.success) {
-      throw new AppError(dbResult.error || "Withdrawal request failed.", 400, "WITHDRAWAL_FAILED");
+    if (rpcError) {
+      console.error("[WITHDRAWAL_RPC_ERROR]", rpcError);
+      throw new AppError("Unable to process withdrawal request. Please check your balance and try again.", 400, "WITHDRAWAL_FAILED");
     }
 
-    // 5. Audit Log
+    if (!dbResult || !dbResult.success) {
+      const safeErrorMessage = dbResult?.error || "Withdrawal failed due to insufficient balance or account restrictions.";
+      throw new AppError(safeErrorMessage, 400, "WITHDRAWAL_FAILED");
+    }
+
+    // 6. Immutable Audit Log
     await logAuditEvent({
       actorId: authenticatedUserId,
       actorType: "user",
       action: "withdrawal_requested",
       targetType: "withdrawal",
       targetId: dbResult.withdrawal_id,
-      details: { amount: cleanAmount, method, wallet_address: cleanAddress },
+      details: { amount: cleanAmount, method, wallet_address: cleanAddress, idempotencyKey: safeIdempotencyKey },
       ipAddress: clientIp,
     });
 

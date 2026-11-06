@@ -1,210 +1,175 @@
+// supabase/functions/auth/index.ts
+// Secure Telegram WebApp Authentication & Session Edge Function
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
+import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { verifyTelegramInitData } from "../_shared/telegram-verification.ts";
+import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
+import { logAuditEvent } from "../_shared/audit-log.ts";
 
-const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
+const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET") || "your-super-secret-jwt-token-with-at-least-32-characters-long"; // Fallback for local testing, but user should set it!
+const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET");
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// ----------------------------------------------------
-// TELEGRAM INIT_DATA HASH VALIDATION
-// ----------------------------------------------------
-// This function strictly verifies that the request is genuinely from Telegram
-// Hacker cannot spoof this without the BOT_TOKEN.
-async function verifyTelegramAuth(initData: string) {
-  const urlParams = new URLSearchParams(initData);
-  const hash = urlParams.get("hash");
-  urlParams.delete("hash");
+serve(async (req: Request) => {
+  const cors = handleCors(req);
+  if (cors) return cors;
 
-  const dataCheckString = Array.from(urlParams.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-  // Generate Secret Key using SHA-256 of Bot Token
-  const encoder = new TextEncoder();
-  const secretKeyHash = await crypto.subtle.digest("SHA-256", encoder.encode(BOT_TOKEN));
-  const secretKey = await crypto.subtle.importKey(
-    "raw",
-    secretKeyHash,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  // Sign data check string
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    secretKey,
-    encoder.encode(dataCheckString)
-  );
-
-  const calculatedHash = Array.from(new Uint8Array(signature))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  // 1. Check if hash matches
-  if (calculatedHash !== hash) {
-    return null; // Invalid signature: Hacking attempt
-  }
-
-  // 2. Prevent Replay Attacks (Check timestamp within 1 hour)
-  const authDate = parseInt(urlParams.get("auth_date") || "0", 10);
-  const now = Math.floor(Date.now() / 1000);
-  if (now - authDate > 3600) {
-    return null; // Expired session: Replay attack prevention
-  }
-
-  return JSON.parse(urlParams.get("user") || "{}");
-}
-
-// ----------------------------------------------------
-// EDGE FUNCTION HANDLER
-// ----------------------------------------------------
-serve(async (req) => {
-  // CORS Headers for Telegram Web App
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  // Rate Limiting: 20 auth attempts per minute per IP
+  const rate = checkRateLimit(`auth_${clientIp}`, 20, 60000);
+  if (!rate.allowed) {
+    return errorResponse(new AppError("Too many authentication attempts. Please try again later.", 429, "RATE_LIMIT_EXCEEDED"));
   }
 
   try {
-    const { initData, start_param } = await req.json();
+    if (req.method !== "POST") {
+      throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { initData, start_param } = body;
 
     if (!initData) {
-      return new Response(JSON.stringify({ error: "Missing initData" }), { status: 400, headers: corsHeaders });
+      throw new AppError("Missing required Telegram initData parameter.", 400, "MISSING_INIT_DATA");
     }
 
-    // VALIDATE TELEGRAM DATA
-    const tgUser = await verifyTelegramAuth(initData);
-    if (!tgUser) {
-      return new Response(JSON.stringify({ error: "Unauthorized / Invalid Signature. Hacking attempt blocked." }), { status: 401, headers: corsHeaders });
+    if (!BOT_TOKEN) {
+      throw new AppError("Server configuration error: TELEGRAM_BOT_TOKEN is not set.", 500, "CONFIG_ERROR");
     }
 
-    // Proxy / VPN Check
-    try {
-      const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('cf-connecting-ip');
-      const PROXYCHECK_KEY = Deno.env.get("PROXYCHECK_KEY");
-      const IPAPI_KEY = Deno.env.get("IPAPI_KEY");
-      
-      let isVpn = false;
-      
-      if (clientIp) {
-          if (PROXYCHECK_KEY) {
-            const proxyRes = await fetch(`https://proxycheck.io/v2/${clientIp}?key=${PROXYCHECK_KEY}&vpn=1`);
-            const proxyData = await proxyRes.json();
-            
-            if (proxyData[clientIp] && proxyData[clientIp].proxy === "yes") {
-                isVpn = true;
-            }
-          }
-          
-          if (!isVpn && IPAPI_KEY) {
-              const ipapiRes = await fetch(`http://api.ipapi.com/api/${clientIp}?access_key=${IPAPI_KEY}&security=1`);
-              const ipapiData = await ipapiRes.json();
-              if (ipapiData.security && (ipapiData.security.is_proxy || ipapiData.security.is_tor)) {
-                  isVpn = true;
-              }
-          }
-          
-          if (isVpn) {
-              return new Response(JSON.stringify({ error: "VPN Blocked", isVpnBlock: true }), { status: 403, headers: corsHeaders });
-          }
-      }
-    } catch (e) {
-      console.error("Proxy checking failed: ", e);
+    if (!SUPABASE_JWT_SECRET) {
+      throw new AppError("Server configuration error: SUPABASE_JWT_SECRET is not set.", 500, "CONFIG_ERROR");
     }
 
-    // Check if user exists
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('telegram_id', tgUser.id)
+    // 1. Cryptographic HMAC-SHA256 Verification with Clock Tolerance & Replay Check
+    const verification = await verifyTelegramInitData(initData, BOT_TOKEN);
+    if (!verification.valid || !verification.user) {
+      await logAuditEvent({
+        actorType: "system",
+        action: "auth_failed_invalid_signature",
+        details: { error: verification.error, errorCode: verification.errorCode, clientIp },
+        ipAddress: clientIp,
+      });
+      throw new AppError(
+        verification.error || "Unauthorized: Cryptographic signature verification failed.",
+        401,
+        verification.errorCode || "INVALID_SIGNATURE"
+      );
+    }
+
+    const tgUser = verification.user;
+
+    // 2. Lookup existing user by telegram_id
+    const { data: existingUser, error: lookupErr } = await supabaseAdmin
+      .from("users")
+      .select("id, status, wallet_balance, total_earned, total_withdrawn")
+      .eq("telegram_id", tgUser.id)
       .maybeSingle();
-      
+
+    if (lookupErr) throw lookupErr;
+
     const isNewUser = !existingUser;
 
-    // UPSERT USER SECURELY IN DB
-    // If user doesn't exist, create them. If they do, update names.
-    const { data: userRow, error: dbError } = await supabase
-      .from('users')
+    // Check account status if existing
+    if (existingUser && existingUser.status === "suspended") {
+      await logAuditEvent({
+        actorId: existingUser.id,
+        actorType: "user",
+        action: "auth_attempt_suspended_user",
+        details: { telegram_id: tgUser.id },
+        ipAddress: clientIp,
+      });
+      throw new AppError("This account has been suspended. Please contact support.", 403, "ACCOUNT_SUSPENDED");
+    }
+
+    // 3. Upsert User Profile securely via Server Admin Client
+    const { data: userRow, error: upsertErr } = await supabaseAdmin
+      .from("users")
       .upsert({
         telegram_id: tgUser.id,
         username: tgUser.username,
-        first_name: tgUser.first_name
-      }, { onConflict: 'telegram_id' })
-      .select('id, status, level')
+        first_name: tgUser.first_name,
+        last_name: tgUser.last_name,
+        last_active_at: new Date().toISOString()
+      }, { onConflict: "telegram_id" })
+      .select("id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, created_at")
       .single();
 
-    if (dbError) throw dbError;
+    if (upsertErr || !userRow) throw upsertErr || new Error("Failed to persist user profile");
 
-    // Process Referral if new user and has start_param
+    // 4. Handle Referrals for New Users
     if (isNewUser && start_param) {
       try {
-        const referrerId = parseInt(start_param.toString().replace('ref_', ''), 10);
-        if (!isNaN(referrerId) && referrerId !== tgUser.id) {
-          // Find referrer UUID
-          const { data: referrerUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('telegram_id', referrerId)
+        const referrerTgId = parseInt(String(start_param).replace(/^ref_/, ""), 10);
+        if (!isNaN(referrerTgId) && referrerTgId !== tgUser.id) {
+          const { data: referrer } = await supabaseAdmin
+            .from("users")
+            .select("id")
+            .eq("telegram_id", referrerTgId)
             .maybeSingle();
-            
-          if (referrerUser) {
-            // Create referral
-            const { error: referralError } = await supabase
-              .from('referrals')
-              .insert({
-                referrer_id: referrerUser.id,
-                referred_user_id: userRow.id
-              });
-              
-            if (referralError) {
-              console.error("Failed to create referral record:", referralError);
-            }
+
+          if (referrer) {
+            await supabaseAdmin.from("referrals").insert({
+              referrer_id: referrer.id,
+              referred_user_id: userRow.id,
+            });
+            await logAuditEvent({
+              actorId: userRow.id,
+              actorType: "user",
+              action: "referral_registered",
+              targetType: "user",
+              targetId: referrer.id,
+              details: { referrerTelegramId: referrerTgId },
+              ipAddress: clientIp,
+            });
           }
         }
-      } catch (err) {
-        console.error("Error processing referral:", err);
+      } catch (refErr) {
+        console.error("[REFERRAL_PROCESSING_ERROR]", refErr);
       }
     }
 
-    // Check if user is banned
-    if (userRow.status === 'suspended') {
-        return new Response(JSON.stringify({ error: "Account Banned." }), { status: 403, headers: corsHeaders });
-    }
-
-    // GENERATE SECURE CUSTOM JWT
+    // 5. Issue Cryptographically Signed User JWT
     const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
     const jwt = await new jose.SignJWT({
-      aud: 'authenticated',
-      role: 'authenticated',
+      aud: "authenticated",
+      role: "authenticated",
       sub: userRow.id,
       email: `${tgUser.id}@telegram.local`,
-      user_metadata: { tg_id: tgUser.id }
+      app_metadata: { provider: "telegram" },
+      user_metadata: { tg_id: tgUser.id, username: tgUser.username }
     })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('24h')
-    .sign(secret);
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("24h")
+      .sign(secret);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      user_uuid: userRow.id,
+    // 6. Return Verified Session and Profile
+    return successResponse({
       access_token: jwt,
-      message: "Authentication secure & verified" 
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      user_uuid: userRow.id,
+      user: {
+        id: userRow.id,
+        telegram_id: userRow.telegram_id,
+        username: userRow.username,
+        first_name: userRow.first_name,
+        last_name: userRow.last_name,
+        wallet_balance: Number(userRow.wallet_balance || 0),
+        total_earned: Number(userRow.total_earned || 0),
+        total_withdrawn: Number(userRow.total_withdrawn || 0),
+        status: userRow.status
+      }
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500, headers: corsHeaders });
+  } catch (err) {
+    return errorResponse(err);
   }
 });

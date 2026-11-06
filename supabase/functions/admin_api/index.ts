@@ -3,12 +3,13 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
 import { checkRateLimit } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { validatePositiveAmount, sanitizeString, isValidUuid } from "../_shared/validation.ts";
+import { AdminRole } from "../_shared/permissions.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,7 +19,7 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
   // Rate limiting for admin requests (120 reqs / minute per IP)
   const rate = checkRateLimit(`admin_${clientIp}`, 120, 60000);
@@ -35,7 +36,7 @@ serve(async (req: Request) => {
     const action = body.action || (pathAction !== "admin_api" && pathAction !== "admin_action" ? pathAction : null);
 
     if (!action) {
-      throw new AppError("Missing admin action specification.", 400, "MISSING_ACTION");
+      throw new AppError("Missing administrator action specification.", 400, "MISSING_ACTION");
     }
 
     // ========================================================================
@@ -44,7 +45,6 @@ serve(async (req: Request) => {
     if (action === "get_admin_data" || action === "get_dashboard_stats") {
       const admin = await verifyAdminRequest(req, "view_dashboard");
 
-      // Aggregate high-level platform analytics
       const [
         { count: totalUsers },
         { count: totalTasks },
@@ -65,7 +65,6 @@ serve(async (req: Request) => {
       const totalEarned = balanceStats?.reduce((acc, curr) => acc + Number(curr.total_earned || 0), 0) || 0;
       const totalPaidOut = withdrawalStats?.reduce((acc, curr) => acc + Number(curr.amount || 0), 0) || 0;
 
-      // Recent 10 transactions
       const { data: recentTransactions } = await supabaseAdmin
         .from("transactions")
         .select("*, user:users(telegram_id, username, first_name)")
@@ -73,7 +72,7 @@ serve(async (req: Request) => {
         .limit(10);
 
       return successResponse({
-        admin: { email: admin.email, role: admin.role },
+        admin: { email: admin.email, role: admin.role, fullName: admin.fullName },
         stats: {
           totalUsers: totalUsers || 0,
           activeTasks: totalTasks || 0,
@@ -114,8 +113,8 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "manage_users");
       const { userId, status, reason } = body;
 
-      if (!userId || !isValidUuid(userId)) throw new AppError("Valid userId is required.");
-      if (!["active", "suspended"].includes(status)) throw new AppError("Invalid status value.");
+      if (!userId || !isValidUuid(userId)) throw new AppError("Valid userId is required.", 400, "INVALID_USER_ID");
+      if (!["active", "suspended"].includes(status)) throw new AppError("Invalid status value.", 400, "INVALID_STATUS");
 
       const { error } = await supabaseAdmin
         .from("users")
@@ -130,7 +129,7 @@ serve(async (req: Request) => {
         action: `user_status_${status}`,
         targetType: "user",
         targetId: userId,
-        details: { status, reason: sanitizeString(reason) },
+        details: { status, reason: sanitizeString(reason || "") },
         ipAddress: clientIp,
       });
 
@@ -139,11 +138,11 @@ serve(async (req: Request) => {
 
     if (action === "adjust_user_balance") {
       const admin = await verifyAdminRequest(req, "manage_balances");
-      const { userId, amount, reason } = body;
+      const { userId, amount, reason, type } = body;
 
-      if (!userId || !isValidUuid(userId)) throw new AppError("Valid userId is required.");
+      if (!userId || !isValidUuid(userId)) throw new AppError("Valid userId is required.", 400, "INVALID_USER_ID");
       const numAmount = validatePositiveAmount(amount, 0.01, 10000.0);
-      const isDeduction = body.type === "deduct";
+      const isDeduction = type === "deduct";
       const finalAmount = isDeduction ? -numAmount : numAmount;
 
       const { data: rpcResult, error } = await supabaseAdmin.rpc("atomic_wallet_credit", {
@@ -151,7 +150,7 @@ serve(async (req: Request) => {
         p_amount: finalAmount,
         p_type: "manual_adjustment",
         p_idempotency_key: `adj_${Date.now()}_${userId}`,
-        p_description: `Admin adjustment: ${sanitizeString(reason) || "Manual update"}`
+        p_description: `Admin adjustment (${admin.email}): ${sanitizeString(reason || "Manual update")}`
       });
 
       if (error) throw error;
@@ -162,7 +161,7 @@ serve(async (req: Request) => {
         action: "manual_balance_adjustment",
         targetType: "user",
         targetId: userId,
-        details: { amount: finalAmount, reason: sanitizeString(reason) },
+        details: { amount: finalAmount, reason: sanitizeString(reason || "") },
         ipAddress: clientIp,
       });
 
@@ -199,17 +198,17 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "manage_withdrawals");
       const { withdrawalId, txHash, note } = body;
 
-      if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.");
+      if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.", 400, "INVALID_WITHDRAWAL_ID");
 
       const { data: result, error } = await supabaseAdmin.rpc("admin_approve_withdrawal", {
         p_admin_id: admin.id,
         p_withdrawal_id: withdrawalId,
-        p_tx_hash: sanitizeString(txHash, 100),
-        p_note: sanitizeString(note, 250)
+        p_tx_hash: sanitizeString(txHash || "", 100),
+        p_note: sanitizeString(note || "", 250)
       });
 
       if (error) throw error;
-      if (!result.success) throw new AppError(result.error || "Approval failed");
+      if (!result?.success) throw new AppError(result?.error || "Approval failed", 400, "APPROVAL_FAILED");
 
       return successResponse(result);
     }
@@ -218,8 +217,8 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "manage_withdrawals");
       const { withdrawalId, reason } = body;
 
-      if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.");
-      if (!reason || reason.trim().length < 3) throw new AppError("Rejection reason is required.");
+      if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.", 400, "INVALID_WITHDRAWAL_ID");
+      if (!reason || reason.trim().length < 3) throw new AppError("Rejection reason is required.", 400, "MISSING_REASON");
 
       const { data: result, error } = await supabaseAdmin.rpc("admin_reject_withdrawal", {
         p_admin_id: admin.id,
@@ -228,7 +227,7 @@ serve(async (req: Request) => {
       });
 
       if (error) throw error;
-      if (!result.success) throw new AppError(result.error || "Rejection failed");
+      if (!result?.success) throw new AppError(result?.error || "Rejection failed", 400, "REJECTION_FAILED");
 
       return successResponse(result);
     }
@@ -251,7 +250,7 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "manage_tasks");
       const { title, description, category, reward, maxCompletions, targetUrl, jobLength, proofInstructions } = body;
 
-      if (!title || !description) throw new AppError("Task title and description are required.");
+      if (!title || !description) throw new AppError("Task title and description are required.", 400, "MISSING_FIELDS");
       const cleanReward = validatePositiveAmount(reward, 0.01, 100.0);
 
       const { data: newTask, error } = await supabaseAdmin
@@ -262,9 +261,9 @@ serve(async (req: Request) => {
           category: sanitizeString(category || "Other", 40),
           reward: cleanReward,
           max_completions: Math.max(1, parseInt(maxCompletions) || 100),
-          target_url: sanitizeString(targetUrl, 300),
+          target_url: sanitizeString(targetUrl || "", 300),
           job_length: Math.max(1, parseInt(jobLength) || 5),
-          proof_instructions: sanitizeString(proofInstructions, 500),
+          proof_instructions: sanitizeString(proofInstructions || "", 500),
           status: "active"
         })
         .select()
@@ -289,8 +288,8 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "manage_tasks");
       const { taskId, status } = body;
 
-      if (!taskId || !isValidUuid(taskId)) throw new AppError("Valid taskId required.");
-      if (!["active", "paused", "completed", "archived"].includes(status)) throw new AppError("Invalid task status.");
+      if (!taskId || !isValidUuid(taskId)) throw new AppError("Valid taskId required.", 400, "INVALID_TASK_ID");
+      if (!["active", "paused", "completed", "archived"].includes(status)) throw new AppError("Invalid task status.", 400, "INVALID_STATUS");
 
       const { error } = await supabaseAdmin.from("tasks").update({ status }).eq("id", taskId);
       if (error) throw error;
@@ -325,18 +324,18 @@ serve(async (req: Request) => {
       const admin = await verifyAdminRequest(req, "review_submissions");
       const { submissionId, decision, comment } = body;
 
-      if (!submissionId || !isValidUuid(submissionId)) throw new AppError("Valid submissionId required.");
-      if (!["approved", "rejected"].includes(decision)) throw new AppError("Decision must be 'approved' or 'rejected'.");
+      if (!submissionId || !isValidUuid(submissionId)) throw new AppError("Valid submissionId required.", 400, "INVALID_SUBMISSION_ID");
+      if (!["approved", "rejected"].includes(decision)) throw new AppError("Decision must be 'approved' or 'rejected'.", 400, "INVALID_DECISION");
 
       const { data: result, error } = await supabaseAdmin.rpc("admin_review_submission", {
         p_admin_id: admin.id,
         p_submission_id: submissionId,
         p_decision: decision,
-        p_comment: sanitizeString(comment, 250)
+        p_comment: sanitizeString(comment || "", 250)
       });
 
       if (error) throw error;
-      if (!result.success) throw new AppError(result.error || "Review failed");
+      if (!result?.success) throw new AppError(result?.error || "Review failed", 400, "REVIEW_FAILED");
 
       return successResponse(result);
     }
@@ -354,7 +353,7 @@ serve(async (req: Request) => {
     if (action === "update_setting") {
       const admin = await verifyAdminRequest(req, "manage_settings");
       const { key, value } = body;
-      if (!key || typeof value !== "object") throw new AppError("Key and JSON object value required.");
+      if (!key || typeof value !== "object") throw new AppError("Key and JSON object value required.", 400, "INVALID_SETTINGS");
 
       const { error } = await supabaseAdmin
         .from("app_settings")
@@ -389,6 +388,68 @@ serve(async (req: Request) => {
 
       if (error) throw error;
       return successResponse({ logs, total: count, page, limit });
+    }
+
+    // ========================================================================
+    // 6. ADMIN USER MANAGEMENT (SUPER ADMIN ONLY)
+    // ========================================================================
+    if (action === "get_admins") {
+      await verifyAdminRequest(req, "manage_admins");
+      const { data: admins, error } = await supabaseAdmin
+        .from("admin_users")
+        .select("id, auth_user_id, email, full_name, role, status, created_at, updated_at")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return successResponse({ admins });
+    }
+
+    if (action === "update_admin_role") {
+      const admin = await verifyAdminRequest(req, "manage_admins");
+      const { targetAdminId, role, status } = body;
+
+      if (!targetAdminId || !isValidUuid(targetAdminId)) {
+        throw new AppError("Valid targetAdminId required.", 400, "INVALID_ADMIN_ID");
+      }
+
+      // Prevent super_admin demoting or locking themselves out
+      if (targetAdminId === admin.id && status === "suspended") {
+        throw new AppError("Cannot suspend your own administrator account.", 400, "CANNOT_SELF_SUSPEND");
+      }
+
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (role) {
+        const allowedRoles: AdminRole[] = ["super_admin", "admin", "finance_admin", "finance", "moderator", "support"];
+        if (!allowedRoles.includes(role)) {
+          throw new AppError("Invalid administrator role specified.", 400, "INVALID_ROLE");
+        }
+        updates.role = role;
+      }
+      if (status) {
+        if (!["active", "suspended"].includes(status)) {
+          throw new AppError("Invalid administrator status.", 400, "INVALID_STATUS");
+        }
+        updates.status = status;
+      }
+
+      const { error } = await supabaseAdmin
+        .from("admin_users")
+        .update(updates)
+        .eq("id", targetAdminId);
+
+      if (error) throw error;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "admin_role_updated",
+        targetType: "admin_user",
+        targetId: targetAdminId,
+        details: updates,
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ message: "Administrator permissions updated successfully." });
     }
 
     throw new AppError(`Unknown admin action: '${action}'`, 404, "UNKNOWN_ACTION");
