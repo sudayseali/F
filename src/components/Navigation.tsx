@@ -1,7 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, CheckSquare, Layers, Wallet, User as UserIcon, Coins, Sparkles, Check, Home } from "lucide-react";
+import { CheckSquare, Layers, Wallet, User as UserIcon, Check, Home } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
+import { ASSETS_3D } from "../lib/assets";
 
 const navItems = [
   { label: "Home", icon: Home, path: "/" },
@@ -24,12 +25,11 @@ export function Navigation() {
 
   return (
     <>
-      {/* Telegram Native Top App Bar matching Screenshot */}
+      {/* Telegram Native Top App Bar matching Screenshot with 3D Coin Badge */}
       <header className="sticky top-0 left-0 right-0 z-40 bg-[#030712]/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-white/[0.06]">
         {/* Left: User Avatar & Name */}
         <div className="flex items-center gap-3">
           <Link to="/profile" onClick={handleTabClick} className="relative group">
-            {/* Avatar circle with electric cyan/blue gradient */}
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#0284c7] via-[#0088cc] to-[#38bdf8] flex items-center justify-center text-white font-black text-base shadow-lg shadow-sky-500/30 group-active:scale-95 transition-transform">
               {initial}
             </div>
@@ -54,16 +54,17 @@ export function Navigation() {
           </div>
         </div>
 
-        {/* Right: Golden Coin Pill ($0.00) */}
+        {/* Right: Golden 3D Coin Pill ($0.00) */}
         <Link
           to="/wallet"
           onClick={handleTabClick}
-          className="flex items-center gap-2 bg-[#0c162e] border border-amber-500/40 px-3.5 py-1.5 rounded-full shadow-lg hover:border-amber-400 transition active:scale-95"
+          className="flex items-center gap-2 bg-[#0c162e] border border-amber-500/40 pl-1.5 pr-3 py-1 rounded-full shadow-lg hover:border-amber-400 transition active:scale-95"
         >
-          {/* Golden Mascot Coin */}
-          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-amber-600 flex items-center justify-center text-amber-950 font-black text-[10px] shadow-sm">
-            $
-          </div>
+          <img
+            src={ASSETS_3D.coinsStack}
+            alt="3D Gold Coins"
+            className="w-5 h-5 rounded-full object-cover shadow-sm"
+          />
           <span className="text-sm font-extrabold text-white tracking-tight tabular-nums">
             ${balance.toFixed(2)}
           </span>

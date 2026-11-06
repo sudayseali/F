@@ -1,6 +1,6 @@
 import { 
-  ArrowUpRight, ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, 
-  History, ArrowLeft, ChevronRight, Loader2, CheckCircle2, Coins, Sparkles 
+  ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, 
+  History, ArrowLeft, ChevronRight, Loader2, Coins 
 } from "lucide-react";
 import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
@@ -8,31 +8,31 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
-import { TelegramWalletGraphic } from "../components/TelegramWalletGraphic";
+import { ASSETS_3D } from "../lib/assets";
 
 type PaymentMethod = "payeer" | "trx" | "zaad" | null;
 
 const METHODS = [
   {
-    id: "payeer",
-    name: "Payeer USD",
-    icon: "🅿️",
-    min: 1.00,
-    placeholder: "P1000000000",
-    desc: "Instant USD transfer to your Payeer account"
-  },
-  {
     id: "trx",
     name: "TRON (TRX)",
-    icon: "💎",
+    iconImg: ASSETS_3D.walletCrypto,
     min: 1.00,
     placeholder: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
     desc: "Direct crypto payout to your TRON wallet"
   },
   {
+    id: "payeer",
+    name: "Payeer USD",
+    iconImg: ASSETS_3D.walletCyan,
+    min: 1.00,
+    placeholder: "P1000000000",
+    desc: "Instant USD transfer to your Payeer account"
+  },
+  {
     id: "zaad",
     name: "Zaad Mobile",
-    icon: "📱",
+    iconImg: ASSETS_3D.coinsStack,
     min: 1.00,
     placeholder: "063XXXXXXX",
     desc: "Local mobile money payout"
@@ -165,13 +165,17 @@ export function Wallet() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Wallet Balance Hero Card matching Screenshot Style */}
+      {/* Wallet Balance Hero Card with 3D Gold Coins Pyramid */}
       <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
         <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Left 3D Telegram Wallet Graphic */}
-        <div className="shrink-0 -ml-2">
-          <TelegramWalletGraphic className="w-24 h-24" />
+        {/* Left: 3D Telegram Wallet Asset */}
+        <div className="shrink-0 -ml-2 -my-2 relative">
+          <img
+            src={ASSETS_3D.telegramWallet}
+            alt="3D Telegram Wallet"
+            className="w-28 h-28 object-contain drop-shadow-[0_12px_28px_rgba(0,136,204,0.65)] transform -rotate-2 hover:rotate-0 transition-transform duration-300"
+          />
         </div>
 
         {/* Right Info */}
@@ -235,7 +239,7 @@ export function Wallet() {
             <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
           </div>
 
-          {/* Payment Methods */}
+          {/* Payment Methods with 3D Icons */}
           <div className="space-y-2">
             {METHODS.map((m) => {
               const isSelected = method === m.id;
@@ -253,7 +257,11 @@ export function Wallet() {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{m.icon}</span>
+                    <img
+                      src={m.iconImg}
+                      alt={m.name}
+                      className="w-10 h-10 object-contain rounded-xl drop-shadow-sm shrink-0"
+                    />
                     <div>
                       <div className="text-xs font-bold text-white">{m.name}</div>
                       <div className="text-[10px] text-slate-400">{m.desc}</div>

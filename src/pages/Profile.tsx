@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { tgHaptics, openTgLink } from "../lib/telegram";
 
+import { ASSETS_3D } from "../lib/assets";
+
 export function Profile() {
   const { user } = useTelegram();
   const navigate = useNavigate();
@@ -15,22 +17,22 @@ export function Profile() {
     {
       label: "Invite Friends & Earn",
       subtitle: "Get a 10% lifetime bonus on referrals",
-      icon: Users,
-      iconColor: "text-purple-400 bg-purple-500/15",
+      icon3D: ASSETS_3D.giftPurple,
+      iconColor: "bg-purple-500/15",
       action: () => navigate("/referrals")
     },
     {
       label: "Withdrawal History",
       subtitle: "View payout receipts and requests",
-      icon: History,
-      iconColor: "text-amber-400 bg-amber-500/15",
+      icon3D: ASSETS_3D.walletCyan,
+      iconColor: "bg-sky-500/15",
       action: () => navigate("/wallet")
     },
     {
       label: "Join Telegram Community",
       subtitle: "Official announcements, promos & bonuses",
-      icon: Send,
-      iconColor: "text-[#38bdf8] bg-sky-500/15",
+      icon3D: ASSETS_3D.rocket,
+      iconColor: "bg-sky-500/15",
       action: () => openTgLink("https://t.me/PayvoraCommunity")
     }
   ];
@@ -85,7 +87,6 @@ export function Profile() {
       {/* Menu Items List */}
       <div className="card-glass-dark divide-y divide-white/5 overflow-hidden rounded-2xl">
         {menuItems.map((item) => {
-          const Icon = item.icon;
           return (
             <div
               key={item.label}
@@ -96,8 +97,12 @@ export function Profile() {
               className="p-4 flex items-center justify-between cursor-pointer hover:bg-white/5 transition active:bg-white/10"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconColor} border border-white/5`}>
-                  <Icon className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconColor} border border-white/5 overflow-hidden`}>
+                  <img
+                    src={item.icon3D}
+                    alt={item.label}
+                    className="w-7 h-7 object-contain drop-shadow-sm"
+                  />
                 </div>
                 <div>
                   <div className="text-xs font-bold text-white">{item.label}</div>

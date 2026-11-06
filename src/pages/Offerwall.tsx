@@ -8,13 +8,15 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
+import { ASSETS_3D } from "../lib/assets";
 
 interface Provider {
   id: string;
   name: string;
   category: string;
   rewardType: string;
-  icon: any;
+  icon3D?: string;
+  icon?: any;
   iconBg: string;
   iconColor: string;
   badge: string;
@@ -29,9 +31,10 @@ const PROVIDERS: Provider[] = [
     name: "CPX Research",
     category: "Surveys",
     rewardType: "Instant Crediting",
+    icon3D: ASSETS_3D.coinsStack,
     icon: BarChart3,
-    iconBg: "bg-sky-500/20",
-    iconColor: "text-[#38bdf8]",
+    iconBg: "bg-amber-500/15",
+    iconColor: "text-amber-400",
     badge: "🔥 Hot",
     badgeType: "hot",
     description: "Paid market research surveys with instant token payouts.",
@@ -42,8 +45,9 @@ const PROVIDERS: Provider[] = [
     name: "ayeT - Studios",
     category: "Games",
     rewardType: "High Payouts",
+    icon3D: ASSETS_3D.rocket,
     icon: Play,
-    iconBg: "bg-purple-500/20",
+    iconBg: "bg-purple-500/15",
     iconColor: "text-[#c084fc]",
     badge: "🎮 Games",
     badgeType: "games",
@@ -55,8 +59,9 @@ const PROVIDERS: Provider[] = [
     name: "Torox Offers",
     category: "Games",
     rewardType: "Tiered Offers",
+    icon3D: ASSETS_3D.coinsPyramid,
     icon: Zap,
-    iconBg: "bg-amber-500/20",
+    iconBg: "bg-amber-500/15",
     iconColor: "text-[#fbbf24]",
     badge: "⚡ Fast Track",
     badgeType: "blue",
@@ -68,8 +73,9 @@ const PROVIDERS: Provider[] = [
     name: "Lootably",
     category: "Apps",
     rewardType: "Interactive",
+    icon3D: ASSETS_3D.walletCyan,
     icon: Shield,
-    iconBg: "bg-cyan-500/20",
+    iconBg: "bg-cyan-500/15",
     iconColor: "text-[#22d3ee]",
     badge: "✓ Verified",
     badgeType: "green",
@@ -81,8 +87,9 @@ const PROVIDERS: Provider[] = [
     name: "AdGate Media",
     category: "Apps",
     rewardType: "Discovery",
+    icon3D: ASSETS_3D.walletCrypto,
     icon: Layers,
-    iconBg: "bg-indigo-500/20",
+    iconBg: "bg-indigo-500/15",
     iconColor: "text-[#818cf8]",
     badge: "Global",
     badgeType: "blue",
@@ -94,8 +101,9 @@ const PROVIDERS: Provider[] = [
     name: "CPA Rapid Offers",
     category: "Quick",
     rewardType: "Micro-Tasks",
+    icon3D: ASSETS_3D.giftLavender,
     icon: Gift,
-    iconBg: "bg-rose-500/20",
+    iconBg: "bg-rose-500/15",
     iconColor: "text-[#fb7185]",
     badge: "⚡ Instant",
     badgeType: "hot",
@@ -234,8 +242,12 @@ export function Offerwall() {
           </p>
         </div>
 
-        <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 shadow-lg">
-          <Layers className="w-6 h-6 text-sky-200" />
+        <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center shrink-0 shadow-lg overflow-hidden">
+          <img
+            src={ASSETS_3D.rocket}
+            alt="3D Rocket"
+            className="w-10 h-10 object-contain drop-shadow-md transform -rotate-12"
+          />
         </div>
       </div>
 
@@ -275,10 +287,16 @@ export function Offerwall() {
               onClick={() => handleProviderClick(provider)}
               className="card-glass-dark p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-sky-500/40 transition-all duration-200 group active:bg-[#0f1d3d]"
             >
-              {/* Provider Logo / Badge */}
-              <div className={`w-11 h-11 rounded-xl ${provider.iconBg} ${provider.iconColor} flex items-center justify-center shrink-0 border border-white/10 shadow-sm`}>
+              {/* Provider 3D Logo / Badge */}
+              <div className={`w-11 h-11 rounded-xl ${provider.iconBg} flex items-center justify-center shrink-0 border border-white/10 shadow-sm overflow-hidden`}>
                 {isLoading ? (
                   <Loader2 className="w-5 h-5 animate-spin text-[#38bdf8]" />
+                ) : provider.icon3D ? (
+                  <img
+                    src={provider.icon3D}
+                    alt={provider.name}
+                    className="w-8 h-8 object-contain rounded-lg drop-shadow-sm"
+                  />
                 ) : (
                   <Icon className="w-5 h-5" />
                 )}

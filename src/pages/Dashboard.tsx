@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { Link, useNavigate } from "react-router-dom";
 import { tgHaptics } from "../lib/telegram";
-import { TelegramWalletGraphic, GiftBoxGraphic } from "../components/TelegramWalletGraphic";
+import { ASSETS_3D } from "../lib/assets";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -59,14 +59,18 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Hero Balance Card matching Screenshot */}
+      {/* Hero Balance Card with 3D Wallet Icon */}
       <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
         {/* Ambient subtle blur glow inside */}
         <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Left: 3D Telegram Wallet Graphic */}
-        <div className="shrink-0 -ml-2">
-          <TelegramWalletGraphic className="w-28 h-28" />
+        {/* Left: User-Provided 3D Telegram Wallet with Gold Star Coins */}
+        <div className="shrink-0 -ml-2 -my-2 relative">
+          <img
+            src={ASSETS_3D.telegramWallet}
+            alt="3D Telegram Wallet"
+            className="w-28 h-28 object-contain drop-shadow-[0_12px_28px_rgba(0,136,204,0.65)] transform -rotate-2 hover:rotate-0 transition-transform duration-300"
+          />
         </div>
 
         {/* Right: Available Balance & Conversion */}
@@ -96,15 +100,19 @@ export function Dashboard() {
         </Link>
       </div>
 
-      {/* 4 Square Quick Action Buttons matching Screenshot */}
+      {/* 4 Square Quick Action Buttons with 3D Icons */}
       <div className="grid grid-cols-4 gap-2.5">
         <Link
           to="/offerwall"
           onClick={() => tgHaptics.selection()}
-          className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-sky-400/30 transition active:scale-95 group shadow-lg"
+          className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-sky-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-[#38bdf8] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Gift className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+            <img
+              src={ASSETS_3D.giftLavender}
+              alt="3D Offers"
+              className="w-8 h-8 object-contain rounded-lg"
+            />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Offers</span>
         </Link>
@@ -112,10 +120,10 @@ export function Dashboard() {
         <Link
           to="/tasks"
           onClick={() => tgHaptics.selection()}
-          className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-emerald-400/30 transition active:scale-95 group shadow-lg"
+          className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-emerald-400/40 transition active:scale-95 group shadow-lg"
         >
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-[#34d399] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <CheckCircle className="w-5 h-5" />
+            <CheckCircle className="w-6 h-6" />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Tasks</span>
         </Link>
@@ -123,10 +131,14 @@ export function Dashboard() {
         <Link
           to="/wallet"
           onClick={() => tgHaptics.selection()}
-          className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-amber-400/30 transition active:scale-95 group shadow-lg"
+          className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-amber-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[#fbbf24] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Wallet className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-sky-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+            <img
+              src={ASSETS_3D.telegramWallet}
+              alt="3D Wallet"
+              className="w-8 h-8 object-contain rounded-lg"
+            />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Withdraw</span>
         </Link>
@@ -134,24 +146,32 @@ export function Dashboard() {
         <Link
           to="/referrals"
           onClick={() => tgHaptics.selection()}
-          className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-purple-400/30 transition active:scale-95 group shadow-lg"
+          className="card-glass-dark p-2.5 rounded-2xl flex flex-col items-center justify-center gap-1.5 hover:border-purple-400/40 transition active:scale-95 group shadow-lg"
         >
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 text-[#c084fc] flex items-center justify-center group-hover:scale-105 transition-transform">
-            <Users className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center group-hover:scale-105 transition-transform overflow-hidden">
+            <img
+              src={ASSETS_3D.giftPurple}
+              alt="3D Friends Gift"
+              className="w-8 h-8 object-contain rounded-lg"
+            />
           </div>
           <span className="text-xs font-bold text-white tracking-tight">Friends</span>
         </Link>
       </div>
 
-      {/* Daily Check-In Banner matching Screenshot */}
+      {/* Daily Check-In Banner with 3D Rocket Icon */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0369a1] via-[#1d4ed8] to-[#2563eb] p-3.5 flex items-center justify-between border border-sky-400/30 shadow-lg">
         {/* Subtle sparkle effects */}
-        <div className="absolute right-14 top-2 text-sky-200/40 text-xs select-none">✦</div>
+        <div className="absolute right-16 top-2 text-sky-200/40 text-xs select-none">✦</div>
         <div className="absolute right-24 bottom-2 text-sky-200/40 text-[10px] select-none">✦</div>
 
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-[#0284c7]/30 border border-sky-400/40 text-sky-200 flex items-center justify-center shadow-inner shrink-0">
-            <Calendar className="w-5 h-5" />
+          <div className="w-11 h-11 rounded-2xl bg-[#0284c7]/30 border border-sky-400/40 flex items-center justify-center shadow-inner shrink-0 overflow-hidden">
+            <img
+              src={ASSETS_3D.rocket}
+              alt="3D Rocket"
+              className="w-9 h-9 object-contain drop-shadow-md transform -rotate-12"
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -175,7 +195,7 @@ export function Dashboard() {
         </button>
       </div>
 
-      {/* Featured Offers Section matching Screenshot */}
+      {/* Featured Offers Section */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
@@ -199,7 +219,6 @@ export function Dashboard() {
             onClick={() => tgHaptics.selection()}
             className="card-glow-blue p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-sky-400/50 transition-all active:scale-98"
           >
-            {/* Background wave decoration */}
             <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
               <BarChart3 className="w-24 h-24 text-sky-400" />
             </div>
@@ -234,7 +253,6 @@ export function Dashboard() {
             onClick={() => tgHaptics.selection()}
             className="card-glow-purple p-4 rounded-2xl relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-purple-400/50 transition-all active:scale-98"
           >
-            {/* Background gamepad decoration */}
             <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
               <Play className="w-24 h-24 text-purple-400" />
             </div>
@@ -265,7 +283,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Row matching Screenshot */}
+      {/* Stats Row */}
       <div className="grid grid-cols-2 gap-2.5">
         {/* Approved Tasks */}
         <div className="card-glass-dark p-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden">
@@ -283,7 +301,7 @@ export function Dashboard() {
           <TrendingUp className="w-6 h-6 text-sky-500/30" />
         </div>
 
-        {/* Pending Review */}
+        {/* Pending Review with 3D Coin Stack */}
         <div className="card-glass-dark p-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-[#fbbf24] flex items-center justify-center border border-amber-500/20 shrink-0">
@@ -300,13 +318,17 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Invite Friends & Earn Banner matching Screenshot */}
+      {/* Invite Friends & Earn Banner with 3D Purple Gift Box Icon */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4c1d95] via-[#3b0764] to-[#1e1b4b] border border-purple-500/30 p-4 flex items-center justify-between shadow-xl">
         {/* Sparkles */}
         <div className="absolute left-1/3 top-2 text-purple-300/40 text-xs">✦</div>
 
         <div className="flex items-center gap-3">
-          <GiftBoxGraphic className="w-12 h-12 shrink-0" />
+          <img
+            src={ASSETS_3D.giftPurple}
+            alt="3D Purple Gift Box"
+            className="w-13 h-13 object-contain drop-shadow-[0_8px_16px_rgba(168,85,247,0.5)] shrink-0"
+          />
           <div>
             <h3 className="text-sm font-bold text-white tracking-tight">
               Invite Friends & Earn

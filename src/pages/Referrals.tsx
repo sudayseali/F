@@ -4,7 +4,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { tgHaptics, openTgLink, tgBackButton } from "../lib/telegram";
-import { GiftBoxGraphic } from "../components/TelegramWalletGraphic";
+import { ASSETS_3D } from "../lib/assets";
 
 export function Referrals() {
   const navigate = useNavigate();
@@ -83,7 +83,11 @@ export function Referrals() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl pointer-events-none" />
 
         <div className="mx-auto mb-2 flex justify-center">
-          <GiftBoxGraphic className="w-16 h-16" />
+          <img
+            src={ASSETS_3D.giftPurple}
+            alt="3D Purple Gift Box"
+            className="w-20 h-20 object-contain drop-shadow-[0_12px_24px_rgba(168,85,247,0.55)]"
+          />
         </div>
 
         <h2 className="text-xl font-black text-white tracking-tight mb-1">

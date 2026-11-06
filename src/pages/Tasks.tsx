@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
+import { ASSETS_3D } from "../lib/assets";
 
 export function Tasks() {
   const navigate = useNavigate();
@@ -71,6 +72,27 @@ export function Tasks() {
 
   return (
     <div className="space-y-4 pb-6">
+      {/* 3D Bounty Banner */}
+      <div className="hero-balance-card p-4 relative overflow-hidden flex items-center justify-between">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-400/20 rounded-full blur-2xl pointer-events-none" />
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-sky-200 mb-1">
+            <Sparkles className="w-3 h-3" />
+            <span>Fast Bounties</span>
+          </div>
+          <h2 className="text-lg font-black text-white tracking-tight">Active Micro-Tasks</h2>
+          <p className="text-xs text-sky-100/80 mt-0.5">Complete simple tasks & earn instant balance</p>
+        </div>
+
+        <div className="shrink-0">
+          <img
+            src={ASSETS_3D.rocket}
+            alt="3D Rocket"
+            className="w-12 h-12 object-contain drop-shadow-md transform -rotate-12"
+          />
+        </div>
+      </div>
+
       {/* Header Search with glowing blue border on focus */}
       <div className="relative">
         <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
