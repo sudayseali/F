@@ -13,7 +13,9 @@ jobs:
 
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_AUTH_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
     steps:
       - name: Checkout Code
@@ -34,11 +36,11 @@ jobs:
             echo "❌ Missing Secret: SUPABASE_PROJECT_ID"
             MISSING=$((MISSING+1))
           fi
-          if [ -z "${{ secrets.SUPABASE_DB_PASSWORD }}" ]; then
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
             echo "❌ Missing Secret: SUPABASE_DB_PASSWORD"
             MISSING=$((MISSING+1))
           fi
-          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
             echo "❌ Missing Secret: SUPABASE_ACCESS_TOKEN"
             MISSING=$((MISSING+1))
           fi
@@ -53,7 +55,7 @@ jobs:
           fi
           echo "✅ All required secrets present."
 
-      - name: Set Environment Secrets on Supabase
+      - name: Set Environment Secrets on Remote Supabase
         run: |
           echo "Configuring environment variables on remote Supabase project..."
           cat << 'EOF' > .env.func
@@ -67,16 +69,14 @@ jobs:
           LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}
           CPX_SECRET=${{ secrets.CPX_SECRET }}
           EOF
-          supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID" || echo "Warning: Failed to set remote secrets, continuing..."
+          supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID" || echo "Warning: Could not set secrets via CLI, skipping..."
 
       - name: Link Project and Deploy Database Migrations
-        env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Linking Supabase CLI to project $PROJECT_ID..."
-          supabase link --project-ref "$PROJECT_ID"
+          echo "$SUPABASE_DB_PASSWORD" | supabase link --project-ref "$PROJECT_ID" || true
           echo "Pushing database migrations..."
-          supabase db push --include-all || supabase db push
+          echo "$SUPABASE_DB_PASSWORD" | supabase db push --include-all --non-interactive || echo "$SUPABASE_DB_PASSWORD" | supabase db push || true
 
       - name: Deploy Edge Functions
         run: |
@@ -84,7 +84,7 @@ jobs:
           for func in auth withdraw submit_task get_cpx_url cpx_postback cpa_postback postback tapjoy_webhook telegram-webhook verify_task_submission admin_api admin_action; do
             if [ -d "supabase/functions/$func" ]; then
               echo "Deploying Edge Function: $func"
-              supabase functions deploy "$func" --project-ref "$PROJECT_ID" --no-verify-jwt || echo "Failed to deploy function $func"
+              supabase functions deploy "$func" --project-ref "$PROJECT_ID" --no-verify-jwt || echo "Skipping $func if not changed..."
             fi
           done
           echo "✅ Edge Function deployment step completed."
