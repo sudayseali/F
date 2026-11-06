@@ -74,9 +74,9 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           echo "Linking Supabase CLI to project $PROJECT_ID..."
-          supabase link --project-ref "$PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+          supabase link --project-ref "$PROJECT_ID"
           echo "Pushing database migrations..."
-          supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all --non-interactive || supabase db push -p "$SUPABASE_DB_PASSWORD"
+          supabase db push --include-all || supabase db push
 
       - name: Deploy Edge Functions
         run: |
