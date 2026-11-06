@@ -91,7 +91,7 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Maximum withdrawal amount is $5,000.00 per request');
     END IF;
 
-    IF method NOT IN ('usdt', 'trx', 'payeer') THEN
+    IF method NOT IN ('usdt', 'usdt_bep20', 'trx', 'payeer') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid payment method.');
     END IF;
 

@@ -12,7 +12,7 @@ export interface TelegramUser {
   balance?: number;
 }
 
-export type PaymentMethod = "usdt" | "trx" | "payeer" | null;
+export type PaymentMethod = "usdt" | "usdt_bep20" | "trx" | "payeer" | null;
 
 export interface PayoutMethodInfo {
   id: PaymentMethod;

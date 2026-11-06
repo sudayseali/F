@@ -34,6 +34,12 @@ export function validatePayoutAddress(method: string, address: string): string {
     if (!tronRegex.test(clean)) {
       throw new AppError('Invalid TRON / USDT (TRC20) address format. Must begin with T and be 34 characters.', 400, 'INVALID_TRON_ADDRESS');
     }
+  } else if (method === 'usdt_bep20') {
+    // EVM / BNB Smart Chain address standard: 0x followed by 40 hex characters
+    const evmRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!evmRegex.test(clean)) {
+      throw new AppError('Invalid BNB Smart Chain (BEP20) address format. Must begin with 0x and be 42 characters long.', 400, 'INVALID_BEP20_ADDRESS');
+    }
   } else if (method === 'payeer') {
     // Payeer account format: P followed by 7 to 12 digits
     const payeerRegex = /^P[0-9]{7,12}$/;

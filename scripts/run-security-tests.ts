@@ -250,8 +250,8 @@ async function runAllSecurityTests() {
 
   // 2. Attempts to withdraw using another user's UUID
   {
-    const verifiedTokenUserId = "user_uuid_alice_1111";
-    const bodyAttemptedUserId = "user_uuid_bob_2222";
+    const verifiedTokenUserId: string = "user_uuid_alice_1111";
+    const bodyAttemptedUserId: string = "user_uuid_bob_2222";
     const isMismatch = verifiedTokenUserId !== bodyAttemptedUserId;
     const result = isMismatch ? "403 IDENTITY_MISMATCH" : "Allowed";
     recordTest("SEC-TEST-02", "Attempt to withdraw with another user's UUID", "Withdrawal Security", isMismatch, "403 IDENTITY_MISMATCH", result);
@@ -260,7 +260,7 @@ async function runAllSecurityTests() {
   // 3. Unauthorized wallet modifications
   {
     // Verification that client cannot execute direct UPDATE on wallet_balance
-    const userRole = "authenticated";
+    const userRole: string = "authenticated";
     const canUpdateBalanceDirectly = userRole === "service_role"; // RLS allows only service_role
     recordTest("SEC-TEST-03", "Unauthorized direct wallet modification", "Database Security", !canUpdateBalanceDirectly, "BLOCKED BY RLS", !canUpdateBalanceDirectly ? "BLOCKED BY RLS" : "Allowed");
   }
@@ -349,8 +349,8 @@ async function runAllSecurityTests() {
 
   // 11. RLS isolation between users
   {
-    const userA = "uuid-user-a";
-    const userB = "uuid-user-b";
+    const userA: string = "uuid-user-a";
+    const userB: string = "uuid-user-b";
     // Check if query filters strictly by auth.uid() = id
     const canUserAAccessUserB = userA === userB;
     recordTest("SEC-TEST-11", "RLS isolation between users", "Database Security", !canUserAAccessUserB, "ISOLATED (NO CROSS-ACCESS)", !canUserAAccessUserB ? "ISOLATED" : "Cross-Access Allowed");

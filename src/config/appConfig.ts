@@ -55,6 +55,14 @@ export const APP_CONFIG = {
         desc: "Direct Tether USD payout to your TRC20 wallet",
       },
       {
+        id: "usdt_bep20" as const,
+        name: "USDT (BEP20)",
+        min: 1.00,
+        network: "BNB Smart Chain (BEP20)",
+        placeholder: "0x1234567890abcdef1234567890abcdef12345678",
+        desc: "Direct Tether USD payout on BNB Smart Chain (BEP20)",
+      },
+      {
         id: "trx" as const,
         name: "TRON (TRX)",
         min: 1.00,

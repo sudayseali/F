@@ -237,10 +237,43 @@ export function Wallet() {
                   <div className="text-xs font-bold text-white flex items-center gap-1.5">
                     <span>USDT (TRC20)</span>
                     <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-extrabold px-1.5 py-0.2 rounded-md">
-                      Stablecoin
+                      TRON
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400">Direct Tether USD payout to your TRC20 wallet</div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
+              </div>
+            </div>
+
+            {/* USDT (BEP20 - BNB Smart Chain) */}
+            <div
+              onClick={() => {
+                tgHaptics.impact("light");
+                setMethod("usdt_bep20");
+              }}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                method === "usdt_bep20"
+                  ? "bg-amber-500/15 border-amber-400 text-white shadow-lg shadow-amber-500/10"
+                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#f59e0b] via-[#d97706] to-[#f59e0b] text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                  <svg className="w-6 h-6 fill-white" viewBox="0 0 24 24">
+                    <path d="M12 2l3.2 3.2-3.2 3.2-3.2-3.2L12 2zm0 13.6l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2zM2 12l3.2-3.2 3.2 3.2-3.2 3.2L2 12zm13.6 0l3.2-3.2 3.2 3.2-3.2 3.2 3.2-3.2zM12 8.8l3.2 3.2-3.2 3.2-3.2-3.2 3.2-3.2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>USDT (BEP20)</span>
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-extrabold px-1.5 py-0.2 rounded-md">
+                      BNB Chain
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">Direct Tether USD payout on BNB Smart Chain</div>
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -336,6 +369,8 @@ export function Wallet() {
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
                   {method === "usdt"
                     ? "USDT Address (TRC20)"
+                    : method === "usdt_bep20"
+                    ? "USDT Address (BEP20 / BNB Smart Chain 0x...)"
                     : method === "trx"
                     ? "TRON (TRX) Wallet Address"
                     : "Payeer Account Number (P...)"}
