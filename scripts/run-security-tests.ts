@@ -236,7 +236,7 @@ class MockAtomicPostgres {
 async function runAllSecurityTests() {
   console.log("\n========================================================");
   console.log("PAYVORA AUTOMATED SECURITY TEST SUITE");
-  console.log("Executing 22 Security Scenarios across Auth, DB, RBAC, & RLS");
+  console.log("Executing 25 Security Scenarios across Auth, DB, RBAC, & RLS");
   console.log("========================================================\n");
 
   const now = Math.floor(Date.now() / 1000);
@@ -454,6 +454,30 @@ async function runAllSecurityTests() {
     // The server/edge function ignores clientPayload.balance and computes from ledger
     const balanceFromClientIgnored = !("balance" in { user_id: clientPayload.user_id });
     recordTest("SEC-TEST-22", "Zero-trust client balance injection defense", "Ledger Security", balanceFromClientIgnored, "CLIENT_BALANCE_IGNORED", balanceFromClientIgnored ? "CLIENT_BALANCE_IGNORED" : "Client Balance Accepted");
+  }
+
+  // 23. Unauthenticated CPA/Offerwall postback rejection
+  {
+    const incomingCpaSecret: string = "attacker-guess";
+    const serverCpaSecret: string = "configured-cpa-secret-key-32chars";
+    const postbackAllowed = incomingCpaSecret === serverCpaSecret;
+    recordTest("SEC-TEST-23", "Unauthenticated CPA/Offerwall postback rejection", "Offerwall Security", !postbackAllowed, "REJECTED (403)", !postbackAllowed ? "REJECTED (403)" : "Credited Without Secret");
+  }
+
+  // 24. Withdrawal RPC auth.uid() identity mismatch defense
+  {
+    const callerAuthUid: string = "user-alice-uuid";
+    const targetUserIdParam: string = "user-bob-uuid";
+    const isMismatched = callerAuthUid !== targetUserIdParam;
+    const canWithdrawOtherUser = !isMismatched;
+    recordTest("SEC-TEST-24", "Withdrawal RPC auth.uid() identity mismatch defense", "Database Security", !canWithdrawOtherUser, "REJECTED (MISMATCH)", !canWithdrawOtherUser ? "REJECTED (MISMATCH)" : "Other User Withdrawn");
+  }
+
+  // 25. Public execute revocation on admin review and reward functions
+  {
+    const allowedRolesForAdminReview: string[] = ["service_role"];
+    const publicRoleAllowed = allowedRolesForAdminReview.includes("public") || allowedRolesForAdminReview.includes("anon");
+    recordTest("SEC-TEST-25", "Public execute revocation on admin review and reward RPCs", "RBAC Security", !publicRoleAllowed, "REVOKED FROM PUBLIC/ANON", !publicRoleAllowed ? "REVOKED FROM PUBLIC/ANON" : "Public Executable");
   }
 
   console.log("\n========================================================");

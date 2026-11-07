@@ -30,7 +30,7 @@ export function Tasks() {
           const mapped = data.filter(task => {
              if (task.allowed_countries && Array.isArray(task.allowed_countries) && task.allowed_countries.length > 0) {
                  if (!task.allowed_countries.includes('International')) {
-                     if (!location) return false;
+                     if (!location) return true;
                      return task.allowed_countries.includes(location.country) || task.allowed_countries.includes(location.continent);
                  }
              }

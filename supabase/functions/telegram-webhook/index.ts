@@ -8,6 +8,15 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Security: Verify Telegram Webhook secret token if configured
+  const webhookSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
+  if (webhookSecret) {
+    const incomingSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    if (!incomingSecret || incomingSecret !== webhookSecret) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
   try {
     const update = await req.json();
     console.log("Received update:", JSON.stringify(update));

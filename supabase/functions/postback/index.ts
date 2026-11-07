@@ -3,6 +3,7 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -29,7 +30,7 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.currency_amount || "0");
       transactionId = params.transaction_id || "";
       const ayetSecret = Deno.env.get("AYET_SECRET");
-      if (ayetSecret && params.secret === ayetSecret) {
+      if (ayetSecret && params.secret && constantTimeCompare(params.secret, ayetSecret)) {
         isSecure = true;
       }
     }
@@ -39,7 +40,7 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.amount || "0");
       transactionId = params.tx_id || "";
       const toroxSecret = Deno.env.get("TOROX_SECRET");
-      if (!toroxSecret || params.secret === toroxSecret) {
+      if (toroxSecret && params.secret && constantTimeCompare(params.secret, toroxSecret)) {
         isSecure = true;
       }
     }
@@ -49,7 +50,7 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.points || "0");
       transactionId = params.tx_id || "";
       const adgateSecret = Deno.env.get("ADGATE_SECRET");
-      if (!adgateSecret || params.secret === adgateSecret) {
+      if (adgateSecret && params.secret && constantTimeCompare(params.secret, adgateSecret)) {
         isSecure = true;
       }
     }
@@ -59,7 +60,7 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.reward || "0");
       transactionId = params.transactionId || "";
       const lootablySecret = Deno.env.get("LOOTABLY_SECRET");
-      if (!lootablySecret || params.hash === lootablySecret) {
+      if (lootablySecret && params.hash && constantTimeCompare(params.hash, lootablySecret)) {
         isSecure = true;
       }
     }
@@ -69,15 +70,20 @@ serve(async (req) => {
       rewardAmount = parseFloat(params.amount_local || "0");
       transactionId = params.trans_id || "";
       const cpxSecret = Deno.env.get("CPX_SECRET");
-      if (!cpxSecret || params.secure_hash === cpxSecret) {
+      if (cpxSecret && params.secure_hash && constantTimeCompare(params.secure_hash, cpxSecret)) {
         isSecure = true;
       }
     } else {
-      // Generic fallback
-      rawUserId = params.user_id || params.subid || "";
-      rewardAmount = parseFloat(params.payout || params.amount || "0");
-      transactionId = params.tx_id || params.trans_id || `gen_${Date.now()}`;
-      isSecure = true;
+      // Generic fallback: MUST supply a valid server generic secret
+      const genericSecret = Deno.env.get("OFFERWALL_GENERIC_SECRET");
+      if (genericSecret && params.secret && constantTimeCompare(params.secret, genericSecret)) {
+        rawUserId = params.user_id || params.subid || "";
+        rewardAmount = parseFloat(params.payout || params.amount || "0");
+        transactionId = params.tx_id || params.trans_id || `gen_${Date.now()}`;
+        isSecure = true;
+      } else {
+        isSecure = false;
+      }
     }
 
     if (!isSecure) {

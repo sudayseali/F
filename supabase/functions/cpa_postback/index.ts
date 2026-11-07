@@ -1,13 +1,16 @@
 // supabase/functions/cpa_postback/index.ts
-// Secure CPA network postback receiver with idempotency and atomic crediting
+// Secure CPA network postback receiver with idempotency, signature verification, and atomic crediting
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 );
+
+const CPA_SECRET = Deno.env.get("CPA_SECRET") || "";
 
 serve(async (req) => {
   try {
@@ -16,6 +19,16 @@ serve(async (req) => {
     const payout = parseFloat(url.searchParams.get("payout") || url.searchParams.get("amount") || "0");
     const network = url.searchParams.get("network") || "cpa";
     const txId = url.searchParams.get("tx_id") || url.searchParams.get("conversion_id") || url.searchParams.get("id");
+    const providedSecret = url.searchParams.get("secret") || req.headers.get("x-cpa-secret") || "";
+
+    // 0. Enforce Secret Verification
+    if (CPA_SECRET) {
+      if (!providedSecret || !constantTimeCompare(providedSecret, CPA_SECRET)) {
+        return new Response("403 Forbidden - Invalid CPA Security Secret", { status: 403 });
+      }
+    } else if (Deno.env.get("ENVIRONMENT") === "production") {
+      return new Response("500 Server Misconfiguration - CPA_SECRET not set", { status: 500 });
+    }
 
     if (!rawUserId) {
       return new Response("Missing SubID / User ID", { status: 400 });

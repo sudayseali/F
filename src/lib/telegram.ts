@@ -46,11 +46,17 @@ export const tgHaptics = {
 };
 
 // Telegram Back Button management
+let activeBackCallback: (() => void) | null = null;
+
 export const tgBackButton = {
   show: (onClick: () => void) => {
     try {
       const tg = getTelegramWebApp();
       if (tg?.BackButton) {
+        if (activeBackCallback) {
+          tg.BackButton.offClick(activeBackCallback);
+        }
+        activeBackCallback = onClick;
         tg.BackButton.show();
         tg.BackButton.onClick(onClick);
       }
@@ -62,9 +68,11 @@ export const tgBackButton = {
     try {
       const tg = getTelegramWebApp();
       if (tg?.BackButton) {
-        if (callbackToRemove) {
-          tg.BackButton.offClick(callbackToRemove);
+        const toRemove = callbackToRemove || activeBackCallback;
+        if (toRemove) {
+          tg.BackButton.offClick(toRemove);
         }
+        activeBackCallback = null;
         tg.BackButton.hide();
       }
     } catch {

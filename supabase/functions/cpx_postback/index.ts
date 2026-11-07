@@ -29,15 +29,31 @@ serve(async (req) => {
     }
 
     // 1. Signature Verification (if secret configured)
-    if (CPX_SECRET && secureHash) {
+    if (CPX_SECRET) {
+      if (!secureHash) {
+        return new Response("403 Forbidden - Missing required CPX hash parameter", { status: 403 });
+      }
+
       const dataToHash = `${transId}-${CPX_SECRET}`;
       const encoder = new TextEncoder();
       const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(dataToHash));
       const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
       
-      // Allow if matches or if legacy MD5
-      if (secureHash.length === 64 && secureHash.toLowerCase() !== hashHex.toLowerCase()) {
+      let match = secureHash.toLowerCase() === hashHex.toLowerCase();
+      // Also support MD5 if provider uses legacy MD5 hashing
+      if (!match) {
+        const md5Buffer = await crypto.subtle.digest("MD5", encoder.encode(dataToHash)).catch(() => null);
+        if (md5Buffer) {
+          const md5Hex = Array.from(new Uint8Array(md5Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+          if (secureHash.toLowerCase() === md5Hex.toLowerCase()) {
+            match = true;
+          }
+        }
+      }
+
+      if (!match) {
         console.warn(`[CPX_SECURITY_WARNING] Signature mismatch for trans_id ${transId}`);
+        return new Response("403 Forbidden - Invalid signature hash", { status: 403 });
       }
     }
 
