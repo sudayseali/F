@@ -196,12 +196,27 @@ export function Offerwall() {
       setActiveOfferwallUrl(toroxUrl);
       setIframeLoading(true);
       setLoadingProvider(null);
-    } else {
-      // General provider launcher
-      const demoUrl = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${APP_CONFIG.offerwalls.cpx.appId}&ext_user_id=${userId}`;
-      setActiveProviderName(provider.name);
-      setActiveOfferwallUrl(demoUrl);
+    } else if (provider.id === "adgate") {
+      setLoadingProvider("adgate");
+      const adgateUrl = `https://wall.adgaterewards.com/naPR/${userId}`;
+      setActiveProviderName("AdGate Media");
+      setActiveOfferwallUrl(adgateUrl);
       setIframeLoading(true);
+      setLoadingProvider(null);
+    } else if (provider.id === "lootably") {
+      setLoadingProvider("lootably");
+      const lootablyUrl = `https://wall.lootably.com/?placementID=24128&sid=${userId}`;
+      setActiveProviderName("Lootably");
+      setActiveOfferwallUrl(lootablyUrl);
+      setIframeLoading(true);
+      setLoadingProvider(null);
+    } else {
+      setLoadingProvider(provider.id);
+      const realProviderUrl = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${APP_CONFIG.offerwalls.cpx.appId}&ext_user_id=${userId}&subid_1=${encodeURIComponent(provider.id)}`;
+      setActiveProviderName(provider.name);
+      setActiveOfferwallUrl(realProviderUrl);
+      setIframeLoading(true);
+      setLoadingProvider(null);
     }
   };
 

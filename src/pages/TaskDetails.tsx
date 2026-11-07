@@ -78,17 +78,21 @@ export function TaskDetails() {
         body: {
           task_id: id,
           proof: publicUrl,
+          proof_text: publicUrl,
+          proof_data: publicUrl,
           telegram_username: username
         }
       });
 
       if (submitError) throw submitError;
 
+      tgHaptics.notification("success");
       setStatus('success');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Verification submitted for manual review.');
-      setStatus('success');
+      tgHaptics.notification("error");
+      setError(err.message || 'Submission failed. Please try again.');
+      setStatus('idle');
     }
   };
 

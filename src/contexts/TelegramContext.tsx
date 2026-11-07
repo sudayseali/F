@@ -141,15 +141,32 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           console.error("Server authentication failed:", e);
         }
       } else {
-        // In browser development / preview mode outside Telegram
-        const demoUser: TelegramUser = {
-          id: 789456123,
-          first_name: "Demo",
-          last_name: "User",
-          username: "telegram_user",
-          balance: 14.50
-        };
-        setUser(demoUser);
+        // Outside Telegram (e.g. web browser preview)
+        // Fetch real database test record instead of hardcoded demo data
+        try {
+          const { data: realUser } = await supabase
+            .from('users')
+            .select('id, telegram_id, username, first_name, last_name, wallet_balance')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (realUser) {
+            setUser({
+              id: realUser.telegram_id,
+              uuid: realUser.id,
+              username: realUser.username || "user",
+              first_name: realUser.first_name || "User",
+              last_name: realUser.last_name,
+              balance: Number(realUser.wallet_balance || 0)
+            });
+          } else {
+            // Unconnected state awaiting Telegram launch
+            setUser(null);
+          }
+        } catch {
+          setUser(null);
+        }
       }
       setIsReady(true);
     };
@@ -183,21 +200,55 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
+    const connectRealDatabaseAccount = async () => {
+      try {
+        const { data: realUser } = await supabase
+          .from('users')
+          .select('id, telegram_id, username, first_name, last_name, wallet_balance')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (realUser) {
+          setUser({
+            id: realUser.telegram_id,
+            uuid: realUser.id,
+            username: realUser.username || "user",
+            first_name: realUser.first_name || "User",
+            last_name: realUser.last_name,
+            balance: Number(realUser.wallet_balance || 0)
+          });
+        }
+      } catch (err) {
+        console.error("Failed to connect database account:", err);
+      }
+    };
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#0e1621] text-center">
         <div className="w-16 h-16 bg-[#2481cc]/15 text-[#2481cc] rounded-2xl flex items-center justify-center mb-6 border border-[#2481cc]/25 shadow-lg">
           <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.84 1.15-5.06 3.28-.47.33-.89.49-1.27.48-.41-.01-1.21-.24-1.8-.43-.49-.16-.88-.24-.85-.51.02-.14.22-.29.62-.46 2.44-1.06 4.07-1.74 4.88-2.07 2.32-.97 2.8-1.14 3.12-1.15.07 0 .22.02.3.09.07.06.09.14.1.23-.01.07-.01.12-.02.21z"/></svg>
         </div>
-        <h1 className="text-xl font-bold text-white mb-2">Telegram Mini App</h1>
-        <p className="text-slate-400 text-sm max-w-xs mb-6">
-          Open this app through your Telegram bot or click below to launch preview.
+        <h1 className="text-xl font-black text-white mb-2">Payvora Telegram App</h1>
+        <p className="text-slate-400 text-xs max-w-xs mb-6 leading-relaxed">
+          Ka fur barnaamijka gudaha bot-kaaga rasmiga ah ee Telegram si aad si toos ah ugu xidhanto akoonkaaga dhabta ah.
         </p>
-        <button
-          onClick={() => setUser({ id: 123456789, first_name: "Demo", username: "user", balance: 14.50 })}
-          className="px-6 py-2.5 bg-brand text-white text-sm font-semibold rounded-xl shadow-md"
-        >
-          Open Preview Mode
-        </button>
+        <div className="flex flex-col gap-2.5 w-full max-w-xs">
+          <a
+            href="https://t.me/PayvoraBot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2"
+          >
+            <span>🚀 Open in Telegram Bot</span>
+          </a>
+          <button
+            onClick={connectRealDatabaseAccount}
+            className="w-full py-2.5 bg-white/10 hover:bg-white/15 text-slate-300 text-xs font-semibold rounded-xl border border-white/10 transition active:scale-95"
+          >
+            Connect Real Database Profile
+          </button>
+        </div>
       </div>
     );
   }

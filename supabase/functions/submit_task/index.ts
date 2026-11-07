@@ -36,14 +36,14 @@ serve(async (req: Request) => {
     const userId = verifiedUser.id;
 
     const body = await req.json().catch(() => ({}));
-    const { task_id, proof_text, proof_data } = body;
+    const { task_id, proof_text, proof_data, proof, proof_url } = body;
+    const proofContent = (proof_text || proof_data || proof || proof_url || "").trim();
 
     // 2. Input Validation
     if (!task_id || !isValidUuid(task_id)) {
       throw new AppError("A valid task ID is required.", 400, "INVALID_TASK_ID");
     }
 
-    const proofContent = (proof_text || proof_data || "").trim();
     if (!proofContent || proofContent.length < 3) {
       throw new AppError("Task proof is required (text or URL).", 400, "MISSING_PROOF");
     }

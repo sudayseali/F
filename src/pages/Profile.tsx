@@ -11,8 +11,10 @@ import { APP_CONFIG } from "../config/appConfig";
 export function Profile() {
   const { user } = useTelegram();
   const navigate = useNavigate();
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Cabdl";
-  const initial = displayName.charAt(0).toUpperCase();
+  const displayName = user?.first_name 
+    ? `${user.first_name} ${user.last_name || ""}`.trim() 
+    : (user?.username ? `@${user.username}` : "Payvora Member");
+  const initial = displayName.charAt(0).toUpperCase() || "P";
 
   const menuItems = [
     {
@@ -75,7 +77,7 @@ export function Profile() {
         </div>
 
         <p className="text-xs text-slate-400 mb-2">
-          Telegram ID: {user?.id || "8804412131"}
+          Telegram ID: {user?.id ? user.id.toString() : "Not Connected"}
         </p>
 
         <div className="inline-flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-bold text-emerald-400 shadow-sm">
@@ -89,7 +91,7 @@ export function Profile() {
         <div className="card-glass-dark p-3.5 rounded-2xl">
           <div className="text-[11px] text-slate-400 font-medium mb-0.5">Account ID</div>
           <div className="text-sm font-mono font-bold text-white truncate">
-            {user?.id || "8804412131"}
+            {user?.id ? user.id.toString() : "—"}
           </div>
         </div>
 

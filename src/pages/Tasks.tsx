@@ -10,10 +10,11 @@ import type { TaskItem } from "../types";
 
 export function Tasks() {
   const navigate = useNavigate();
-  const { location } = useTelegram();
+  const { location, user } = useTelegram();
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState<TaskItem[]>([]);
+  const [userStats, setUserStats] = useState({ completed: 0, pending: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,6 +47,19 @@ export function Tasks() {
           }));
           setJobs(mapped);
         }
+
+        if (user?.uuid) {
+          const { data: subs } = await supabase
+            .from('submissions')
+            .select('status')
+            .eq('user_id', user.uuid);
+          if (subs) {
+            setUserStats({
+              completed: subs.filter(s => s.status === 'approved').length,
+              pending: subs.filter(s => s.status === 'pending').length,
+            });
+          }
+        }
       } catch (err) {
         console.error("Error fetching tasks:", err);
       } finally {
@@ -53,7 +67,7 @@ export function Tasks() {
       }
     }
     fetchTasks();
-  }, [location]);
+  }, [location, user?.uuid]);
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -150,7 +164,7 @@ export function Tasks() {
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <span className="text-[10px] text-slate-400 font-medium">Completed</span>
-            <span className="text-sm font-black text-white tabular-nums mt-0.5">12</span>
+            <span className="text-sm font-black text-white tabular-nums mt-0.5">{userStats.completed}</span>
           </div>
 
           {/* Card 2: Earned */}
@@ -159,16 +173,16 @@ export function Tasks() {
               <img src={ASSETS_3D.starCoin} alt="" className="w-4 h-4 object-contain" />
             </div>
             <span className="text-[10px] text-slate-400 font-medium">Earned</span>
-            <span className="text-sm font-black text-white tabular-nums mt-0.5">$24.50</span>
+            <span className="text-sm font-black text-white tabular-nums mt-0.5">${(user?.balance || 0).toFixed(2)}</span>
           </div>
 
-          {/* Card 3: This Week */}
+          {/* Card 3: Pending Review */}
           <div className="card-glass-dark p-3 rounded-2xl flex flex-col items-center justify-center text-center">
             <div className="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-300 flex items-center justify-center mb-1">
               <Clock className="w-4 h-4" />
             </div>
-            <span className="text-[10px] text-slate-400 font-medium">This Week</span>
-            <span className="text-sm font-black text-emerald-400 tabular-nums mt-0.5">+60%</span>
+            <span className="text-[10px] text-slate-400 font-medium">In Review</span>
+            <span className="text-sm font-black text-amber-400 tabular-nums mt-0.5">{userStats.pending}</span>
           </div>
         </div>
       </div>

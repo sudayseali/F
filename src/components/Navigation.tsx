@@ -15,8 +15,10 @@ const navItems = [
 export function Navigation() {
   const location = useLocation();
   const { user } = useTelegram();
-  const displayName = user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : "Cabdl";
-  const initial = displayName.charAt(0).toUpperCase();
+  const displayName = user?.first_name 
+    ? `${user.first_name} ${user.last_name || ""}`.trim() 
+    : (user?.username ? `@${user.username}` : "Payvora Member");
+  const initial = displayName.charAt(0).toUpperCase() || "P";
   const balance = user?.balance ?? 0;
 
   const handleTabClick = () => {

@@ -11,10 +11,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
+import { TelegramModal } from "../components/TelegramModal";
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useTelegram();
+  const { user, refreshUser } = useTelegram();
   const balance = user?.balance || 0;
   
   const [stats, setStats] = useState({
@@ -23,7 +24,21 @@ export function Dashboard() {
   });
   
   const [loading, setLoading] = useState(true);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [dailyClaimed, setDailyClaimed] = useState(false);
+
+  // Modal feedback state
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "info" | "error" | "success";
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info"
+  });
 
   useEffect(() => {
     async function fetchStats() {
@@ -36,7 +51,7 @@ export function Dashboard() {
         const { data: subs } = await supabase
           .from('submissions')
           .select('status')
-          .eq('worker_id', user.uuid);
+          .eq('user_id', user.uuid);
           
         if (subs) {
           setStats({
@@ -53,9 +68,49 @@ export function Dashboard() {
     fetchStats();
   }, [user?.uuid]);
 
-  const handleClaimDaily = () => {
+  const handleClaimDaily = async () => {
+    if (isClaiming || dailyClaimed) return;
     tgHaptics.impact("medium");
-    setDailyClaimed(true);
+    setIsClaiming(true);
+
+    try {
+      const res = await supabase.functions.invoke("daily_checkin", {});
+      
+      if (res.error) {
+        throw new Error(res.error.message || "Failed to claim daily check-in");
+      }
+
+      const resData = res.data;
+      if (resData?.success) {
+        setDailyClaimed(true);
+        await refreshUser();
+        tgHaptics.notification("success");
+        setModalState({
+          isOpen: true,
+          title: "Daily Reward Claimed! 🎉",
+          message: "You have received +50 Points ($0.05) credited directly to your Payvora wallet balance.",
+          type: "success"
+        });
+      } else {
+        const msg = resData?.error || "Daily reward already claimed today.";
+        setDailyClaimed(true);
+        setModalState({
+          isOpen: true,
+          title: "Daily Check-In",
+          message: msg,
+          type: "info"
+        });
+      }
+    } catch (err: any) {
+      setModalState({
+        isOpen: true,
+        title: "Daily Check-In",
+        message: err.message || "Could not claim daily reward right now. Please try again later.",
+        type: "error"
+      });
+    } finally {
+      setIsClaiming(false);
+    }
   };
 
   return (
@@ -191,12 +246,12 @@ export function Dashboard() {
 
         <button
           onClick={handleClaimDaily}
-          disabled={dailyClaimed}
+          disabled={dailyClaimed || isClaiming}
           className={`btn-cyan-glow px-5 py-2 rounded-xl text-xs font-extrabold text-white shrink-0 shadow-lg ${
-            dailyClaimed ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-95"
+            dailyClaimed || isClaiming ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-95"
           }`}
         >
-          {dailyClaimed ? "Claimed" : "Claim"}
+          {isClaiming ? "Claiming..." : dailyClaimed ? "Claimed" : "Claim"}
         </button>
       </div>
 
@@ -353,6 +408,14 @@ export function Dashboard() {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      <TelegramModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState(prev => ({ ...prev, isOpen: false }))}
+        title={modalState.title}
+        message={modalState.message}
+        type={modalState.type}
+      />
     </div>
   );
 }
