@@ -78,7 +78,25 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- Ensure columns exist if table was already created in earlier migration
-ALTER TABLE public.users ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users' 
+        AND column_name = 'balance'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'users' 
+        AND column_name = 'wallet_balance'
+    ) THEN
+        ALTER TABLE public.users ADD COLUMN wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+        UPDATE public.users SET wallet_balance = balance WHERE balance IS NOT NULL;
+    ELSE
+        ALTER TABLE public.users ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+    END IF;
+END $$;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_earned NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_withdrawn NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
@@ -143,7 +161,24 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
 );
 
 -- Ensure columns exist if table was already created in earlier migration
-ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS wallet_address TEXT;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'withdrawals' 
+        AND column_name = 'payment_details'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'withdrawals' 
+        AND column_name = 'wallet_address'
+    ) THEN
+        ALTER TABLE public.withdrawals RENAME COLUMN payment_details TO wallet_address;
+    ELSE
+        ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS wallet_address TEXT;
+    END IF;
+END $$;
 ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;
 ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS admin_note TEXT;
 ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS reviewed_by UUID;
@@ -201,9 +236,43 @@ CREATE TABLE IF NOT EXISTS public.submissions (
 );
 
 -- Ensure columns exist if table was already created in earlier migration
-ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS proof_text TEXT;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'submissions' 
+        AND column_name = 'worker_id'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'submissions' 
+        AND column_name = 'user_id'
+    ) THEN
+        ALTER TABLE public.submissions RENAME COLUMN worker_id TO user_id;
+    ELSE
+        ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE RESTRICT;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'submissions' 
+        AND column_name = 'proof'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'submissions' 
+        AND column_name = 'proof_text'
+    ) THEN
+        ALTER TABLE public.submissions RENAME COLUMN proof TO proof_text;
+    ELSE
+        ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS proof_text TEXT;
+    END IF;
+END $$;
 ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS admin_comment TEXT;
 ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS reviewed_by UUID;
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON public.submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_task_id ON public.submissions(task_id);
