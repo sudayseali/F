@@ -12,8 +12,7 @@ import { logAuditEvent } from "../_shared/audit-log.ts";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SUPABASE_JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET");
+const JWT_SECRET = Deno.env.get("JWT_SECRET") || Deno.env.get("SUPABASE_JWT_SECRET") || Deno.env.get("CUSTOM_JWT_SECRET");
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -45,8 +44,8 @@ serve(async (req: Request) => {
       throw new AppError("Server configuration error: TELEGRAM_BOT_TOKEN is not set.", 500, "CONFIG_ERROR");
     }
 
-    if (!SUPABASE_JWT_SECRET) {
-      throw new AppError("Server configuration error: SUPABASE_JWT_SECRET is not set.", 500, "CONFIG_ERROR");
+    if (!JWT_SECRET) {
+      throw new AppError("Server configuration error: JWT_SECRET is not set.", 500, "CONFIG_ERROR");
     }
 
     // 1. Cryptographic HMAC-SHA256 Verification with Clock Tolerance & Replay Check
@@ -138,7 +137,7 @@ serve(async (req: Request) => {
     }
 
     // 5. Issue Cryptographically Signed User JWT
-    const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
+    const secret = new TextEncoder().encode(JWT_SECRET);
     const jwt = await new jose.SignJWT({
       aud: "authenticated",
       role: "authenticated",

@@ -1,7 +1,7 @@
 // supabase/functions/_shared/errors.ts
 // Standardized error handling and responses
 
-import { corsHeaders } from './cors.ts';
+import { corsHeaders, getCorsHeaders } from './cors.ts';
 
 export class AppError extends Error {
   statusCode: number;
@@ -15,7 +15,7 @@ export class AppError extends Error {
   }
 }
 
-export function errorResponse(err: unknown): Response {
+export function errorResponse(err: unknown, req?: Request): Response {
   let message = 'An unexpected error occurred.';
   let statusCode = 500;
   let code = 'INTERNAL_ERROR';
@@ -32,6 +32,8 @@ export function errorResponse(err: unknown): Response {
 
   console.error(`[API_ERROR] ${code} (${statusCode}):`, message);
 
+  const headers = req ? getCorsHeaders(req) : corsHeaders;
+
   return new Response(
     JSON.stringify({
       success: false,
@@ -42,14 +44,16 @@ export function errorResponse(err: unknown): Response {
     {
       status: statusCode,
       headers: {
-        ...corsHeaders,
+        ...headers,
         'Content-Type': 'application/json',
       },
     }
   );
 }
 
-export function successResponse(data: unknown, statusCode = 200): Response {
+export function successResponse(data: unknown, statusCode = 200, req?: Request): Response {
+  const headers = req ? getCorsHeaders(req) : corsHeaders;
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -59,7 +63,7 @@ export function successResponse(data: unknown, statusCode = 200): Response {
     {
       status: statusCode,
       headers: {
-        ...corsHeaders,
+        ...headers,
         'Content-Type': 'application/json',
       },
     }

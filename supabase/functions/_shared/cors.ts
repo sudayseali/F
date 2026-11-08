@@ -20,6 +20,8 @@ export function isOriginAllowed(origin: string | null): boolean {
 
   const normalized = origin.trim().replace(/\/$/, '').toLowerCase();
 
+  if (normalized === 'null') return true;
+
   // 1. Check custom environment variable
   const envOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
     .split(',')
@@ -53,29 +55,27 @@ export function isOriginAllowed(origin: string | null): boolean {
 /**
  * Generates CORS headers tailored to the incoming request
  */
-export function getCorsHeaders(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin') || req.headers.get('origin');
-  const allowed = isOriginAllowed(origin);
+export function getCorsHeaders(req?: Request): Record<string, string> {
+  const origin = req?.headers?.get('Origin') || req?.headers?.get('origin');
+  const allowed = origin ? isOriginAllowed(origin) : true;
 
   const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': origin && allowed ? origin : '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-telegram-init-data',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Max-Age': '86400',
   };
 
-  if (origin && allowed) {
-    headers['Access-Control-Allow-Origin'] = origin;
+  if (origin && allowed && origin !== 'null') {
     headers['Access-Control-Allow-Credentials'] = 'true';
     headers['Vary'] = 'Origin';
-  } else if (!origin) {
-    // Non-browser request (e.g. server-to-server webhook)
-    headers['Access-Control-Allow-Origin'] = '*';
   }
 
   return headers;
 }
 
-export const corsHeaders = {
+export const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-telegram-init-data',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Max-Age': '86400',
@@ -86,14 +86,6 @@ export const corsHeaders = {
  */
 export function handleCors(req: Request): Response | null {
   if (req.method === 'OPTIONS') {
-    const origin = req.headers.get('Origin') || req.headers.get('origin');
-    if (origin && !isOriginAllowed(origin)) {
-      return new Response(JSON.stringify({ error: 'Origin not allowed by CORS policy' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
     const headers = getCorsHeaders(req);
     return new Response('ok', { headers });
   }

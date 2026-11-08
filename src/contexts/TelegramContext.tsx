@@ -86,31 +86,60 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         setUser(initialUserObj);
 
         try {
-          const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || 'https://placeholder.supabase.co';
-          const authController = new AbortController();
-          const authTimeoutId = setTimeout(() => authController.abort(), 6000);
-
           // All Telegram authentication MUST pass through the trusted server-side Edge Function
-          const res = await fetch(`${baseUrl}/functions/v1/auth`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+          const { data: authResponse, error: invokeErr } = await supabase.functions.invoke('auth', {
+            body: { 
               initData: tg.initData,
               start_param: tg.initDataUnsafe?.start_param 
-            }),
-            signal: authController.signal
+            }
           });
-          clearTimeout(authTimeoutId);
 
-          const authResponse = await res.json();
+          if (invokeErr) {
+            console.error("[TELEGRAM_AUTH_INVOKE_ERROR]", invokeErr);
+            // Attempt direct fetch with explicit apikey header as fallback
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            if (baseUrl && anonKey) {
+              const directRes = await fetch(`${baseUrl}/functions/v1/auth`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': anonKey,
+                  'Authorization': `Bearer ${anonKey}`
+                },
+                body: JSON.stringify({
+                  initData: tg.initData,
+                  start_param: tg.initDataUnsafe?.start_param
+                })
+              });
+              const directData = await directRes.json().catch(() => null);
+              if (directData && (directData.success || directData.data)) {
+                const token = directData.data?.access_token || directData.access_token;
+                const verifiedProfile = directData.data?.user || directData.user;
+                if (token) setSupabaseToken(token);
+                if (verifiedProfile) {
+                  setUser({
+                    id: verifiedProfile.telegram_id,
+                    uuid: verifiedProfile.id,
+                    username: verifiedProfile.username,
+                    first_name: verifiedProfile.first_name,
+                    last_name: verifiedProfile.last_name,
+                    balance: Number(verifiedProfile.wallet_balance || 0)
+                  });
+                }
+                setIsReady(true);
+                return;
+              }
+            }
+          }
 
-          if (authResponse.error === "VPN Blocked" || authResponse.isVpnBlock) {
+          if (authResponse?.error === "VPN Blocked" || authResponse?.isVpnBlock) {
             setIsVpnBlock(true);
             setIsReady(true);
             return;
           }
 
-          if (authResponse.success && authResponse.data) {
+          if (authResponse?.success && authResponse?.data) {
             const token = authResponse.data.access_token;
             const verifiedProfile = authResponse.data.user;
 
@@ -128,14 +157,14 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
                 balance: Number(verifiedProfile.wallet_balance || 0)
               });
             }
-          } else if (authResponse.success && authResponse.access_token) {
+          } else if (authResponse?.success && authResponse?.access_token) {
             // Support flat response structure
             setSupabaseToken(authResponse.access_token);
             if (authResponse.user_uuid) {
               await fetchUserData(authResponse.user_uuid);
             }
-          } else {
-            console.warn("Telegram authentication response:", authResponse.error || "Unauthenticated");
+          } else if (authResponse?.error) {
+            console.warn("Telegram authentication response:", authResponse.error);
           }
         } catch (e) {
           console.error("Server authentication failed:", e);

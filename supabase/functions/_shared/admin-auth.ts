@@ -30,18 +30,18 @@ export async function verifyAdminRequest(
   }
 
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const SUPABASE_JWT_SECRET = Deno.env.get('SUPABASE_JWT_SECRET');
+  const JWT_SECRET = Deno.env.get('JWT_SECRET') || Deno.env.get('SUPABASE_JWT_SECRET') || Deno.env.get('CUSTOM_JWT_SECRET');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!SUPABASE_JWT_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!JWT_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new AppError('Server configuration missing for authentication.', 500, 'CONFIG_ERROR');
   }
 
   // 1. Verify Cryptographic JWT Signature
   let payload: jose.JWTPayload;
   try {
-    const secret = new TextEncoder().encode(SUPABASE_JWT_SECRET);
+    const secret = new TextEncoder().encode(JWT_SECRET);
     const { payload: verifiedPayload } = await jose.jwtVerify(token, secret);
     payload = verifiedPayload;
   } catch (err: any) {

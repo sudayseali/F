@@ -60,21 +60,22 @@ jobs:
       - name: Set Environment Secrets on Remote Supabase
         run: |
           echo "Configuring environment variables on remote Supabase project..."
-          cat << 'EOF' > .env.func
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
-          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
-          AYET_SECRET=${{ secrets.AYET_SECRET }}
-          TOROX_SECRET=${{ secrets.TOROX_SECRET }}
-          ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}
-          LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}
-          CPX_SECRET=${{ secrets.CPX_SECRET }}
-          CPA_SECRET=${{ secrets.CPA_SECRET }}
-          TAPJOY_SECRET=${{ secrets.TAPJOY_SECRET }}
-          TELEGRAM_WEBHOOK_SECRET=${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          EOF
-          supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID" || echo "Warning: Could not set secrets via CLI, check Supabase permissions..."
+          > .env.func
+          [ -n "${{ secrets.SUPABASE_URL }}" ] && echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env.func
+          [ -n "${{ secrets.JWT_SECRET }}" ] && echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env.func
+          [ -n "${{ secrets.SUPABASE_JWT_SECRET }}" ] && echo "JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> .env.func
+          [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env.func
+          [ -n "${{ secrets.AYET_SECRET }}" ] && echo "AYET_SECRET=${{ secrets.AYET_SECRET }}" >> .env.func
+          [ -n "${{ secrets.TOROX_SECRET }}" ] && echo "TOROX_SECRET=${{ secrets.TOROX_SECRET }}" >> .env.func
+          [ -n "${{ secrets.ADGATE_SECRET }}" ] && echo "ADGATE_SECRET=${{ secrets.ADGATE_SECRET }}" >> .env.func
+          [ -n "${{ secrets.LOOTABLY_SECRET }}" ] && echo "LOOTABLY_SECRET=${{ secrets.LOOTABLY_SECRET }}" >> .env.func
+          [ -n "${{ secrets.CPX_SECRET }}" ] && echo "CPX_SECRET=${{ secrets.CPX_SECRET }}" >> .env.func
+          [ -n "${{ secrets.CPA_SECRET }}" ] && echo "CPA_SECRET=${{ secrets.CPA_SECRET }}" >> .env.func
+          [ -n "${{ secrets.TAPJOY_SECRET }}" ] && echo "TAPJOY_SECRET=${{ secrets.TAPJOY_SECRET }}" >> .env.func
+          [ -n "${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" ] && echo "TELEGRAM_WEBHOOK_SECRET=${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" >> .env.func
+          if [ -s .env.func ]; then
+            supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID" || echo "Warning: Could not set secrets via CLI, check Supabase permissions..."
+          fi
           rm -f .env.func
 
       - name: Link Project and Deploy Database Migrations
