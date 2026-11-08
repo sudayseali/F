@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure columns exist if table was already created in earlier migration
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_earned NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_withdrawn NUMERIC(12, 2) NOT NULL DEFAULT 0.00;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_users_telegram_id ON public.users(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_users_status ON public.users(status);
 
@@ -105,6 +112,13 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure columns exist if table was already created in earlier migration
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT UNIQUE;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS balance_before NUMERIC(12, 2);
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS balance_after NUMERIC(12, 2);
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS reference_id TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions(type);
 CREATE INDEX IF NOT EXISTS idx_transactions_idempotency ON public.transactions(idempotency_key);
@@ -127,6 +141,14 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
     requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ
 );
+
+-- Ensure columns exist if table was already created in earlier migration
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS wallet_address TEXT;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS admin_note TEXT;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS reviewed_by UUID;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_withdrawals_user_id ON public.withdrawals(user_id);
 CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON public.withdrawals(status);
@@ -151,6 +173,15 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Ensure columns exist if table was already created in earlier migration
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Other';
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS job_length INTEGER DEFAULT 5;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS max_completions INTEGER DEFAULT 100;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS current_completions INTEGER DEFAULT 0;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS target_url TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS proof_instructions TEXT;
+ALTER TABLE public.tasks ADD COLUMN IF NOT EXISTS allowed_countries TEXT[] DEFAULT '{"International"}';
+
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
 
 -- ----------------------------------------------------------------------------
@@ -168,6 +199,11 @@ CREATE TABLE IF NOT EXISTS public.submissions (
     submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_task_user_submission UNIQUE (task_id, user_id)
 );
+
+-- Ensure columns exist if table was already created in earlier migration
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS proof_text TEXT;
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS admin_comment TEXT;
+ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS reviewed_by UUID;
 
 CREATE INDEX IF NOT EXISTS idx_submissions_user_id ON public.submissions(user_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_task_id ON public.submissions(task_id);
