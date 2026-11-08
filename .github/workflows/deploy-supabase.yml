@@ -81,7 +81,7 @@ jobs:
           echo "Linking Supabase CLI to project $PROJECT_ID..."
           echo "$SUPABASE_DB_PASSWORD" | supabase link --project-ref "$PROJECT_ID"
           echo "Pushing database migrations..."
-          echo "$SUPABASE_DB_PASSWORD" | supabase db push --include-all --yes
+          supabase db push --remote --include-all --yes --password "$SUPABASE_DB_PASSWORD"
 
       - name: Deploy Edge Functions
         run: |
