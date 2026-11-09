@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase, setSupabaseToken } from '../lib/supabase';
+import { supabase, setSupabaseToken, getSupabaseToken, clearSupabaseToken } from '../lib/supabase';
 
 // Real user context with UUID and data
 interface TelegramUser {
@@ -23,16 +23,23 @@ export interface LocationData {
 interface TelegramContextType {
   user: TelegramUser | null;
   location: LocationData | null;
+  authError: string | null;
   refreshUser: () => Promise<void>;
 }
 
-const TelegramContext = createContext<TelegramContextType>({ user: null, location: null, refreshUser: async () => {} });
+const TelegramContext = createContext<TelegramContextType>({ 
+  user: null, 
+  location: null, 
+  authError: null, 
+  refreshUser: async () => {} 
+});
 
 export const useTelegram = () => useContext(TelegramContext);
 
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [location, setLocation] = useState<LocationData | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
@@ -94,8 +101,10 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
             }
           });
 
-          if (invokeErr) {
-            console.error("[TELEGRAM_AUTH_INVOKE_ERROR]", invokeErr);
+          let effectiveData = authResponse;
+
+          if (invokeErr || (!authResponse?.success && !authResponse?.data && !authResponse?.access_token)) {
+            console.error("[TELEGRAM_AUTH_INVOKE_ERROR]", invokeErr || authResponse);
             // Attempt direct fetch with explicit apikey header as fallback
             const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
             const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -113,35 +122,23 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
                 })
               });
               const directData = await directRes.json().catch(() => null);
-              if (directData && (directData.success || directData.data)) {
-                const token = directData.data?.access_token || directData.access_token;
-                const verifiedProfile = directData.data?.user || directData.user;
-                if (token) setSupabaseToken(token);
-                if (verifiedProfile) {
-                  setUser({
-                    id: verifiedProfile.telegram_id,
-                    uuid: verifiedProfile.id,
-                    username: verifiedProfile.username,
-                    first_name: verifiedProfile.first_name,
-                    last_name: verifiedProfile.last_name,
-                    balance: Number(verifiedProfile.wallet_balance || 0)
-                  });
-                }
-                setIsReady(true);
-                return;
+              if (directData && (directData.success || directData.data || directData.access_token)) {
+                effectiveData = directData;
+              } else if (directData?.error) {
+                effectiveData = directData;
               }
             }
           }
 
-          if (authResponse?.error === "VPN Blocked" || authResponse?.isVpnBlock) {
+          if (effectiveData?.error === "VPN Blocked" || effectiveData?.isVpnBlock) {
             setIsVpnBlock(true);
             setIsReady(true);
             return;
           }
 
-          if (authResponse?.success && authResponse?.data) {
-            const token = authResponse.data.access_token;
-            const verifiedProfile = authResponse.data.user;
+          if (effectiveData && (effectiveData.success || effectiveData.data || effectiveData.access_token)) {
+            const token = effectiveData.data?.access_token || effectiveData.access_token;
+            const verifiedProfile = effectiveData.data?.user || effectiveData.user;
 
             if (token) {
               setSupabaseToken(token);
@@ -156,18 +153,20 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
                 last_name: verifiedProfile.last_name,
                 balance: Number(verifiedProfile.wallet_balance || 0)
               });
+            } else if (effectiveData.user_uuid) {
+              await fetchUserData(effectiveData.user_uuid);
             }
-          } else if (authResponse?.success && authResponse?.access_token) {
-            // Support flat response structure
-            setSupabaseToken(authResponse.access_token);
-            if (authResponse.user_uuid) {
-              await fetchUserData(authResponse.user_uuid);
-            }
-          } else if (authResponse?.error) {
-            console.warn("Telegram authentication response:", authResponse.error);
+            setAuthError(null);
+          } else {
+            const errorMsg = effectiveData?.error || invokeErr?.message || "Failed to authenticate session with server.";
+            console.warn("Telegram authentication response:", errorMsg);
+            setAuthError(errorMsg);
+            clearSupabaseToken();
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Server authentication failed:", e);
+          setAuthError(e?.message || "Authentication error");
+          clearSupabaseToken();
         }
       } else {
         // Outside Telegram (e.g. web browser preview)
@@ -283,7 +282,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <TelegramContext.Provider value={{ user, location, refreshUser }}>
+    <TelegramContext.Provider value={{ user, location, authError, refreshUser }}>
       {children}
     </TelegramContext.Provider>
   );

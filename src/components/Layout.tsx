@@ -1,7 +1,11 @@
 import { Outlet } from "react-router-dom";
 import { Navigation } from "./Navigation";
+import { useTelegram } from "../contexts/TelegramContext";
+import { AlertTriangle } from "lucide-react";
 
 export function Layout() {
+  const { authError } = useTelegram();
+
   return (
     <div className="min-h-screen bg-[#030712] text-[#f8fafc] flex flex-col items-center relative overflow-x-hidden">
       {/* Background radial glows matching screenshot */}
@@ -14,6 +18,16 @@ export function Layout() {
       <div className="w-full max-w-md min-h-screen flex flex-col bg-[#030712] relative shadow-2xl">
         <Navigation />
         
+        {authError && (
+          <div className="mx-4 mt-2 p-3 bg-red-500/15 border border-red-500/30 rounded-xl text-red-200 text-xs flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <div className="flex-1">
+              <span className="font-semibold block">Authentication Required</span>
+              <span>{authError}. Please restart from @PayvoraBot.</span>
+            </div>
+          </div>
+        )}
+
         {/* Main Content Area */}
         <main className="flex-1 px-4 pt-3 pb-24 overflow-y-auto">
           <Outlet />

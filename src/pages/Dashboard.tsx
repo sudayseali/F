@@ -70,6 +70,18 @@ export function Dashboard() {
 
   const handleClaimDaily = async () => {
     if (isClaiming || dailyClaimed) return;
+
+    // Security Check: Guard against unauthenticated state
+    if (!user?.uuid) {
+      setModalState({
+        isOpen: true,
+        title: "Authentication Required",
+        message: "Please open Payvora via the official Telegram Bot (@PayvoraBot) to authenticate your session before claiming rewards.",
+        type: "error"
+      });
+      return;
+    }
+
     tgHaptics.impact("medium");
     setIsClaiming(true);
 
@@ -102,10 +114,14 @@ export function Dashboard() {
         });
       }
     } catch (err: any) {
+      const rawMsg = err.message || "";
+      const isAuthIssue = rawMsg.includes("INVALID_SESSION") || rawMsg.includes("JWS") || rawMsg.includes("Unauthorized");
       setModalState({
         isOpen: true,
-        title: "Daily Check-In",
-        message: err.message || "Could not claim daily reward right now. Please try again later.",
+        title: isAuthIssue ? "Session Expired" : "Daily Check-In",
+        message: isAuthIssue 
+          ? "Your Telegram session has expired or is invalid. Please restart the app from @PayvoraBot."
+          : (err.message || "Could not claim daily reward right now. Please try again later."),
         type: "error"
       });
     } finally {

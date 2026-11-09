@@ -36,16 +36,19 @@ export function constantTimeCompare(a: string, b: string): boolean {
 
 /**
  * Validates Telegram WebApp initData string using Web Cryptography API
+ * Supports official Telegram specification, modern Bot API 7+ (with signature parameter),
+ * and raw character preservation.
+ * 
  * @param initData Raw query string from window.Telegram.WebApp.initData
  * @param botToken Official bot token issued by BotFather
  * @param maxAgeSeconds Maximum allowed age of auth_date (default: 86400s / 24h)
- * @param clockToleranceSeconds Allowed future clock drift (default: 60s)
+ * @param clockToleranceSeconds Allowed future clock drift (default: 300s / 5m)
  */
 export async function verifyTelegramInitData(
   initData: string,
   botToken: string,
   maxAgeSeconds = 86400,
-  clockToleranceSeconds = 60
+  clockToleranceSeconds = 300
 ): Promise<VerificationResult> {
   if (!initData || typeof initData !== 'string' || initData.trim() === '') {
     return { valid: false, error: 'Missing or empty Telegram initData string', errorCode: 'MISSING_INIT_DATA' };
@@ -56,7 +59,13 @@ export async function verifyTelegramInitData(
   }
 
   try {
-    const urlParams = new URLSearchParams(initData);
+    // Strip leading hash fragments or prefix if forwarded from webview URL hash
+    let rawInitData = initData.trim().replace(/^#/, '');
+    if (rawInitData.startsWith('tgWebAppData=')) {
+      rawInitData = rawInitData.replace(/^tgWebAppData=/, '');
+    }
+
+    const urlParams = new URLSearchParams(rawInitData);
     const hash = urlParams.get('hash');
 
     if (!hash) {
@@ -80,7 +89,7 @@ export async function verifyTelegramInitData(
       return { valid: false, error: 'Invalid "auth_date" timestamp format', errorCode: 'INVALID_AUTH_DATE' };
     }
 
-    // Reject future timestamps outside clock tolerance
+    // Reject future timestamps outside clock tolerance (5 minutes drift allowed)
     if (authDateUnix > currentUnix + clockToleranceSeconds) {
       return { 
         valid: false, 
@@ -98,17 +107,29 @@ export async function verifyTelegramInitData(
       };
     }
 
-    const cleanBotToken = botToken.trim();
+    // Sanitize bot token (strip surrounding quotes and whitespace)
+    const cleanBotToken = botToken.trim().replace(/^["']|["']$/g, '').trim();
 
-    // 2. Sort all parameters alphabetically (excluding 'hash' and 'signature')
-    const pairs: string[] = [];
+    // 2. Prepare candidate dataCheckStrings:
+    // Candidate A: all keys except 'hash' (as in official @telegram-apps/init-data-node)
+    const pairsAll: string[] = [];
+    // Candidate B: all keys except 'hash' and 'signature' (for legacy or third-party detached signatures)
+    const pairsNoSig: string[] = [];
+
     urlParams.forEach((value, key) => {
-      if (key !== 'hash' && key !== 'signature') {
-        pairs.push(`${key}=${value}`);
+      if (key !== 'hash') {
+        pairsAll.push(`${key}=${value}`);
+        if (key !== 'signature') {
+          pairsNoSig.push(`${key}=${value}`);
+        }
       }
     });
-    pairs.sort();
-    const dataCheckString = pairs.join('\n');
+
+    pairsAll.sort();
+    pairsNoSig.sort();
+
+    const dataCheckStringA = pairsAll.join('\n');
+    const dataCheckStringB = pairsNoSig.join('\n');
 
     // 3. Derive Secret Key: HMAC-SHA256 of botToken with key "WebAppData"
     const encoder = new TextEncoder();
@@ -127,7 +148,7 @@ export async function verifyTelegramInitData(
       encoder.encode(cleanBotToken)
     );
 
-    // 4. Compute HMAC-SHA256 signature over data_check_string
+    // 4. Compute HMAC-SHA256 signature
     const hmacKey = await crypto.subtle.importKey(
       'raw',
       secretKeyBuffer,
@@ -136,18 +157,54 @@ export async function verifyTelegramInitData(
       ['sign']
     );
 
-    const signatureBuffer = await crypto.subtle.sign(
-      'HMAC',
-      hmacKey,
-      encoder.encode(dataCheckString)
-    );
+    const calculateHmacHex = async (dataStr: string): Promise<string> => {
+      const signatureBuffer = await crypto.subtle.sign(
+        'HMAC',
+        hmacKey,
+        encoder.encode(dataStr)
+      );
+      return Array.from(new Uint8Array(signatureBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    };
 
-    // Convert signature to hex
-    const hashArray = Array.from(new Uint8Array(signatureBuffer));
-    const calculatedHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    // Test Candidate A (standard / modern TMA)
+    const calculatedHashA = await calculateHmacHex(dataCheckStringA);
+    let matched = constantTimeCompare(calculatedHashA.toLowerCase(), hash.toLowerCase());
+
+    // If signature was present and candidate A failed, test Candidate B (excluding signature)
+    if (!matched && pairsNoSig.length !== pairsAll.length) {
+      const calculatedHashB = await calculateHmacHex(dataCheckStringB);
+      matched = constantTimeCompare(calculatedHashB.toLowerCase(), hash.toLowerCase());
+    }
+
+    // If still not matched, test raw string parsing to avoid URLSearchParams space/plus mangling
+    if (!matched) {
+      const rawParts = rawInitData.split('&');
+      const rawPairs: string[] = [];
+      for (const part of rawParts) {
+        const eqIdx = part.indexOf('=');
+        if (eqIdx !== -1) {
+          const k = decodeURIComponent(part.slice(0, eqIdx));
+          if (k !== 'hash') {
+            const rawVal = part.slice(eqIdx + 1);
+            try {
+              rawPairs.push(`${k}=${decodeURIComponent(rawVal)}`);
+            } catch {
+              rawPairs.push(`${k}=${rawVal}`);
+            }
+          }
+        }
+      }
+      if (rawPairs.length > 0) {
+        rawPairs.sort();
+        const rawHash = await calculateHmacHex(rawPairs.join('\n'));
+        matched = constantTimeCompare(rawHash.toLowerCase(), hash.toLowerCase());
+      }
+    }
 
     // Constant-time string comparison to prevent timing attacks
-    if (!constantTimeCompare(calculatedHash.toLowerCase(), hash.toLowerCase())) {
+    if (!matched) {
       return { 
         valid: false, 
         error: 'Cryptographic signature mismatch. Untrusted or tampered initData.', 
