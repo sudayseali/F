@@ -98,10 +98,12 @@ export async function verifyTelegramInitData(
       };
     }
 
-    // 2. Sort all parameters alphabetically (excluding 'hash')
+    const cleanBotToken = botToken.trim();
+
+    // 2. Sort all parameters alphabetically (excluding 'hash' and 'signature')
     const pairs: string[] = [];
     urlParams.forEach((value, key) => {
-      if (key !== 'hash') {
+      if (key !== 'hash' && key !== 'signature') {
         pairs.push(`${key}=${value}`);
       }
     });
@@ -122,7 +124,7 @@ export async function verifyTelegramInitData(
     const secretKeyBuffer = await crypto.subtle.sign(
       'HMAC',
       secretKeyMaterial,
-      encoder.encode(botToken)
+      encoder.encode(cleanBotToken)
     );
 
     // 4. Compute HMAC-SHA256 signature over data_check_string
