@@ -133,20 +133,21 @@ export async function verifyTelegramInitData(
 
     // 3. Derive Secret Key: HMAC-SHA256 of botToken with key "WebAppData"
     const encoder = new TextEncoder();
-    const keyData = encoder.encode('WebAppData');
-    const secretKeyMaterial = await crypto.subtle.importKey(
-      'raw',
-      keyData,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
+    const encoder = new TextEncoder();
 
-    const secretKeyBuffer = await crypto.subtle.sign(
-      'HMAC',
-      secretKeyMaterial,
-      encoder.encode(cleanBotToken)
-    );
+const secretKeyMaterial = await crypto.subtle.importKey(
+  'raw',
+  encoder.encode(cleanBotToken),
+  { name: 'HMAC', hash: 'SHA-256' },
+  false,
+  ['sign']
+);
+
+const secretKeyBuffer = await crypto.subtle.sign(
+  'HMAC',
+  secretKeyMaterial,
+  encoder.encode('WebAppData')
+);
 
     // 4. Compute HMAC-SHA256 signature
     const hmacKey = await crypto.subtle.importKey(
