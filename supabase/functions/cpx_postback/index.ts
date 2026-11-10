@@ -35,14 +35,14 @@ serve(async (req) => {
       }
 
       const dataToHash = `${transId}-${CPX_SECRET}`;
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(dataToHash));
+      const cpxEncoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", cpxEncoder.encode(dataToHash));
       const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
       
       let match = secureHash.toLowerCase() === hashHex.toLowerCase();
       // Also support MD5 if provider uses legacy MD5 hashing
       if (!match) {
-        const md5Buffer = await crypto.subtle.digest("MD5", encoder.encode(dataToHash)).catch(() => null);
+        const md5Buffer = await crypto.subtle.digest("MD5", cpxEncoder.encode(dataToHash)).catch(() => null);
         if (md5Buffer) {
           const md5Hex = Array.from(new Uint8Array(md5Buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
           if (secureHash.toLowerCase() === md5Hex.toLowerCase()) {

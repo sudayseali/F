@@ -10,9 +10,14 @@ import { validatePositiveAmount, validatePayoutAddress } from "../_shared/valida
 import { checkRateLimit } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, key);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -23,7 +28,7 @@ serve(async (req: Request) => {
   // Rate limiting (max 5 withdrawal requests per minute per IP)
   const rate = checkRateLimit(`wd_${clientIp}`, 5, 60000);
   if (!rate.allowed) {
-    return errorResponse(new AppError("Too many withdrawal requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"));
+    return errorResponse(new AppError("Too many withdrawal requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"), req);
   }
 
   try {
@@ -81,6 +86,7 @@ serve(async (req: Request) => {
 
     // 5. Call Atomic Database RPC with Row Locking (FOR UPDATE)
     // Ensures concurrent requests cannot double-spend or create negative balances
+    const supabaseAdmin = getSupabaseAdmin();
     const { data: dbResult, error: rpcError } = await supabaseAdmin.rpc("request_withdrawal", {
       user_id_param: authenticatedUserId,
       amount_param: cleanAmount,
@@ -113,9 +119,9 @@ serve(async (req: Request) => {
       message: "Withdrawal request submitted successfully and queued for review.",
       withdrawal_id: dbResult.withdrawal_id,
       new_balance: dbResult.new_balance
-    });
+    }, 200, req);
 
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, req);
   }
 });

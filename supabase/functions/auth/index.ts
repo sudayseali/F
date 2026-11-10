@@ -10,12 +10,14 @@ import { checkRateLimit } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
-const BOT_TOKEN = (Deno.env.get("TELEGRAM_BOT_TOKEN") || "").trim();
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const JWT_SECRET = Deno.env.get("JWT_SECRET") || Deno.env.get("SUPABASE_JWT_SECRET") || Deno.env.get("CUSTOM_JWT_SECRET");
-
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !serviceKey) {
+    throw new AppError("Server configuration missing: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured.", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, serviceKey);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -26,13 +28,16 @@ serve(async (req: Request) => {
   // Rate Limiting: 20 auth attempts per minute per IP
   const rate = checkRateLimit(`auth_${clientIp}`, 20, 60000);
   if (!rate.allowed) {
-    return errorResponse(new AppError("Too many authentication attempts. Please try again later.", 429, "RATE_LIMIT_EXCEEDED"));
+    return errorResponse(new AppError("Too many authentication attempts. Please try again later.", 429, "RATE_LIMIT_EXCEEDED"), req);
   }
 
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
     }
+
+    const BOT_TOKEN = (Deno.env.get("TELEGRAM_BOT_TOKEN") || "").trim().replace(/^["']|["']$/g, '').trim();
+    const JWT_SECRET = Deno.env.get("JWT_SECRET") || Deno.env.get("SUPABASE_JWT_SECRET") || Deno.env.get("CUSTOM_JWT_SECRET");
 
     const body = await req.json().catch(() => ({}));
     const { initData, start_param } = body;
@@ -48,6 +53,8 @@ serve(async (req: Request) => {
     if (!JWT_SECRET) {
       throw new AppError("Server configuration error: JWT_SECRET is not set.", 500, "CONFIG_ERROR");
     }
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     // 1. Cryptographic HMAC-SHA256 Verification with Clock Tolerance & Replay Check
     const verification = await verifyTelegramInitData(initData, BOT_TOKEN);
@@ -167,9 +174,9 @@ serve(async (req: Request) => {
         total_withdrawn: Number(userRow.total_withdrawn || 0),
         status: userRow.status
       }
-    });
+    }, 200, req);
 
   } catch (err) {
-    return errorResponse(err);
+    return errorResponse(err, req);
   }
 });

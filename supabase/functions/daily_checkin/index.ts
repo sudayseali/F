@@ -8,9 +8,14 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { checkRateLimit } from "../_shared/rate-limit.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, key);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -21,7 +26,7 @@ serve(async (req: Request) => {
   // Rate Limiting: 6 daily check-in requests per minute per IP
   const rate = checkRateLimit(`daily_${clientIp}`, 6, 60000);
   if (!rate.allowed) {
-    return errorResponse(new AppError("Too many daily check-in requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"));
+    return errorResponse(new AppError("Too many daily check-in requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"), req);
   }
 
   try {
@@ -32,6 +37,8 @@ serve(async (req: Request) => {
     // 1. Authenticate user strictly via JWT
     const verifiedUser = await verifyUserRequest(req);
     const userId = verifiedUser.id;
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     // 2. Call Atomic Database Procedure with 24-hour cooldown check
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("claim_daily_reward", {
@@ -44,7 +51,7 @@ serve(async (req: Request) => {
     }
 
     if (!result?.success) {
-      return errorResponse(new AppError(result?.error || "Daily reward already claimed.", 400, "ALREADY_CLAIMED"));
+      return errorResponse(new AppError(result?.error || "Daily reward already claimed.", 400, "ALREADY_CLAIMED"), req);
     }
 
     return successResponse({
@@ -53,9 +60,9 @@ serve(async (req: Request) => {
       points: result.points,
       new_balance: result.new_balance,
       claimed_at: result.claimed_at
-    });
+    }, 200, req);
 
   } catch (err) {
-    return errorResponse(err);
+    return errorResponse(err, req);
   }
 });

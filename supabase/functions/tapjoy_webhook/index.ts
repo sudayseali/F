@@ -27,8 +27,8 @@ serve(async (req) => {
       }
 
       const rawString = `${transactionId || ""}:${userId}:${currency}:${tapjoySecret}`;
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("MD5", encoder.encode(rawString)).catch(() => null);
+      const tapjoyEncoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("MD5", tapjoyEncoder.encode(rawString)).catch(() => null);
       
       if (hashBuffer) {
         const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');

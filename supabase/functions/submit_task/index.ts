@@ -10,9 +10,14 @@ import { checkRateLimit } from "../_shared/rate-limit.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, key);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -23,7 +28,7 @@ serve(async (req: Request) => {
   // Rate Limiting: 10 task submissions per minute per IP
   const rate = checkRateLimit(`task_sub_${clientIp}`, 10, 60000);
   if (!rate.allowed) {
-    return errorResponse(new AppError("Too many task submissions. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"));
+    return errorResponse(new AppError("Too many task submissions. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"), req);
   }
 
   try {
@@ -53,6 +58,8 @@ serve(async (req: Request) => {
     }
 
     const cleanProof = sanitizeString(proofContent, 2000);
+
+    const supabaseAdmin = getSupabaseAdmin();
 
     // 3. Verify Task Exists and is Active
     const { data: task, error: taskErr } = await supabaseAdmin
@@ -117,9 +124,9 @@ serve(async (req: Request) => {
       message: "Proof submitted successfully and queued for review.",
       submission_id: newSubmission.id,
       status: "pending"
-    });
+    }, 200, req);
 
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, req);
   }
 });
