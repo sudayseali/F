@@ -31,11 +31,13 @@ export async function verifyUserRequest(req: Request): Promise<VerifiedUser> {
   let payload: jose.JWTPayload;
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload: verifiedPayload } = await jose.jwtVerify(token, secret);
+    const { payload: verifiedPayload } = await jose.jwtVerify(token, secret, { algorithms: ['HS256'], audience: 'authenticated' });
     payload = verifiedPayload;
   } catch (err: any) {
     throw new AppError(`Invalid or expired session: ${err.message}`, 401, 'INVALID_SESSION');
   }
+
+  if (payload.role !== 'authenticated') { throw new AppError('Invalid token role', 401, 'INVALID_SESSION'); }
 
   const userId = payload.sub;
   if (!userId) {
