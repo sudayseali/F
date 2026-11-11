@@ -1,93 +1,55 @@
-// supabase/functions/_shared/cors.ts
-// Hardened CORS with strict origin allowlist for Telegram WebApp and Admin Frontend
-
+// Strict CORS allowlist for Payvora Telegram WebApp and production frontend.
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://web.telegram.org',
   'https://webk.telegram.org',
   'https://webz.telegram.org',
   'https://t.me',
+  'https://payvora-tan.vercel.app',
+  'https://f-ozuz8j4yk-guul-s-projects.vercel.app',
+  'https://f-qwy8lo3e9-guul-s-projects.vercel.app',
+  'https://f-guul-s-projects.vercel.app',
+  'https://f-steel-eight.vercel.app',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:3000',
-  'https://payvora-tan.vercel.app',
 ];
 
-/**
- * Checks if the request origin matches the allowlist or allowed domain patterns
- */
 export function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
-
+  if (!origin || origin.trim().toLowerCase() === 'null') return false;
   const normalized = origin.trim().replace(/\/$/, '').toLowerCase();
-
-  if (normalized === 'null') return true;
-
-  // 1. Check custom environment variable
   const envOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
     .split(',')
-    .map(o => o.trim().replace(/\/$/, '').toLowerCase())
+    .map((value) => value.trim().replace(/\/$/, '').toLowerCase())
     .filter(Boolean);
-
-  if (envOrigins.includes(normalized)) return true;
-
-  // 2. Check default allowed origins
-  if (DEFAULT_ALLOWED_ORIGINS.some(o => o.toLowerCase() === normalized)) return true;
-
-  // 3. Check trusted domain patterns (Vercel previews and Google Cloud Run dev urls)
-  try {
-    const url = new URL(normalized);
-    const host = url.hostname;
-    if (
-      host.endsWith('.vercel.app') ||
-      host.endsWith('.run.app') ||
-      host === 'localhost' ||
-      host === '127.0.0.1'
-    ) {
-      return true;
-    }
-  } catch {
-    return false;
-  }
-
-  return false;
+  return DEFAULT_ALLOWED_ORIGINS.includes(normalized) || envOrigins.includes(normalized);
 }
 
-/**
- * Generates CORS headers tailored to the incoming request
- */
 export function getCorsHeaders(req?: Request): Record<string, string> {
-  const origin = req?.headers?.get('Origin') || req?.headers?.get('origin');
-  const allowed = origin ? isOriginAllowed(origin) : true;
-
+  const origin = req?.headers.get('Origin');
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Origin': origin && allowed ? origin : '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-telegram-init-data',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
   };
-
-  if (origin && allowed && origin !== 'null') {
-    headers['Access-Control-Allow-Credentials'] = 'true';
-    headers['Vary'] = 'Origin';
-  }
-
+  if (origin && isOriginAllowed(origin)) headers['Access-Control-Allow-Origin'] = origin;
   return headers;
 }
 
 export const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-telegram-init-data',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
 
-/**
- * Handles CORS preflight OPTIONS requests with strict origin enforcement
- */
 export function handleCors(req: Request): Response | null {
-  if (req.method === 'OPTIONS') {
-    const headers = getCorsHeaders(req);
-    return new Response('ok', { headers });
+  const origin = req.headers.get('Origin');
+  if (origin && !isOriginAllowed(origin)) {
+    return new Response(JSON.stringify({ success: false, error: 'Origin not allowed', code: 'CORS_ORIGIN_DENIED' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+    });
   }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: getCorsHeaders(req) });
   return null;
 }
