@@ -78,12 +78,25 @@ jobs:
           fi
           rm -f .env.func
 
-      - name: Link Project and Deploy Database Migrations
+      
+      - name: Link Supabase Project
         run: |
           echo "Linking Supabase CLI to project $PROJECT_ID..."
           echo "$SUPABASE_DB_PASSWORD" | supabase link --project-ref "$PROJECT_ID"
-          echo "Pushing database migrations..."
-          supabase db push --remote --include-all --yes --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Validate Migration History
+        run: |
+          echo "Checking migration history before deployment..."
+
+          if [ ! -d "supabase/migrations" ]; then
+            echo "ERROR: Migration directory is missing."
+            exit 1
+          fi
+
+          echo "Migration directory exists."
+          echo "Database migrations are NOT automatically pushed."
+          echo "Resolve remote migration history separately before enabling db push."
+
 
       - name: Deploy Edge Functions
         run: |
