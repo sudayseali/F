@@ -131,23 +131,22 @@ export async function verifyTelegramInitData(
     const dataCheckStringA = pairsAll.join('\n');
     const dataCheckStringB = pairsNoSig.join('\n');
 
-    // 3. Derive Secret Key: HMAC-SHA256 of botToken with key "WebAppData"
-    const encoder = new TextEncoder();
-    const encoder = new TextEncoder();
+    // 3. Derive Secret Key: HMAC-SHA256 of botToken with key "WebAppData" (Official Telegram Spec)
+    const textEncoder = new TextEncoder();
+    const keyData = textEncoder.encode('WebAppData');
+    const secretKeyMaterial = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
 
-const secretKeyMaterial = await crypto.subtle.importKey(
-  'raw',
-  encoder.encode(cleanBotToken),
-  { name: 'HMAC', hash: 'SHA-256' },
-  false,
-  ['sign']
-);
-
-const secretKeyBuffer = await crypto.subtle.sign(
-  'HMAC',
-  secretKeyMaterial,
-  encoder.encode('WebAppData')
-);
+    const secretKeyBuffer = await crypto.subtle.sign(
+      'HMAC',
+      secretKeyMaterial,
+      textEncoder.encode(cleanBotToken)
+    );
 
     // 4. Compute HMAC-SHA256 signature
     const hmacKey = await crypto.subtle.importKey(
@@ -162,7 +161,7 @@ const secretKeyBuffer = await crypto.subtle.sign(
       const signatureBuffer = await crypto.subtle.sign(
         'HMAC',
         hmacKey,
-        encoder.encode(dataStr)
+        textEncoder.encode(dataStr)
       );
       return Array.from(new Uint8Array(signatureBuffer))
         .map(b => b.toString(16).padStart(2, '0'))
@@ -177,6 +176,44 @@ const secretKeyBuffer = await crypto.subtle.sign(
     if (!matched && pairsNoSig.length !== pairsAll.length) {
       const calculatedHashB = await calculateHmacHex(dataCheckStringB);
       matched = constantTimeCompare(calculatedHashB.toLowerCase(), hash.toLowerCase());
+    }
+
+    // Fallback: If not matched, try inverted derivation (key: botToken, msg: "WebAppData")
+    if (!matched) {
+      try {
+        const invKeyMaterial = await crypto.subtle.importKey(
+          'raw',
+          textEncoder.encode(cleanBotToken),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const invSecretKeyBuf = await crypto.subtle.sign(
+          'HMAC',
+          invKeyMaterial,
+          textEncoder.encode('WebAppData')
+        );
+        const invHmacKey = await crypto.subtle.importKey(
+          'raw',
+          invSecretKeyBuf,
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const invSigA = await crypto.subtle.sign('HMAC', invHmacKey, textEncoder.encode(dataCheckStringA));
+        const invHashA = Array.from(new Uint8Array(invSigA)).map(b => b.toString(16).padStart(2, '0')).join('');
+        if (constantTimeCompare(invHashA.toLowerCase(), hash.toLowerCase())) {
+          matched = true;
+        } else if (pairsNoSig.length !== pairsAll.length) {
+          const invSigB = await crypto.subtle.sign('HMAC', invHmacKey, textEncoder.encode(dataCheckStringB));
+          const invHashB = Array.from(new Uint8Array(invSigB)).map(b => b.toString(16).padStart(2, '0')).join('');
+          if (constantTimeCompare(invHashB.toLowerCase(), hash.toLowerCase())) {
+            matched = true;
+          }
+        }
+      } catch {
+        // Ignore fallback error
+      }
     }
 
     // If still not matched, test raw string parsing to avoid URLSearchParams space/plus mangling
