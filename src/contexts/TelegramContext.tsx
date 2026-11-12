@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase, setSupabaseToken, getSupabaseToken, clearSupabaseToken } from '../lib/supabase';
+import { SplashScreen } from '../components/SplashScreen';
 
 // Real user context with UUID and data
 interface TelegramUser {
@@ -203,14 +204,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (!isReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0e1621] text-slate-200">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-9 w-9 border-2 border-brand border-t-transparent"></div>
-          <span className="text-xs text-white/50 font-medium">Loading Telegram WebApp...</span>
-        </div>
-      </div>
-    );
+    return <SplashScreen minDuration={1000} onComplete={() => {}} />;
   }
 
   if (isVpnBlock) {
