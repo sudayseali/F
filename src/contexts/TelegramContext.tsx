@@ -42,7 +42,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVpnBlock, setIsVpnBlock] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isTelegramInitDone, setIsTelegramInitDone] = useState(false);
+  const [isSplashMinDone, setIsSplashMinDone] = useState(false);
 
   // Secure user profile refresh using authenticated session
   const fetchUserData = async (userUuid: string) => {
@@ -133,7 +134,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
           if (effectiveData?.error === "VPN Blocked" || effectiveData?.isVpnBlock) {
             setIsVpnBlock(true);
-            setIsReady(true);
+            setIsTelegramInitDone(true);
             return;
           }
 
@@ -197,14 +198,14 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           setUser(null);
         }
       }
-      setIsReady(true);
+      setIsTelegramInitDone(true);
     };
 
     initTelegram();
   }, []);
 
-  if (!isReady) {
-    return <SplashScreen minDuration={1000} onComplete={() => {}} />;
+  if (!isTelegramInitDone || !isSplashMinDone) {
+    return <SplashScreen minDuration={1800} onComplete={() => setIsSplashMinDone(true)} />;
   }
 
   if (isVpnBlock) {
