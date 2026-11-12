@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
+import { PayvoraLoadingState } from "../components";
 import type { TaskItem } from "../types";
 
 export function Tasks() {
@@ -190,10 +191,7 @@ export function Tasks() {
       {/* Task List Anchor */}
       <div id="tasks-list-anchor" className="space-y-2.5 pt-1">
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#38bdf8]" />
-            Loading active tasks...
-          </div>
+          <PayvoraLoadingState message="Loading active tasks..." size="md" className="py-12" />
         ) : filteredJobs.length === 0 ? (
           <div className="card-glass-dark p-8 text-center text-xs text-slate-400">
             No tasks found matching your filter.

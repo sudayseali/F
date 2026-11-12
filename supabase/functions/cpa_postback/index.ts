@@ -5,14 +5,14 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 
-const supabaseAdmin = createClient(
-  Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-);
-
 const CPA_SECRET = Deno.env.get("CPA_SECRET") || "";
 
 serve(async (req) => {
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
+
   try {
     const url = new URL(req.url);
     const rawUserId = url.searchParams.get("subid") || url.searchParams.get("aff_sub") || url.searchParams.get("user_id");

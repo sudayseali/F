@@ -5,14 +5,18 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return createClient(url, key);
+}
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
+
+  const supabaseAdmin = getSupabaseAdmin();
 
   try {
     const url = new URL(req.url);

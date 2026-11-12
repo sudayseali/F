@@ -8,9 +8,14 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, key);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
@@ -38,6 +43,8 @@ serve(async (req: Request) => {
       throw new AppError("Decision must be either 'approved' or 'rejected'.", 400, "INVALID_DECISION");
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
+
     // 2. Call Atomic Review RPC
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("admin_review_submission", {
       p_admin_id: admin.id,
@@ -49,9 +56,9 @@ serve(async (req: Request) => {
     if (rpcError) throw rpcError;
     if (!result?.success) throw new AppError(result?.error || "Review operation failed.", 400, "REVIEW_FAILED");
 
-    return successResponse(result);
+    return successResponse(result, 200, req);
 
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, req);
   }
 });

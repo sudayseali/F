@@ -11,14 +11,20 @@ import { logAuditEvent } from "../_shared/audit-log.ts";
 import { validatePositiveAmount, sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { AdminRole } from "../_shared/permissions.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !key) {
+    throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
+  }
+  return createClient(url, key);
+}
 
 serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
+  const supabaseAdmin = getSupabaseAdmin();
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
   // Rate limiting for admin requests (120 reqs / minute per IP)

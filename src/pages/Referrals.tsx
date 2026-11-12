@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { tgHaptics, openTgLink, tgBackButton } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
+import { PayvoraLoadingState } from "../components";
 import { APP_CONFIG } from "../config/appConfig";
 
 export function Referrals() {
@@ -151,7 +152,7 @@ export function Referrals() {
         </h3>
 
         {loading ? (
-          <div className="py-6 text-center text-xs text-slate-400">Loading referrals...</div>
+          <PayvoraLoadingState message="Loading referrals..." size="md" className="py-6" />
         ) : referrals.length === 0 ? (
           <div className="py-8 text-center space-y-2">
             <img

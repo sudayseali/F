@@ -3,6 +3,7 @@ import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, Image as Ima
 import React, { useState, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { tgHaptics, tgBackButton } from "../lib/telegram";
+import { PayvoraSpinner } from "../components";
 
 export function TaskDetails() {
   const { id } = useParams();
@@ -250,7 +251,7 @@ export function TaskDetails() {
             >
               {status === 'submitting' ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <PayvoraSpinner size="sm" />
                   <span>Submitting...</span>
                 </>
               ) : (

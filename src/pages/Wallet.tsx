@@ -8,6 +8,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
+import { PayvoraSpinner, PayvoraLoadingState } from "../components";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
 import type { PaymentMethod, ModalState } from "../types";
@@ -366,7 +367,7 @@ export function Wallet() {
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <PayvoraSpinner size="sm" />
                     <span>Processing...</span>
                   </>
                 ) : (
@@ -388,10 +389,7 @@ export function Wallet() {
           <h3 className="text-sm font-bold text-white mb-2">Transaction History</h3>
 
           {loading ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-[#38bdf8]" />
-              Loading history...
-            </div>
+            <PayvoraLoadingState message="Loading history..." size="md" className="py-8" />
           ) : transactions.length === 0 ? (
             <div className="py-8 text-center text-xs text-slate-400">
               No transactions recorded yet. Complete offers to begin earning!

@@ -12,6 +12,7 @@ import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
 import { TelegramModal } from "../components/TelegramModal";
+import { PayvoraSpinner } from "../components";
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -263,11 +264,16 @@ export function Dashboard() {
         <button
           onClick={handleClaimDaily}
           disabled={dailyClaimed || isClaiming}
-          className={`btn-cyan-glow px-5 py-2 rounded-xl text-xs font-extrabold text-white shrink-0 shadow-lg ${
+          className={`btn-cyan-glow px-5 py-2 rounded-xl text-xs font-extrabold text-white shrink-0 shadow-lg flex items-center justify-center gap-1.5 ${
             dailyClaimed || isClaiming ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-95"
           }`}
         >
-          {isClaiming ? "Claiming..." : dailyClaimed ? "Claimed" : "Claim"}
+          {isClaiming ? (
+            <>
+              <PayvoraSpinner size="xs" />
+              <span>Claiming...</span>
+            </>
+          ) : dailyClaimed ? "Claimed" : "Claim"}
         </button>
       </div>
 

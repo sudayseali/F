@@ -8,6 +8,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { supabase } from "../lib/supabase";
 import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
+import { PayvoraSpinner, PayvoraLoadingState } from "../components";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
 import type { Provider, ModalState } from "../types";
@@ -288,7 +289,7 @@ export function Offerwall() {
               {/* Provider 3D Logo / Badge */}
               <div className={`w-11 h-11 rounded-xl ${provider.iconBg} flex items-center justify-center shrink-0 border border-white/10 shadow-sm overflow-hidden`}>
                 {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-[#38bdf8]" />
+                  <PayvoraSpinner size="sm" />
                 ) : provider.icon3D ? (
                   <img
                     src={provider.icon3D}
@@ -385,9 +386,9 @@ export function Offerwall() {
             {/* Iframe Container */}
             <div className="flex-1 relative bg-white">
               {iframeLoading && (
-                <div className="absolute inset-0 bg-[#030712] z-10 flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="w-8 h-8 animate-spin text-[#38bdf8]" />
-                  <p className="text-xs text-slate-400">Connecting to {activeProviderName}...</p>
+                <div className="absolute inset-0 bg-[#030712] z-10 flex flex-col items-center justify-center gap-3">
+                  <PayvoraSpinner size="lg" />
+                  <p className="text-xs font-semibold text-slate-300">Connecting to {activeProviderName}...</p>
                 </div>
               )}
               <iframe

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors } from "../_shared/cors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
-import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
+import { errorResponse, successResponse } from "../_shared/errors.ts";
 
 serve(async (req) => {
   const cors = handleCors(req);
@@ -13,8 +13,8 @@ serve(async (req) => {
 
     const url = `https://offers.cpx-research.com/index.php?app_id=${appId}&ext_user_id=${verifiedUser.id}`;
     
-    return successResponse({ url });
+    return successResponse({ url }, 200, req);
   } catch (error: any) {
-    return errorResponse(error);
+    return errorResponse(error, req);
   }
 });

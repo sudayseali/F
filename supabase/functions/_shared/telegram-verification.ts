@@ -162,22 +162,46 @@ export async function verifyTelegramInitData(
     const calculatedHash = Array.from(new Uint8Array(signatureBuffer))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
-    const matched = constantTimeCompare(calculatedHash.toLowerCase(), hash.toLowerCase());
+    let matched = constantTimeCompare(calculatedHash.toLowerCase(), hash.toLowerCase());
+
+    // If signature parameter was present and candidate A failed, test Candidate B (excluding signature)
+    if (!matched && pairsNoSig.length !== pairsAll.length) {
+      const sigBufB = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(dataCheckStringB));
+      const hashB = Array.from(new Uint8Array(sigBufB)).map(b => b.toString(16).padStart(2, '0')).join('');
+      matched = constantTimeCompare(hashB.toLowerCase(), hash.toLowerCase());
+    }
+
+    // If still not matched, test raw string parsing to avoid URLSearchParams space/plus mangling
+    if (!matched) {
+      const rawParts = rawInitData.split('&');
+      const rawPairs: string[] = [];
+      for (const part of rawParts) {
+        const eqIdx = part.indexOf('=');
+        if (eqIdx !== -1) {
+          const k = decodeURIComponent(part.slice(0, eqIdx));
+          if (k !== 'hash') {
+            const rawVal = part.slice(eqIdx + 1);
+            try {
+              rawPairs.push(`${k}=${decodeURIComponent(rawVal)}`);
+            } catch {
+              rawPairs.push(`${k}=${rawVal}`);
+            }
+          }
+        }
+      }
+      if (rawPairs.length > 0) {
+        rawPairs.sort();
+        const rawSigBuf = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(rawPairs.join('\n')));
+        const rawHash = Array.from(new Uint8Array(rawSigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        matched = constantTimeCompare(rawHash.toLowerCase(), hash.toLowerCase());
+      }
+    }
 
     if (!matched) {
       return {
         valid: false,
         error: 'Cryptographic signature mismatch. Untrusted or tampered initData.',
         errorCode: 'INVALID_SIGNATURE'
-      };
-    }
-
-    // Constant-time string comparison to prevent timing attacks
-    if (!matched) {
-      return { 
-        valid: false, 
-        error: 'Cryptographic signature mismatch. Untrusted or tampered initData.', 
-        errorCode: 'INVALID_SIGNATURE' 
       };
     }
 
