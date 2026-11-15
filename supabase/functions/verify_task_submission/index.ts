@@ -7,6 +7,7 @@ import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
+import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -45,16 +46,60 @@ serve(async (req: Request) => {
 
     const supabaseAdmin = getSupabaseAdmin();
 
+    // Lookup submission + task before atomic review
+    const { data: subInfo } = await supabaseAdmin
+      .from("submissions")
+      .select("user_id, task_id, task:tasks(title, reward)")
+      .eq("id", subId)
+      .maybeSingle();
+
+    const cleanComment = sanitizeString(comment || "", 250);
+
     // 2. Call Atomic Review RPC
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("admin_review_submission", {
       p_admin_id: admin.id,
       p_submission_id: subId,
       p_decision: finalDecision,
-      p_comment: sanitizeString(comment || "", 250)
+      p_comment: cleanComment
     });
 
     if (rpcError) throw rpcError;
     if (!result?.success) throw new AppError(result?.error || "Review operation failed.", 400, "REVIEW_FAILED");
+
+    // 3. Dispatch Task Decision Alert & Referrer Commission Alert
+    if (subInfo?.user_id) {
+      const taskObj = Array.isArray(subInfo.task) ? subInfo.task[0] : subInfo.task;
+      const taskTitle = taskObj?.title || "Micro-Task";
+      const rewardNum = Number(taskObj?.reward || 0);
+
+      if (finalDecision === "approved") {
+        await sendUserAlert(supabaseAdmin, {
+          userId: subInfo.user_id,
+          category: "task",
+          eventKey: "task_approved",
+          title: "Task Approved!",
+          message: `Your submission for "${taskTitle}" was approved and +$${rewardNum.toFixed(2)} was credited to your wallet.`,
+          amount: rewardNum,
+          actionUrl: "/wallet",
+          ctaLabel: "💰 View Wallet",
+          metadata: { submission_id: subId, task_id: subInfo.task_id },
+        });
+        await notifyReferrerOfCommission(supabaseAdmin, subInfo.user_id, rewardNum, `task "${taskTitle}"`);
+      } else {
+        await sendUserAlert(supabaseAdmin, {
+          userId: subInfo.user_id,
+          category: "task",
+          eventKey: "task_rejected",
+          title: "Task Submission Declined",
+          message: cleanComment
+            ? `Your submission for "${taskTitle}" was declined: ${cleanComment}`
+            : `Your submission for "${taskTitle}" did not meet the proof requirements.`,
+          actionUrl: subInfo.task_id ? `/tasks/${subInfo.task_id}` : "/tasks",
+          ctaLabel: "📋 View Tasks",
+          metadata: { submission_id: subId, task_id: subInfo.task_id },
+        });
+      }
+    }
 
     return successResponse(result, 200, req);
 

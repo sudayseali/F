@@ -5,6 +5,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
@@ -121,6 +122,20 @@ serve(async (req) => {
       status: "credited",
       raw_payload: Object.fromEntries(url.searchParams.entries())
     });
+
+    await sendUserAlert(supabaseAdmin, {
+      userId: targetUserId,
+      category: "offer",
+      eventKey: "offer_credited",
+      title: `${network.toUpperCase()} Offer Reward Credited!`,
+      message: `Your ${network.toUpperCase()} offer conversion was verified and +$${payout.toFixed(2)} has been added to your wallet.`,
+      amount: payout,
+      actionUrl: "/wallet",
+      ctaLabel: "💰 View Wallet",
+      metadata: { provider: network, tx_id: safeTxId },
+    });
+
+    await notifyReferrerOfCommission(supabaseAdmin, targetUserId, payout, `a ${network.toUpperCase()} offer`);
 
     return new Response("Postback Success", { status: 200 });
   } catch (error: any) {

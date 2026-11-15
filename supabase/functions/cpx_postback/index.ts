@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { md5Hex, sha256Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
@@ -136,6 +137,20 @@ serve(async (req) => {
         status: "credited",
         raw_payload: Object.fromEntries(url.searchParams.entries())
       });
+
+      await sendUserAlert(supabaseAdmin, {
+        userId: targetUserId,
+        category: "offer",
+        eventKey: "offer_credited",
+        title: "CPX Survey Reward Credited!",
+        message: `You completed a CPX Research survey and received +$${amountLocal.toFixed(2)} in your wallet.`,
+        amount: amountLocal,
+        actionUrl: "/wallet",
+        ctaLabel: "💰 View Wallet",
+        metadata: { provider: "cpx", trans_id: transId },
+      });
+
+      await notifyReferrerOfCommission(supabaseAdmin, targetUserId, amountLocal, "a CPX Research survey");
     } else if (status === "2") {
       await logAuditEvent({
         actorId: targetUserId,
@@ -145,6 +160,17 @@ serve(async (req) => {
         targetId: transId,
         details: { amountLocal },
         ipAddress: clientIp,
+      });
+
+      await sendUserAlert(supabaseAdmin, {
+        userId: targetUserId,
+        category: "offer",
+        eventKey: "offer_chargeback",
+        title: "CPX Survey Reversal Notice",
+        message: `CPX Research reported a reversal for transaction ${transId}.`,
+        actionUrl: "/offerwall",
+        ctaLabel: "🎁 View Offers",
+        metadata: { provider: "cpx", trans_id: transId, amount: amountLocal },
       });
     }
 

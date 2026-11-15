@@ -10,23 +10,26 @@ import {
   Referrals, Profile, Offerwall 
 } from "./pages";
 import { TelegramProvider } from "./contexts/TelegramContext";
+import { AlertsProvider } from "./contexts/AlertsContext";
 
 export default function App() {
   return (
     <TelegramProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="offerwall" element={<Offerwall />} />
-            <Route path="tasks/:id" element={<TaskDetails />} />
-            <Route path="wallet" element={<Wallet />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="referrals" element={<Referrals />} />
-          </Route>
-        </Routes>
-      </Router>
+      <AlertsProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="tasks" element={<Tasks />} />
+              <Route path="offerwall" element={<Offerwall />} />
+              <Route path="tasks/:id" element={<TaskDetails />} />
+              <Route path="wallet" element={<Wallet />} />
+              <Route path="profile" element={<Profile />} />
+              <Route path="referrals" element={<Referrals />} />
+            </Route>
+          </Routes>
+        </Router>
+      </AlertsProvider>
     </TelegramProvider>
   );
 }

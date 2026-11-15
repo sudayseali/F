@@ -10,6 +10,7 @@ import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { validatePositiveAmount, sanitizeString, sanitizePostgrestSearch, isValidUuid } from "../_shared/validation.ts";
 import { AdminRole } from "../_shared/permissions.ts";
+import { sendUserAlert, notifyReferrerOfCommission, broadcastNewTaskAlert } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -298,7 +299,14 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse({ task: newTask }, 200, req);
+      const broadcastResult = await broadcastNewTaskAlert(supabaseAdmin, {
+        id: newTask.id,
+        title: newTask.title,
+        reward: cleanReward,
+        category: newTask.category,
+      });
+
+      return successResponse({ task: newTask, alertedUsers: broadcastResult.notified }, 200, req);
     }
 
     if (action === "update_task_status") {
@@ -354,15 +362,57 @@ serve(async (req: Request) => {
       if (!submissionId || !isValidUuid(submissionId)) throw new AppError("Valid submissionId required.", 400, "INVALID_SUBMISSION_ID");
       if (!["approved", "rejected"].includes(decision)) throw new AppError("Decision must be 'approved' or 'rejected'.", 400, "INVALID_DECISION");
 
+      const { data: subInfo } = await supabaseAdmin
+        .from("submissions")
+        .select("user_id, task_id, task:tasks(title, reward)")
+        .eq("id", submissionId)
+        .maybeSingle();
+
+      const cleanComment = sanitizeString(comment || "", 250);
+
       const { data: result, error } = await supabaseAdmin.rpc("admin_review_submission", {
         p_admin_id: admin.id,
         p_submission_id: submissionId,
         p_decision: decision,
-        p_comment: sanitizeString(comment || "", 250)
+        p_comment: cleanComment
       });
 
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Review failed", 400, "REVIEW_FAILED");
+
+      if (subInfo?.user_id) {
+        const taskObj = Array.isArray(subInfo.task) ? subInfo.task[0] : subInfo.task;
+        const taskTitle = taskObj?.title || "Micro-Task";
+        const rewardNum = Number(taskObj?.reward || 0);
+
+        if (decision === "approved") {
+          await sendUserAlert(supabaseAdmin, {
+            userId: subInfo.user_id,
+            category: "task",
+            eventKey: "task_approved",
+            title: "Task Approved!",
+            message: `Your submission for "${taskTitle}" was approved and +$${rewardNum.toFixed(2)} was credited to your wallet.`,
+            amount: rewardNum,
+            actionUrl: "/wallet",
+            ctaLabel: "💰 View Wallet",
+            metadata: { submission_id: submissionId, task_id: subInfo.task_id },
+          });
+          await notifyReferrerOfCommission(supabaseAdmin, subInfo.user_id, rewardNum, `task "${taskTitle}"`);
+        } else {
+          await sendUserAlert(supabaseAdmin, {
+            userId: subInfo.user_id,
+            category: "task",
+            eventKey: "task_rejected",
+            title: "Task Submission Declined",
+            message: cleanComment
+              ? `Your submission for "${taskTitle}" was declined: ${cleanComment}`
+              : `Your submission for "${taskTitle}" did not meet the proof requirements.`,
+            actionUrl: subInfo.task_id ? `/tasks/${subInfo.task_id}` : "/tasks",
+            ctaLabel: "📋 View Tasks",
+            metadata: { submission_id: submissionId, task_id: subInfo.task_id },
+          });
+        }
+      }
 
       return successResponse(result, 200, req);
     }

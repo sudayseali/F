@@ -1,5 +1,6 @@
 import React from "react";
 import { useTelegram } from "../contexts/TelegramContext";
+import { useAlerts } from "../contexts/AlertsContext";
 import { Users, History, Settings, ExternalLink, ChevronRight, Gift, Shield, Check, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
@@ -10,6 +11,7 @@ import { APP_CONFIG } from "../config/appConfig";
 
 export function Profile() {
   const { user } = useTelegram();
+  const { openAlertsDrawer } = useAlerts();
   const navigate = useNavigate();
   const displayName = user?.first_name 
     ? `${user.first_name} ${user.last_name || ""}`.trim() 
@@ -39,12 +41,12 @@ export function Profile() {
       action: () => openTgLink(APP_CONFIG.telegram.communityUrl)
     },
     {
-      label: "Settings",
-      subtitle: "App preferences & notifications",
-      icon3D: ASSETS_3D.shieldVerified,
+      label: "Notification & Alert Settings",
+      subtitle: "Referral, task, offer & Telegram bot alerts",
+      icon3D: ASSETS_3D.bellNotification,
       iconColor: "bg-cyan-500/15",
       action: () => {
-        tgHaptics.impact("light");
+        openAlertsDrawer("prefs");
       }
     },
     {

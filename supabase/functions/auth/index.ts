@@ -10,6 +10,7 @@ import { checkTelegramChannelMembership } from "../_shared/channel-check.ts";
 import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert } from "../_shared/alerts.ts";
 
 function isMissingColumnError(err: any, columnName?: string): boolean {
   if (!err || typeof err !== "object") return false;
@@ -211,19 +212,36 @@ serve(async (req: Request) => {
             .maybeSingle();
 
           if (referrer) {
-            await supabaseAdmin.from("referrals").insert({
+            const { error: refInsertErr } = await supabaseAdmin.from("referrals").insert({
               referrer_id: referrer.id,
               referred_user_id: userRow.id,
             });
-            await logAuditEvent({
-              actorId: userRow.id,
-              actorType: "user",
-              action: "referral_registered",
-              targetType: "user",
-              targetId: referrer.id,
-              details: { referrerTelegramId: referrerTgId },
-              ipAddress: clientIp,
-            });
+            if (!refInsertErr) {
+              await logAuditEvent({
+                actorId: userRow.id,
+                actorType: "user",
+                action: "referral_registered",
+                targetType: "user",
+                targetId: referrer.id,
+                details: { referrerTelegramId: referrerTgId },
+                ipAddress: clientIp,
+              });
+
+              const inviteeLabel = tgUser.username
+                ? `@${tgUser.username}`
+                : tgUser.first_name || "A new friend";
+
+              await sendUserAlert(supabaseAdmin, {
+                userId: referrer.id,
+                category: "referral",
+                eventKey: "referral_joined",
+                title: "New Referral Joined!",
+                message: `${inviteeLabel} joined Payvora using your link. You earn 10% lifetime commission on their tasks & offers.`,
+                actionUrl: "/referrals",
+                ctaLabel: "🤝 View Referrals",
+                metadata: { referred_user_id: userRow.id, referred_telegram_id: tgUser.id },
+              });
+            }
           }
         }
       } catch (refErr) {

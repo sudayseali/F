@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { md5Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
@@ -120,6 +121,20 @@ serve(async (req) => {
       status: "credited",
       raw_payload: Object.fromEntries(url.searchParams.entries()),
     });
+
+    await sendUserAlert(supabaseAdmin, {
+      userId: targetUserId,
+      category: "offer",
+      eventKey: "offer_credited",
+      title: "Tapjoy Offer Reward Credited!",
+      message: `Your Tapjoy offer reward of +$${payout.toFixed(2)} has been added to your Payvora wallet.`,
+      amount: payout,
+      actionUrl: "/wallet",
+      ctaLabel: "💰 View Wallet",
+      metadata: { provider: "tapjoy", transaction_id: transactionId },
+    });
+
+    await notifyReferrerOfCommission(supabaseAdmin, targetUserId, payout, "a Tapjoy offer");
 
     return new Response("OK", { status: 200 });
   } catch (error: any) {

@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { md5Hex, sha256Hex, hmacSha256Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -221,6 +222,21 @@ serve(async (req) => {
       status: "credited",
       raw_payload: params
     });
+
+    const providerLabel = provider.toUpperCase();
+    await sendUserAlert(supabaseAdmin, {
+      userId: targetUserId,
+      category: "offer",
+      eventKey: "offer_credited",
+      title: `${providerLabel} Offer Reward Credited!`,
+      message: `Your ${providerLabel} offer completed and +$${rewardAmount.toFixed(2)} has been credited to your wallet.`,
+      amount: rewardAmount,
+      actionUrl: "/wallet",
+      ctaLabel: "💰 View Wallet",
+      metadata: { provider, transaction_id: safeTxId },
+    });
+
+    await notifyReferrerOfCommission(supabaseAdmin, targetUserId, rewardAmount, `a ${providerLabel} offer`);
 
     return new Response("1", { status: 200 });
 

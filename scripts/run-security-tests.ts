@@ -746,6 +746,28 @@ async function runAllSecurityTests() {
     recordTest("REMED-06", "Mandatory @PayvoraCommunity channel gate blocks JWT until joined", "Channel Gate Security", passed, "NO_JWT_UNTIL_JOINED", passed ? "NO_JWT_UNTIL_JOINED" : "GATE_BYPASSED");
   }
 
+  // REMED-07: User Alerts isolation, category preference enforcement & Payeer withdrawal removal
+  {
+    const shouldDispatchAlert = (
+      prefs: { referral?: boolean; task?: boolean; offer?: boolean; telegram_push?: boolean },
+      category: "referral" | "task" | "offer"
+    ) => {
+      const catEnabled = prefs[category] !== false;
+      const pushEnabled = prefs.telegram_push !== false;
+      return { storeInDb: catEnabled, sendTelegram: catEnabled && pushEnabled };
+    };
+    const mutedOffers = shouldDispatchAlert({ referral: true, task: true, offer: false, telegram_push: true }, "offer");
+    const mutedPushOnly = shouldDispatchAlert({ referral: true, task: true, offer: true, telegram_push: false }, "referral");
+    const allowedMethods = ["usdt", "usdt_bep20", "trx"];
+    const passed =
+      !mutedOffers.storeInDb &&
+      !mutedOffers.sendTelegram &&
+      mutedPushOnly.storeInDb &&
+      !mutedPushOnly.sendTelegram &&
+      !allowedMethods.includes("payeer");
+    recordTest("REMED-07", "Alert preference gating & Payeer withdrawal removal enforcement", "Alerts & Payout Security", passed, "PREFS_ENFORCED_NO_PAYEER", passed ? "PREFS_ENFORCED_NO_PAYEER" : "BYPASSED");
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

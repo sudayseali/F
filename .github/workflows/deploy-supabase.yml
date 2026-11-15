@@ -108,7 +108,7 @@ jobs:
       - name: Deploy Edge Functions
         run: |
           echo "Deploying all Edge Functions to Supabase..."
-          for func in auth withdraw daily_checkin submit_task get_cpx_url cpx_postback cpa_postback postback tapjoy_webhook telegram-webhook verify_task_submission admin_api admin_action; do
+          for func in auth withdraw daily_checkin submit_task get_cpx_url cpx_postback cpa_postback postback tapjoy_webhook telegram-webhook verify_task_submission admin_api admin_action alerts; do
             if [ -d "supabase/functions/$func" ]; then
               echo "Deploying Edge Function: $func"
               supabase functions deploy "$func" --yes --no-verify-jwt

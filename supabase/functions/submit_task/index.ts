@@ -9,6 +9,7 @@ import { verifyUserRequest } from "../_shared/auth.ts";
 import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -126,7 +127,7 @@ serve(async (req: Request) => {
 
     if (!newSubmission) throw new Error("Failed to record submission");
 
-    // 6. Audit Log
+    // 6. Audit Log & In-App Task Alert
     await logAuditEvent({
       actorId: userId,
       actorType: "user",
@@ -135,6 +136,17 @@ serve(async (req: Request) => {
       targetId: task_id,
       details: { submissionId: newSubmission.id, taskTitle: task.title, telegramUsername: cleanTgUsername || undefined },
       ipAddress: clientIp,
+    });
+
+    await sendUserAlert(supabaseAdmin, {
+      userId,
+      category: "task",
+      eventKey: "task_submitted",
+      title: "Task Proof Under Review",
+      message: `Your proof for "${task.title}" was submitted and is awaiting verification.`,
+      actionUrl: `/tasks/${task_id}`,
+      telegramPush: false,
+      metadata: { task_id, submission_id: newSubmission.id },
     });
 
     return successResponse({
