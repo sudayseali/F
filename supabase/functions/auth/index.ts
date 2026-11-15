@@ -1,11 +1,12 @@
 // supabase/functions/auth/index.ts
-// Secure Telegram WebApp Authentication & Session Edge Function
+// Secure Telegram WebApp Authentication, Referral Attribution, Channel Gate & Session Edge Function
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
-import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { verifyTelegramInitData } from "../_shared/telegram-verification.ts";
+import { checkTelegramChannelMembership } from "../_shared/channel-check.ts";
 import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
@@ -77,7 +78,7 @@ serve(async (req: Request) => {
     // 2. Lookup existing user by telegram_id
     const { data: existingUser, error: lookupErr } = await supabaseAdmin
       .from("users")
-      .select("id, status, wallet_balance, total_earned, total_withdrawn")
+      .select("id, status, channel_joined, wallet_balance, total_earned, total_withdrawn")
       .eq("telegram_id", tgUser.id)
       .maybeSingle();
 
@@ -107,12 +108,12 @@ serve(async (req: Request) => {
         last_name: tgUser.last_name,
         last_active_at: new Date().toISOString()
       }, { onConflict: "telegram_id" })
-      .select("id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, created_at")
+      .select("id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, channel_joined, created_at")
       .single();
 
     if (upsertErr || !userRow) throw upsertErr || new Error("Failed to persist user profile");
 
-    // 4. Handle Referrals for New Users
+    // 4. Handle Referrals for New Users (recorded immediately so attribution is never lost)
     if (isNewUser && start_param) {
       try {
         const referrerTgId = parseInt(String(start_param).replace(/^ref_/, ""), 10);
@@ -144,7 +145,52 @@ serve(async (req: Request) => {
       }
     }
 
-    // 5. Issue Cryptographically Signed User JWT
+    // 5. Mandatory Official Channel Membership Verification for New / Unverified Users
+    if (!userRow.channel_joined) {
+      const membership = await checkTelegramChannelMembership(BOT_TOKEN, tgUser.id);
+
+      if (membership.ok && membership.isMember) {
+        await supabaseAdmin
+          .from("users")
+          .update({
+            channel_joined: true,
+            channel_verified_at: new Date().toISOString(),
+          })
+          .eq("id", userRow.id);
+
+        await logAuditEvent({
+          actorId: userRow.id,
+          actorType: "user",
+          action: "channel_membership_verified",
+          targetType: "channel",
+          targetId: membership.channelUsername,
+          details: { status: membership.status },
+          ipAddress: clientIp,
+        });
+      } else {
+        await logAuditEvent({
+          actorId: userRow.id,
+          actorType: "user",
+          action: "channel_membership_required",
+          targetType: "channel",
+          targetId: membership.channelUsername,
+          details: { status: membership.status || membership.errorCode },
+          ipAddress: clientIp,
+        });
+
+        // Do NOT mint JWT until channel join is verified server-side
+        return successResponse({
+          requires_channel_join: true,
+          channel_url: membership.channelUrl,
+          channel_username: membership.channelUsername,
+          verification_error: membership.errorMessage || null,
+          member_status: membership.status || null,
+          user_uuid: userRow.id,
+        }, 200, req);
+      }
+    }
+
+    // 6. Issue Cryptographically Signed User JWT
     const secret = new TextEncoder().encode(JWT_SECRET);
     const jwt = await new jose.SignJWT({
       aud: "authenticated",
@@ -159,7 +205,7 @@ serve(async (req: Request) => {
       .setExpirationTime("24h")
       .sign(secret);
 
-    // 6. Return Verified Session and Profile
+    // 7. Return Verified Session and Profile
     return successResponse({
       access_token: jwt,
       user_uuid: userRow.id,
@@ -172,7 +218,8 @@ serve(async (req: Request) => {
         wallet_balance: Number(userRow.wallet_balance || 0),
         total_earned: Number(userRow.total_earned || 0),
         total_withdrawn: Number(userRow.total_withdrawn || 0),
-        status: userRow.status
+        status: userRow.status,
+        channel_joined: true,
       }
     }, 200, req);
 

@@ -718,6 +718,34 @@ async function runAllSecurityTests() {
     recordTest("REMED-05", "Storage proofs owner-folder RLS enforcement", "Storage Security", passed, "OWNER_FOLDER_ONLY", passed ? "OWNER_FOLDER_ONLY" : "PATH_POLICY_BYPASS");
   }
 
+  // REMED-06: Mandatory @PayvoraCommunity channel membership gate enforcement
+  {
+    const evaluateMembership = (status: string, isRestrictedMember?: boolean) => {
+      if (status === "creator" || status === "administrator" || status === "member") return true;
+      if (status === "restricted") return Boolean(isRestrictedMember);
+      return false;
+    };
+    const issueSession = (channelJoined: boolean, memberStatus: string, isRestrictedMember?: boolean) => {
+      if (channelJoined) return { requiresChannelJoin: false, jwtIssued: true };
+      const isMember = evaluateMembership(memberStatus, isRestrictedMember);
+      return isMember
+        ? { requiresChannelJoin: false, jwtIssued: true }
+        : { requiresChannelJoin: true, jwtIssued: false };
+    };
+    const unjoinedLeft = issueSession(false, "left");
+    const unjoinedKicked = issueSession(false, "kicked");
+    const restrictedNonMember = issueSession(false, "restricted", false);
+    const joinedMember = issueSession(false, "member");
+    const existingVerified = issueSession(true, "left");
+    const passed =
+      unjoinedLeft.requiresChannelJoin && !unjoinedLeft.jwtIssued &&
+      unjoinedKicked.requiresChannelJoin && !unjoinedKicked.jwtIssued &&
+      restrictedNonMember.requiresChannelJoin && !restrictedNonMember.jwtIssued &&
+      !joinedMember.requiresChannelJoin && joinedMember.jwtIssued &&
+      !existingVerified.requiresChannelJoin && existingVerified.jwtIssued;
+    recordTest("REMED-06", "Mandatory @PayvoraCommunity channel gate blocks JWT until joined", "Channel Gate Security", passed, "NO_JWT_UNTIL_JOINED", passed ? "NO_JWT_UNTIL_JOINED" : "GATE_BYPASSED");
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

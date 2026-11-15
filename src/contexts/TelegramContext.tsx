@@ -8,6 +8,7 @@ import {
   isTokenExpired,
 } from '../lib/supabase';
 import { SplashScreen } from '../components/SplashScreen';
+import { ChannelJoinGate } from '../components/ChannelJoinGate';
 import { APP_CONFIG } from '../config/appConfig';
 
 // Real user context with server-verified UUID and data
@@ -27,6 +28,12 @@ export interface LocationData {
   continent: string;
   continentCode: string;
   isVpn: boolean;
+}
+
+interface ChannelGateState {
+  url: string;
+  username: string;
+  error?: string | null;
 }
 
 interface TelegramContextType {
@@ -51,6 +58,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [location] = useState<LocationData | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [channelGate, setChannelGate] = useState<ChannelGateState | null>(null);
+  const [isVerifyingChannel, setIsVerifyingChannel] = useState(false);
   const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isTelegramInitDone, setIsTelegramInitDone] = useState(false);
   const [isSplashMinDone, setIsSplashMinDone] = useState(false);
@@ -89,7 +98,12 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.uuid, fetchUserData]);
 
-  const initTelegram = useCallback(async () => {
+  const initTelegram = useCallback(async (options?: { isChannelRetry?: boolean }) => {
+    const isChannelRetry = Boolean(options?.isChannelRetry);
+    if (isChannelRetry) {
+      setIsVerifyingChannel(true);
+    }
+
     const tg = (window as any).Telegram?.WebApp;
 
     // Discard expired local token before attempting authentication or restoration
@@ -102,8 +116,8 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       setIsInsideTelegram(true);
       tg.ready?.();
       tg.expand?.();
-      tg.setHeaderColor?.('#0e1621');
-      tg.setBackgroundColor?.('#0e1621');
+      tg.setHeaderColor?.('#030712');
+      tg.setBackgroundColor?.('#030712');
       tg.enableClosingConfirmation?.();
 
       try {
@@ -154,12 +168,40 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         if (effectiveData?.error === "VPN Blocked" || effectiveData?.isVpnBlock) {
           clearSupabaseToken();
           setUser(null);
+          setChannelGate(null);
           setIsVpnBlock(true);
           setIsTelegramInitDone(true);
+          setIsVerifyingChannel(false);
+          return;
+        }
+
+        const payloadData = effectiveData?.data || effectiveData;
+
+        // Mandatory channel membership check BEFORE entering authenticated branch
+        if (payloadData?.requires_channel_join) {
+          clearSupabaseToken();
+          setUser(null);
+          setAuthError(null);
+
+          const cleanHandle = (payloadData.channel_username || 'PayvoraCommunity').replace(/^@/, '');
+          const gateError =
+            payloadData.verification_error ||
+            (isChannelRetry
+              ? `Membership in @${cleanHandle} is not confirmed yet. Tap Join @${cleanHandle}, subscribe to the channel, then tap Verify & Continue.`
+              : null);
+
+          setChannelGate({
+            url: payloadData.channel_url || 'https://t.me/PayvoraCommunity',
+            username: cleanHandle,
+            error: gateError,
+          });
+          setIsTelegramInitDone(true);
+          setIsVerifyingChannel(false);
           return;
         }
 
         if (effectiveData && (effectiveData.success || effectiveData.data || effectiveData.access_token)) {
+          setChannelGate(null);
           const token = effectiveData.data?.access_token || effectiveData.access_token;
           const verifiedProfile = effectiveData.data?.user || effectiveData.user;
           const verifiedUuid = effectiveData.data?.user_uuid || effectiveData.user_uuid;
@@ -186,6 +228,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           console.warn("Telegram authentication failed:", errorMsg);
           clearSupabaseToken();
           setUser(null);
+          setChannelGate(null);
           setAuthError(errorMsg);
         }
       } catch (e: any) {
@@ -212,6 +255,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    setIsVerifyingChannel(false);
     setIsTelegramInitDone(true);
   }, [fetchUserData]);
 
@@ -225,7 +269,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
   if (isVpnBlock) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#0e1621] text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#030712] text-center">
         <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mb-6 border border-red-500/20">
           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -239,9 +283,21 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  if (channelGate) {
+    return (
+      <ChannelJoinGate
+        channelUrl={channelGate.url}
+        channelUsername={channelGate.username}
+        verificationError={channelGate.error}
+        isVerifying={isVerifyingChannel}
+        onVerify={() => initTelegram({ isChannelRetry: true })}
+      />
+    );
+  }
+
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#0e1621] text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#030712] text-center">
         <div className="w-16 h-16 bg-[#2481cc]/15 text-[#2481cc] rounded-2xl flex items-center justify-center mb-6 border border-[#2481cc]/25 shadow-lg">
           <svg className="w-9 h-9" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.84 1.15-5.06 3.28-.47.33-.89.49-1.27.48-.41-.01-1.21-.24-1.8-.43-.49-.16-.88-.24-.85-.51.02-.14.22-.29.62-.46 2.44-1.06 4.07-1.74 4.88-2.07 2.32-.97 2.8-1.14 3.12-1.15.07 0 .22.02.3.09.07.06.09.14.1.23-.01.07-.01.12-.02.21z" />
