@@ -2,36 +2,65 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { checkTelegramChannelMembership, getRequiredChannelConfig } from "../_shared/channel-check.ts";
 
-const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+const RAW_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
+const BOT_TOKEN = RAW_BOT_TOKEN.trim().replace(/^["']|["']$/g, "").trim();
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function getSafeAppUrl(): string {
+  const raw = (Deno.env.get("FRONTEND_URL") || "https://payvora-tan.vercel.app/").trim().replace(/^["']|["']$/g, "").trim();
+  if (raw.startsWith("https://")) {
+    return raw;
+  }
+  return "https://payvora-tan.vercel.app/";
+}
 
 async function callTelegramApi(method: string, body: Record<string, unknown>) {
-  if (!BOT_TOKEN) return null;
-  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return res.json().catch(() => null);
+  if (!BOT_TOKEN) {
+    console.error(`[TELEGRAM_API_SKIPPED] ${method}: TELEGRAM_BOT_TOKEN is missing`);
+    return null;
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok) {
+      console.error(`[TELEGRAM_API_ERROR] ${method} (${res.status}):`, JSON.stringify(json));
+    }
+    return json;
+  } catch (err: any) {
+    console.error(`[TELEGRAM_API_EXCEPTION] ${method}:`, err?.message || err);
+    return null;
+  }
 }
 
 function buildWelcomeMessage(appUrl: string) {
-  const welcomeMessage = `
-🌟 *Welcome to Payvora!* 🌟
-
-A modern platform where you can complete simple tasks, surveys, and offers to earn real rewards.
-
-*What can you do?*
-✅ Complete daily tasks & high-paying offerwalls.
-✅ Claim +50 PTS Daily Check-In every 24 hours.
-✅ Invite friends & earn 10% lifetime commission.
-✅ Withdraw directly to USDT, TRX, or Payeer.
-
-👉 *Tap the button below to launch the App!*
-  `.trim();
+  const welcomeMessage = [
+    "🌟 <b>Welcome to Payvora!</b> 🌟",
+    "",
+    "A modern platform where you can complete simple tasks, surveys, and offers to earn real rewards.",
+    "",
+    "<b>What can you do?</b>",
+    "✅ Complete daily tasks &amp; high-paying offerwalls.",
+    "✅ Claim +50 PTS Daily Check-In every 24 hours.",
+    "✅ Invite friends &amp; earn 10% lifetime commission.",
+    "✅ Withdraw directly to USDT, TRX, or Payeer.",
+    "",
+    "👉 <b>Tap the button below to launch the App!</b>",
+  ].join("\n");
 
   return {
     text: welcomeMessage,
-    parse_mode: "Markdown",
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
         [
@@ -56,18 +85,19 @@ A modern platform where you can complete simple tasks, surveys, and offers to ea
 }
 
 function buildJoinGateMessage(channelUsername: string, channelUrl: string) {
+  const safeHandle = escapeHtml(channelUsername);
   return {
-    text: `
-🔒 *Join Required Before Starting*
-
-Welcome to *Payvora*! To protect our community and receive updates, gift drops, and payout proofs, please join our official Telegram channel first:
-
-📢 Channel: ${channelUsername}
-
-1️⃣ Tap *Join Channel* below
-2️⃣ Come back and tap *I Joined — Verify*
-    `.trim(),
-    parse_mode: "Markdown",
+    text: [
+      "🔒 <b>Join Required Before Starting</b>",
+      "",
+      "Welcome to <b>Payvora</b>! To protect our community and receive updates, gift drops, and payout proofs, please join our official Telegram channel first:",
+      "",
+      `📢 Channel: <b>${safeHandle}</b>`,
+      "",
+      "1️⃣ Tap <b>Join Channel</b> below",
+      "2️⃣ Come back and tap <b>I Joined — Verify</b>",
+    ].join("\n"),
+    parse_mode: "HTML",
     reply_markup: {
       inline_keyboard: [
         [
@@ -93,14 +123,15 @@ serve(async (req) => {
   }
 
   // Fail-closed: Enforce Telegram Webhook secret token in constant time
-  const webhookSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
+  const webhookSecret = (Deno.env.get("TELEGRAM_WEBHOOK_SECRET") || "").trim().replace(/^["']|["']$/g, "").trim();
   if (!webhookSecret) {
     console.error("[TELEGRAM_WEBHOOK_MISCONFIG] TELEGRAM_WEBHOOK_SECRET is not set");
     return new Response("Server Misconfiguration", { status: 500 });
   }
 
-  const incomingSecret = req.headers.get("x-telegram-bot-api-secret-token") || "";
+  const incomingSecret = (req.headers.get("x-telegram-bot-api-secret-token") || "").trim();
   if (!incomingSecret || !constantTimeCompare(incomingSecret, webhookSecret)) {
+    console.warn(`[TELEGRAM_WEBHOOK_UNAUTHORIZED] secret_header_present=${Boolean(incomingSecret)}`);
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -108,18 +139,22 @@ serve(async (req) => {
     const update = await req.json();
     console.log("Received Telegram update:", update?.update_id ?? "unknown");
 
-    const appUrl = Deno.env.get("FRONTEND_URL") || "https://payvora-tan.vercel.app/";
+    const appUrl = getSafeAppUrl();
 
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
       const fromUserId = update.message.from?.id;
-      const text = update.message.text;
+      const text = String(update.message.text).trim();
 
       if (text.startsWith("/start")) {
         if (!BOT_TOKEN) {
           console.error("TELEGRAM_BOT_TOKEN is not set in environment variables");
         } else if (fromUserId) {
           const membership = await checkTelegramChannelMembership(BOT_TOKEN, fromUserId);
+
+          if (!membership.ok) {
+            console.warn("[TELEGRAM_WEBHOOK_CHANNEL_CHECK_WARN]", membership.errorCode, membership.errorMessage);
+          }
 
           if (!membership.isMember) {
             await callTelegramApi("sendMessage", {
@@ -133,6 +168,11 @@ serve(async (req) => {
             });
           }
         }
+      } else if (text.startsWith("/help")) {
+        await callTelegramApi("sendMessage", {
+          chat_id: chatId,
+          text: "Open the Payvora Mini App using /start to view tasks, offerwalls, and your wallet. For help, reach out via Payvora Support.",
+        });
       }
     } else if (update.callback_query) {
       const callbackQuery = update.callback_query;

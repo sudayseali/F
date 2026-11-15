@@ -4,6 +4,11 @@
 -- ============================================================================
 
 ALTER TABLE public.users
+    ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS total_earned NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS total_withdrawn NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active',
+    ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ADD COLUMN IF NOT EXISTS channel_joined BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS channel_verified_at TIMESTAMPTZ;
 
@@ -14,3 +19,4 @@ SET channel_joined = true,
 WHERE channel_joined = false;
 
 CREATE INDEX IF NOT EXISTS idx_users_channel_joined ON public.users(channel_joined);
+

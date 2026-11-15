@@ -52,7 +52,7 @@ serve(async (req: Request) => {
     }
 
     const BOT_TOKEN = (Deno.env.get("TELEGRAM_BOT_TOKEN") || "").trim().replace(/^["']|["']$/g, '').trim();
-    const JWT_SECRET = Deno.env.get("JWT_SECRET") || Deno.env.get("SUPABASE_JWT_SECRET") || Deno.env.get("CUSTOM_JWT_SECRET");
+    const JWT_SECRET = (Deno.env.get("JWT_SECRET") || Deno.env.get("SUPABASE_JWT_SECRET") || Deno.env.get("CUSTOM_JWT_SECRET") || "").trim().replace(/^["']|["']$/g, '').trim();
 
     const body = await req.json().catch(() => ({}));
     const { initData, start_param } = body;
@@ -163,15 +163,23 @@ serve(async (req: Request) => {
       if (upsertRes.error && isMissingColumnError(upsertRes.error)) {
         hasChannelJoinedCol = false;
         const { last_active_at: _omit, ...baseUpsertPayload } = upsertPayload;
-        const retryPayload = isMissingColumnError(upsertRes.error, "last_active_at")
-          ? baseUpsertPayload
-          : upsertPayload;
 
-        const fallbackUpsert = await supabaseAdmin
+        let fallbackUpsert = await supabaseAdmin
           .from("users")
-          .upsert(retryPayload, { onConflict: "telegram_id" })
+          .upsert(
+            isMissingColumnError(upsertRes.error, "last_active_at") ? baseUpsertPayload : upsertPayload,
+            { onConflict: "telegram_id" }
+          )
           .select("id, telegram_id, username, first_name, last_name")
           .single();
+
+        if (fallbackUpsert.error && isMissingColumnError(fallbackUpsert.error, "last_active_at")) {
+          fallbackUpsert = await supabaseAdmin
+            .from("users")
+            .upsert(baseUpsertPayload, { onConflict: "telegram_id" })
+            .select("id, telegram_id, username, first_name, last_name")
+            .single();
+        }
 
         if (fallbackUpsert.error || !fallbackUpsert.data) {
           throw fallbackUpsert.error || new Error("Failed to persist user profile");
