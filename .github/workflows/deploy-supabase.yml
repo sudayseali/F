@@ -154,6 +154,23 @@ jobs:
             fi
           fi
 
+          # Remove orphan remote-only tracking entries (migrations deleted/created outside repo,
+          # such as 20261110191540 / 20261110191657) from schema_migrations so db push proceeds.
+          # Note: 'repair --status reverted' only updates the tracking ledger; it never alters DB tables/data.
+          ORPHAN_REMOTE=$(echo "$MIG_LIST" | awk -F'|' '
+            NF >= 2 {
+              local_col = $1; remote_col = $2;
+              gsub(/^[ \t]+|[ \t]+$/, "", local_col);
+              gsub(/^[ \t]+|[ \t]+$/, "", remote_col);
+              if (local_col == "" && remote_col ~ /^[0-9]+$/) {
+                printf "%s ", remote_col
+              }
+            }' | xargs)
+          if [ -n "$ORPHAN_REMOTE" ]; then
+            echo "Reconciling orphan remote-only migration entries (tracking table only): $ORPHAN_REMOTE"
+            supabase migration repair --remote --password "$SUPABASE_DB_PASSWORD" --status reverted $ORPHAN_REMOTE
+          fi
+
           echo "Pushing pending SQL migrations automatically to remote Supabase..."
           supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --include-all --yes
           echo "✅ All pending SQL migrations applied to Supabase."
