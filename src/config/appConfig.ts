@@ -70,14 +70,6 @@ export const APP_CONFIG = {
         placeholder: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
         desc: "Direct crypto payout to your TRON wallet",
       },
-      {
-        id: "payeer" as const,
-        name: "Payeer USD",
-        min: 1.00,
-        network: "Payeer Account",
-        placeholder: "P1000000000",
-        desc: "Instant USD transfer to your Payeer account",
-      },
     ],
   },
 };

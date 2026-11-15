@@ -67,8 +67,8 @@ serve(async (req: Request) => {
     const cleanAmount = validatePositiveAmount(amount, 1.00, 5000.00);
 
     // 3. Validate payment method and address format
-    if (!method || !["usdt", "usdt_bep20", "trx", "payeer"].includes(method)) {
-      throw new AppError("Invalid payment method. Supported methods: USDT (TRC20), USDT (BEP20), TRX, Payeer.", 400, "INVALID_METHOD");
+    if (!method || !["usdt", "usdt_bep20", "trx"].includes(method)) {
+      throw new AppError("Invalid payment method. Supported methods: USDT (TRC20), USDT (BEP20), TRX.", 400, "INVALID_METHOD");
     }
     const cleanAddress = validatePayoutAddress(method, wallet_address);
 

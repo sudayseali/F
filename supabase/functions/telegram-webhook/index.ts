@@ -53,7 +53,7 @@ function buildWelcomeMessage(appUrl: string) {
     "✅ Complete daily tasks &amp; high-paying offerwalls.",
     "✅ Claim +50 PTS Daily Check-In every 24 hours.",
     "✅ Invite friends &amp; earn 10% lifetime commission.",
-    "✅ Withdraw directly to USDT, TRX, or Payeer.",
+    "✅ Withdraw directly to USDT (TRC20 / BEP20) or TRX.",
     "",
     "👉 <b>Tap the button below to launch the App!</b>",
   ].join("\n");

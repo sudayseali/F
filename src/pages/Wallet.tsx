@@ -25,10 +25,6 @@ function validateClientAddress(method: PaymentMethod, addr: string): string | nu
     if (!/^0x[a-fA-F0-9]{40}$/.test(clean)) {
       return "Please enter a valid BNB Smart Chain (BEP20) address starting with '0x' (42 characters).";
     }
-  } else if (method === "payeer") {
-    if (!/^P[0-9]{7,12}$/i.test(clean)) {
-      return "Please enter a valid Payeer account number (e.g. P10000000).";
-    }
   }
   return null;
 }
@@ -342,32 +338,6 @@ export function Wallet() {
                 <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
               </div>
             </div>
-
-            {/* Payeer USD */}
-            <div
-              onClick={() => {
-                tgHaptics.impact("light");
-                setMethod("payeer");
-              }}
-              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
-                method === "payeer"
-                  ? "bg-sky-500/15 border-sky-400 text-white shadow-lg shadow-sky-500/10"
-                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#0088cc] text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
-                  P
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-white">Payeer USD</div>
-                  <div className="text-[10px] text-slate-400">Instant USD transfer to your Payeer account</div>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
-              </div>
-            </div>
           </div>
 
           {/* Form */}
@@ -405,9 +375,7 @@ export function Wallet() {
                     ? "USDT Address (TRC20)"
                     : method === "usdt_bep20"
                     ? "USDT Address (BEP20 / BSC)"
-                    : method === "trx"
-                    ? "TRON (TRX) Wallet Address"
-                    : "Payeer Account Number (P...)"}
+                    : "TRON (TRX) Wallet Address"}
                 </label>
                 <input
                   type="text"
