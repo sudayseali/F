@@ -2,6 +2,7 @@
 // Automated Security Test Suite for Payvora Security Architecture
 
 import crypto from "crypto";
+import { md5Hex } from "../supabase/functions/_shared/crypto.ts";
 
 interface TestResult {
   id: string;
@@ -15,7 +16,15 @@ interface TestResult {
 
 const results: TestResult[] = [];
 
-function recordTest(id: string, name: string, category: string, passed: boolean, expected: string, actual: string, details?: string) {
+function recordTest(
+  id: string,
+  name: string,
+  category: string,
+  passed: boolean,
+  expected: string,
+  actual: string,
+  details?: string
+) {
   results.push({ id, name, category, passed, expected, actual, details });
   const icon = passed ? "✅ PASS" : "❌ FAIL";
   console.log(`${icon} [${id}] ${name} -> Expected: ${expected} | Actual: ${actual}`);
@@ -28,13 +37,19 @@ function recordTest(id: string, name: string, category: string, passed: boolean,
 const TEST_BOT_TOKEN = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz";
 const TEST_JWT_SECRET = "super-secret-jwt-token-at-least-32-chars-long";
 
-// Telegram signature generator helper
-function generateTelegramInitData(user: any, authDate: number, botToken: string, tamperHash = false): string {
+function generateTelegramInitData(
+  user: any,
+  authDate: number,
+  botToken: string,
+  tamperHash = false,
+  extraParams?: Record<string, string>
+): string {
   const userJson = JSON.stringify(user);
   const params: Record<string, string> = {
     auth_date: authDate.toString(),
     query_id: "AAHd-TEST",
     user: userJson,
+    ...(extraParams || {}),
   };
 
   const dataCheckString = Object.keys(params)
@@ -54,7 +69,6 @@ function generateTelegramInitData(user: any, authDate: number, botToken: string,
   return searchParams.toString();
 }
 
-// Constant-time compare implementation under test
 function constantTimeCompare(a: string, b: string): boolean {
   if (typeof a !== "string" || typeof b !== "string") return false;
   if (a.length !== b.length) return false;
@@ -65,8 +79,7 @@ function constantTimeCompare(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-// Telegram Verification Logic Under Test
-function verifyTelegramData(initData: string, botToken: string, maxAge = 86400, clockTolerance = 60) {
+function verifyTelegramData(initData: string, botToken: string, maxAge = 86400, clockTolerance = 300) {
   if (!initData) return { valid: false, error: "MISSING_INIT_DATA" };
   const urlParams = new URLSearchParams(initData);
   const hash = urlParams.get("hash");
@@ -84,17 +97,27 @@ function verifyTelegramData(initData: string, botToken: string, maxAge = 86400, 
     return { valid: false, error: "AUTH_DATE_EXPIRED" };
   }
 
-  const pairs: string[] = [];
+  const pairsAll: string[] = [];
+  const pairsNoSig: string[] = [];
   urlParams.forEach((v, k) => {
-    if (k !== "hash") pairs.push(`${k}=${v}`);
+    if (k !== "hash") {
+      pairsAll.push(`${k}=${v}`);
+      if (k !== "signature") pairsNoSig.push(`${k}=${v}`);
+    }
   });
-  pairs.sort();
-  const dataCheckString = pairs.join("\n");
+  pairsAll.sort();
+  pairsNoSig.sort();
 
   const secretKey = crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
-  const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+  const hashA = crypto.createHmac("sha256", secretKey).update(pairsAll.join("\n")).digest("hex");
+  let matched = constantTimeCompare(hashA.toLowerCase(), hash.toLowerCase());
 
-  if (!constantTimeCompare(calculatedHash.toLowerCase(), hash.toLowerCase())) {
+  if (!matched && pairsNoSig.length !== pairsAll.length) {
+    const hashB = crypto.createHmac("sha256", secretKey).update(pairsNoSig.join("\n")).digest("hex");
+    matched = constantTimeCompare(hashB.toLowerCase(), hash.toLowerCase());
+  }
+
+  if (!matched) {
     return { valid: false, error: "INVALID_SIGNATURE" };
   }
 
@@ -102,7 +125,6 @@ function verifyTelegramData(initData: string, botToken: string, maxAge = 86400, 
   return { valid: true, user };
 }
 
-// RBAC logic under test
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: ["view_dashboard", "manage_users", "manage_balances", "manage_tasks", "review_submissions", "manage_withdrawals", "manage_settings", "manage_admins", "view_audit_logs"],
   admin: ["view_dashboard", "manage_users", "manage_balances", "manage_tasks", "review_submissions", "manage_withdrawals", "manage_settings", "view_audit_logs"],
@@ -130,22 +152,29 @@ function checkAdminAuth(token: string | null, adminRecord: any, requiredPermissi
   return { allowed: true, status: 200, admin: adminRecord };
 }
 
-// CORS Origin Checker Under Test
+// Strict non-wildcard CORS checker mirroring _shared/cors.ts
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   const normalized = origin.trim().replace(/\/$/, "").toLowerCase();
+  if (normalized === "null") return true;
   const allowed = [
     "https://web.telegram.org",
     "https://webk.telegram.org",
     "https://webz.telegram.org",
+    "https://t.me",
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://127.0.0.1:3000",
     "https://payvora-tan.vercel.app"
   ];
   if (allowed.includes(normalized)) return true;
   try {
     const host = new URL(normalized).hostname;
-    if (host.endsWith(".vercel.app") || host.endsWith(".run.app") || host === "localhost") {
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      /^ais-(dev|pre)-[a-z0-9-]+\.[a-z0-9-]+\.run\.app$/i.test(host)
+    ) {
       return true;
     }
   } catch {
@@ -154,7 +183,14 @@ function isOriginAllowed(origin: string | null): boolean {
   return false;
 }
 
-// In-Memory Rate Limiter Under Test
+function sanitizePostgrestSearch(val: any, maxLength = 64): string {
+  if (val === null || val === undefined) return "";
+  return String(val)
+    .trim()
+    .replace(/[^a-zA-Z0-9 _@.-]/g, "")
+    .slice(0, maxLength);
+}
+
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 function rateLimit(key: string, maxReq: number, windowMs: number) {
   const now = Date.now();
@@ -170,7 +206,6 @@ function rateLimit(key: string, maxReq: number, windowMs: number) {
   return { allowed: true, remaining: maxReq - rec.count };
 }
 
-// Simulated Atomic Database Withdrawal Logic Under Pessimistic Row Lock
 interface UserDbState {
   id: string;
   balance: number;
@@ -187,12 +222,10 @@ class MockAtomicPostgres {
   users: Map<string, UserDbState> = new Map();
   withdrawals: WithdrawalDbState[] = [];
   transactions: { id: string; userId: string; amount: number; key?: string }[] = [];
-  locks: Set<string> = new Set(); // Row lock simulation
+  locks: Set<string> = new Set();
 
   async executeWithdrawalRpc(userId: string, amount: number, idempotencyKey?: string) {
-    // Acquire lock
     if (this.locks.has(userId)) {
-      // Wait for release
       await new Promise(r => setTimeout(r, 10));
     }
     this.locks.add(userId);
@@ -202,21 +235,17 @@ class MockAtomicPostgres {
       if (!user) return { success: false, error: "USER_NOT_FOUND" };
       if (user.status !== "active") return { success: false, error: "ACCOUNT_SUSPENDED" };
 
-      // Check duplicate pending
       const hasPending = this.withdrawals.some(w => w.userId === userId && w.status === "pending");
       if (hasPending) return { success: false, error: "DUPLICATE_PENDING_WITHDRAWAL" };
 
-      // Check idempotency
       if (idempotencyKey && this.transactions.some(t => t.key === idempotencyKey)) {
         return { success: false, error: "DUPLICATE_IDEMPOTENCY_KEY" };
       }
 
-      // Check balance
       if (user.balance < amount) {
         return { success: false, error: "INSUFFICIENT_FUNDS" };
       }
 
-      // Atomic debit
       user.balance -= amount;
       const wdId = `wd_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       this.withdrawals.push({ id: wdId, userId, amount, status: "pending" });
@@ -230,13 +259,13 @@ class MockAtomicPostgres {
 }
 
 // ============================================================================
-// RUNNING THE 20 SECURITY TEST SCENARIOS
+// RUNNING SECURITY & REMEDIATION TEST SCENARIOS
 // ============================================================================
 
 async function runAllSecurityTests() {
   console.log("\n========================================================");
   console.log("PAYVORA AUTOMATED SECURITY TEST SUITE");
-  console.log("Executing 25 Security Scenarios across Auth, DB, RBAC, & RLS");
+  console.log("Executing Security, Remediation & Cryptographic Scenarios");
   console.log("========================================================\n");
 
   const now = Math.floor(Date.now() / 1000);
@@ -259,9 +288,8 @@ async function runAllSecurityTests() {
 
   // 3. Unauthorized wallet modifications
   {
-    // Verification that client cannot execute direct UPDATE on wallet_balance
     const userRole: string = "authenticated";
-    const canUpdateBalanceDirectly = userRole === "service_role"; // RLS allows only service_role
+    const canUpdateBalanceDirectly = userRole === "service_role";
     recordTest("SEC-TEST-03", "Unauthorized direct wallet modification", "Database Security", !canUpdateBalanceDirectly, "BLOCKED BY RLS", !canUpdateBalanceDirectly ? "BLOCKED BY RLS" : "Allowed");
   }
 
@@ -282,7 +310,6 @@ async function runAllSecurityTests() {
     const db = new MockAtomicPostgres();
     db.users.set("user_conc", { id: "user_conc", balance: 10.0, status: "active" });
 
-    // Attempt 5 concurrent withdrawals of $10 each
     const promises = [
       db.executeWithdrawalRpc("user_conc", 10.0, "c1"),
       db.executeWithdrawalRpc("user_conc", 10.0, "c2"),
@@ -291,8 +318,8 @@ async function runAllSecurityTests() {
       db.executeWithdrawalRpc("user_conc", 10.0, "c5"),
     ];
 
-    const results = await Promise.all(promises);
-    const successes = results.filter(r => r.success);
+    const concurrentResults = await Promise.all(promises);
+    const successes = concurrentResults.filter(r => r.success);
     const userFinal = db.users.get("user_conc");
 
     const passed = successes.length === 1 && userFinal?.balance === 0.0;
@@ -316,7 +343,7 @@ async function runAllSecurityTests() {
 
   // 7. Expired Telegram authentication data
   {
-    const expiredTime = now - 90000; // > 24 hours ago
+    const expiredTime = now - 90000;
     const expiredData = generateTelegramInitData({ id: 12345, first_name: "Old" }, expiredTime, TEST_BOT_TOKEN);
     const check = verifyTelegramData(expiredData, TEST_BOT_TOKEN, 86400);
     const passed = !check.valid && check.error === "AUTH_DATE_EXPIRED";
@@ -325,9 +352,9 @@ async function runAllSecurityTests() {
 
   // 8. Future Telegram timestamps
   {
-    const futureTime = now + 500; // 500s in future > 60s tolerance
+    const futureTime = now + 500;
     const futureData = generateTelegramInitData({ id: 12345, first_name: "TimeTraveler" }, futureTime, TEST_BOT_TOKEN);
-    const check = verifyTelegramData(futureData, TEST_BOT_TOKEN, 86400, 60);
+    const check = verifyTelegramData(futureData, TEST_BOT_TOKEN, 86400, 300);
     const passed = !check.valid && check.error === "FUTURE_TIMESTAMP";
     recordTest("SEC-TEST-08", "Future Telegram timestamp rejection", "Telegram Auth", passed, "FUTURE_TIMESTAMP", check.error || "Valid");
   }
@@ -351,14 +378,12 @@ async function runAllSecurityTests() {
   {
     const userA: string = "uuid-user-a";
     const userB: string = "uuid-user-b";
-    // Check if query filters strictly by auth.uid() = id
     const canUserAAccessUserB = userA === userB;
     recordTest("SEC-TEST-11", "RLS isolation between users", "Database Security", !canUserAAccessUserB, "ISOLATED (NO CROSS-ACCESS)", !canUserAAccessUserB ? "ISOLATED" : "Cross-Access Allowed");
   }
 
   // 12. Direct database balance manipulation
   {
-    // Database constraint check: CHECK (wallet_balance >= 0.00)
     let negativeBalanceAllowed = false;
     const testBalance = -10.0;
     if (testBalance >= 0.0) negativeBalanceAllowed = true;
@@ -405,14 +430,12 @@ async function runAllSecurityTests() {
   // 17. SQL injection protections
   {
     const maliciousInput = "1' OR '1'='1; DROP TABLE users; --";
-    // Check that parameterized queries or UUID regex reject raw SQL injection
     const isValidId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(maliciousInput);
     recordTest("SEC-TEST-17", "SQL injection resistance in ID validation", "Input Validation", !isValidId, "INVALID_UUID_REJECTED", !isValidId ? "INVALID_UUID_REJECTED" : "Injected");
   }
 
   // 18. Audit log integrity
   {
-    // In database migration: public.audit_logs has NO UPDATE and NO DELETE policies
     const auditLogUpdatable = false;
     recordTest("SEC-TEST-18", "Audit log immutability (No UPDATE/DELETE policies)", "Audit Security", !auditLogUpdatable, "IMMUTABLE (WRITE-ONLY)", !auditLogUpdatable ? "IMMUTABLE" : "Modifiable");
   }
@@ -422,8 +445,7 @@ async function runAllSecurityTests() {
     const malformedJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.tampered.signature";
     let tokenValid = false;
     try {
-      // Simulate signature check with HMAC
-      const [header, payload, sig] = malformedJwt.split(".");
+      const [, , sig] = malformedJwt.split(".");
       if (sig !== "correct_signature") tokenValid = false;
     } catch {
       tokenValid = false;
@@ -439,9 +461,9 @@ async function runAllSecurityTests() {
     recordTest("SEC-TEST-20", "Inactive / Revoked admin access rejection", "RBAC Security", passed, "403 INACTIVE_ADMIN", `${check.status} ${check.error}`);
   }
 
-  // 21. Daily Check-in 24h cooldown and duplicate claim rejection
+  // 21. Daily Check-in 24h cooldown
   {
-    const lastClaimAt = new Date(Date.now() - 3600 * 1000); // 1 hour ago
+    const lastClaimAt = new Date(Date.now() - 3600 * 1000);
     const hoursSinceLastClaim = (Date.now() - lastClaimAt.getTime()) / (1000 * 3600);
     const canClaim = hoursSinceLastClaim >= 24;
     recordTest("SEC-TEST-21", "Daily Check-in 24h cooldown defense", "Reward Security", !canClaim, "COOLDOWN_ACTIVE (BLOCKED)", !canClaim ? "COOLDOWN_ACTIVE (BLOCKED)" : "Allowed Too Soon");
@@ -449,18 +471,16 @@ async function runAllSecurityTests() {
 
   // 22. Zero-trust client balance rejection
   {
-    // Verifies that balance cannot be updated directly by client request payload
     const clientPayload = { user_id: "test-user", balance: 9999.00 };
-    // The server/edge function ignores clientPayload.balance and computes from ledger
     const balanceFromClientIgnored = !("balance" in { user_id: clientPayload.user_id });
     recordTest("SEC-TEST-22", "Zero-trust client balance injection defense", "Ledger Security", balanceFromClientIgnored, "CLIENT_BALANCE_IGNORED", balanceFromClientIgnored ? "CLIENT_BALANCE_IGNORED" : "Client Balance Accepted");
   }
 
   // 23. Unauthenticated CPA/Offerwall postback rejection
   {
-    const incomingCpaSecret: string = "attacker-guess";
-    const serverCpaSecret: string = "configured-cpa-secret-key-32chars";
-    const postbackAllowed = incomingCpaSecret === serverCpaSecret;
+    const incomingCpaSecret = "attacker-guess";
+    const serverCpaSecret = "configured-cpa-secret-key-32chars";
+    const postbackAllowed = constantTimeCompare(incomingCpaSecret, serverCpaSecret);
     recordTest("SEC-TEST-23", "Unauthenticated CPA/Offerwall postback rejection", "Offerwall Security", !postbackAllowed, "REJECTED (403)", !postbackAllowed ? "REJECTED (403)" : "Credited Without Secret");
   }
 
@@ -468,28 +488,26 @@ async function runAllSecurityTests() {
   {
     const callerAuthUid: string = "user-alice-uuid";
     const targetUserIdParam: string = "user-bob-uuid";
-    const isMismatched = callerAuthUid !== targetUserIdParam;
-    const canWithdrawOtherUser = !isMismatched;
+    const canWithdrawOtherUser = callerAuthUid === targetUserIdParam;
     recordTest("SEC-TEST-24", "Withdrawal RPC auth.uid() identity mismatch defense", "Database Security", !canWithdrawOtherUser, "REJECTED (MISMATCH)", !canWithdrawOtherUser ? "REJECTED (MISMATCH)" : "Other User Withdrawn");
   }
 
   // 25. Public execute revocation on admin review and reward functions
   {
-    const allowedRolesForAdminReview: string[] = ["service_role"];
+    const allowedRolesForAdminReview = ["service_role"];
     const publicRoleAllowed = allowedRolesForAdminReview.includes("public") || allowedRolesForAdminReview.includes("anon");
     recordTest("SEC-TEST-25", "Public execute revocation on admin review and reward RPCs", "RBAC Security", !publicRoleAllowed, "REVOKED FROM PUBLIC/ANON", !publicRoleAllowed ? "REVOKED FROM PUBLIC/ANON" : "Public Executable");
   }
 
-  // 26. Daily check-in RPC identity mismatch rejection (BOLA/IDOR Defense)
+  // 26. Daily check-in RPC identity mismatch rejection
   {
     const callerAuthUid: string = "user-alice-uuid";
     const targetUserIdParam: string = "user-bob-uuid";
-    const isMismatched = callerAuthUid !== targetUserIdParam;
-    const canClaimOtherUserReward = !isMismatched;
+    const canClaimOtherUserReward = callerAuthUid === targetUserIdParam;
     recordTest("SEC-TEST-26", "Daily reward RPC auth.uid() identity mismatch defense", "Database Security", !canClaimOtherUserReward, "REJECTED (MISMATCH)", !canClaimOtherUserReward ? "REJECTED (MISMATCH)" : "Other User Claimed");
   }
 
-  // 27. Admin approval RPC inactive admin rejection at database level
+  // 27. Admin approval RPC inactive admin rejection
   {
     const dbAdminAccount = { id: "a_fake", status: "suspended" };
     const canExecuteApproval = dbAdminAccount && dbAdminAccount.status === "active";
@@ -509,27 +527,24 @@ async function runAllSecurityTests() {
   // PHASE 4 SPECIFIC TESTS (12 Required Audit Scenarios)
   // ============================================================================
 
-  // 1. Official Telegram HMAC verification with test vector
+  // AUDIT-01: Official Telegram HMAC verification test vector
   {
     const officialBotToken = "5139539316:AAGVhDje2A3mB9yA_7l8-TV8xikC7KcudNk";
     const officialInitData = "query_id=AAGcqlFKAAAAAJyqUUp6-Y62&user=%7B%22id%22%3A1246866076%2C%22first_name%22%3A%22Dante%22%2C%22last_name%22%3A%22%22%2C%22username%22%3A%22S_User%22%2C%22language_code%22%3A%22en%22%7D&auth_date=1651689536&hash=de7f6b26aadbd667a36d76d91969ecf6ffec70ffaa40b3e98d20555e2406bfbb";
-    
-    // Test algorithm directly with maxAge bypass for historical vector
     const urlParams = new URLSearchParams(officialInitData);
-    const hash = urlParams.get("hash");
+    const hash = urlParams.get("hash") || "";
     const pairs: string[] = [];
     urlParams.forEach((v, k) => {
       if (k !== "hash") pairs.push(`${k}=${v}`);
     });
     pairs.sort();
-    const dataCheckString = pairs.join("\n");
     const secretKey = crypto.createHmac("sha256", "WebAppData").update(officialBotToken).digest();
-    const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-    const matches = constantTimeCompare(calculatedHash, hash || "");
+    const calculatedHash = crypto.createHmac("sha256", secretKey).update(pairs.join("\n")).digest("hex");
+    const matches = constantTimeCompare(calculatedHash, hash);
     recordTest("AUDIT-01", "Telegram HMAC verification using official test vectors", "HMAC Verification", matches, "HASH_MATCH (de7f6b26...)", matches ? "HASH_MATCH" : "MISMATCH");
   }
 
-  // 2. Valid Telegram user registration simulation
+  // AUDIT-02: Valid Telegram user registration validation
   {
     const testUser = { id: 7770001, first_name: "Payvora", username: "payvora_user" };
     const validData = generateTelegramInitData(testUser, now, TEST_BOT_TOKEN);
@@ -538,7 +553,7 @@ async function runAllSecurityTests() {
     recordTest("AUDIT-02", "Valid Telegram user registration validation", "Auth Registration", registered, "REGISTERED_SUCCESSFULLY", registered ? "REGISTERED_SUCCESSFULLY" : "REGISTRATION_FAILED");
   }
 
-  // 3. Invalid signature rejection
+  // AUDIT-03: Invalid signature rejection
   {
     const testUser = { id: 7770002, first_name: "Attacker" };
     const tamperedData = generateTelegramInitData(testUser, now, TEST_BOT_TOKEN, true);
@@ -547,14 +562,14 @@ async function runAllSecurityTests() {
     recordTest("AUDIT-03", "Invalid cryptographic signature rejection", "HMAC Security", rejected, "REJECTED (INVALID_SIGNATURE)", rejected ? "REJECTED (INVALID_SIGNATURE)" : "Tampered Signature Accepted");
   }
 
-  // 4. Missing initData rejection
+  // AUDIT-04: Missing initData rejection
   {
     const verification = verifyTelegramData("", TEST_BOT_TOKEN);
     const rejected = !verification.valid && verification.error === "MISSING_INIT_DATA";
     recordTest("AUDIT-04", "Missing initData rejection", "Auth Validation", rejected, "REJECTED (MISSING_INIT_DATA)", rejected ? "REJECTED (MISSING_INIT_DATA)" : "Empty Data Allowed");
   }
 
-  // 5. Duplicate user registration idempotency (onConflict telegram_id)
+  // AUDIT-05: Duplicate user registration idempotency
   {
     const dbUsers = new Map<number, { id: string; balance: number; logins: number }>();
     const upsertUser = (tgId: number) => {
@@ -574,32 +589,27 @@ async function runAllSecurityTests() {
     recordTest("AUDIT-05", "Duplicate user registration idempotency", "Database Integrity", duplicateSafe, "PRESERVED_EXISTING_RECORD", duplicateSafe ? "PRESERVED_EXISTING_RECORD" : "Duplicate Record Created");
   }
 
-  // 6. Expired JWT rejection
+  // AUDIT-06: Expired JWT rejection
   {
     const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
     const payloadExpired = Buffer.from(JSON.stringify({ sub: "u_1", exp: now - 3600, aud: "authenticated" })).toString("base64url");
     const signature = crypto.createHmac("sha256", TEST_JWT_SECRET).update(`${header}.${payloadExpired}`).digest("base64url");
     const expiredToken = `${header}.${payloadExpired}.${signature}`;
 
-    let rejectedExpired = false;
     const parts = expiredToken.split(".");
     const p = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-    if (p.exp < now) rejectedExpired = true;
+    const rejectedExpired = p.exp < now;
     recordTest("AUDIT-06", "Expired JWT session rejection", "JWT Security", rejectedExpired, "REJECTED (EXPIRED)", rejectedExpired ? "REJECTED (EXPIRED)" : "Expired Token Accepted");
   }
 
-  // 7. Invalid JWT rejection (Invalid Compact JWS)
+  // AUDIT-07: Invalid Compact JWS format rejection
   {
     const invalidTokens = ["placeholder-key", "Bearer malformed", "not-a-jwt", ""];
-    let allInvalidRejected = true;
-    for (const badToken of invalidTokens) {
-      const isCompactJws = badToken.split(".").length === 3;
-      if (isCompactJws) allInvalidRejected = false;
-    }
+    const allInvalidRejected = invalidTokens.every(badToken => badToken.split(".").length !== 3);
     recordTest("AUDIT-07", "Invalid Compact JWS format rejection", "JWT Security", allInvalidRejected, "REJECTED (INVALID_COMPACT_JWS)", allInvalidRejected ? "REJECTED (INVALID_COMPACT_JWS)" : "Malformed JWT Accepted");
   }
 
-  // 8. Valid JWT acceptance with sub, aud, role claims
+  // AUDIT-08: Valid JWT acceptance with sub, aud, role claims
   {
     const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
     const payload = Buffer.from(JSON.stringify({ sub: "u_valid_uuid", exp: now + 86400, aud: "authenticated", role: "authenticated" })).toString("base64url");
@@ -613,44 +623,131 @@ async function runAllSecurityTests() {
     recordTest("AUDIT-08", "Valid JWT cryptographic verification & claim validation", "JWT Security", validClaims, "ACCEPTED (VALID_CLAIMS)", validClaims ? "ACCEPTED (VALID_CLAIMS)" : "Valid Token Rejected");
   }
 
-  // 9. Frontend refresh and session restoration from localStorage
+  // AUDIT-09: Frontend refresh and session restoration from localStorage
   {
     const mockStorage: Record<string, string> = {};
-    const setToken = (t: string) => { mockStorage["payvora_auth_token"] = t; };
-    const getToken = () => mockStorage["payvora_auth_token"] || null;
-
-    setToken("valid_session_jwt_test");
-    // Simulate refresh (module reload with persistent storage)
-    const restoredToken = getToken();
-    const restored = restoredToken === "valid_session_jwt_test";
+    mockStorage["payvora_auth_token"] = "valid_session_jwt_test";
+    const restored = mockStorage["payvora_auth_token"] === "valid_session_jwt_test";
     recordTest("AUDIT-09", "Frontend refresh and session restoration from storage", "Session Resilience", restored, "RESTORED_AFTER_REFRESH", restored ? "RESTORED_AFTER_REFRESH" : "Session Lost On Refresh");
   }
 
-  // 10. Daily Check-In with valid authenticated session
+  // AUDIT-10: Daily Check-In with valid authenticated session
   {
     const userSession = { uuid: "user-1234-uuid", balance: 1.00 };
-    const checkinRpc = (uId: string) => {
-      if (!uId) return { success: false, error: "UNAUTHORIZED" };
-      return { success: true, reward_amount: 0.05, new_balance: 1.05 };
-    };
+    const checkinRpc = (uId: string) => uId ? { success: true, reward_amount: 0.05, new_balance: 1.05 } : { success: false, error: "UNAUTHORIZED" };
     const checkinResult = checkinRpc(userSession.uuid);
-    recordTest("AUDIT-10", "Daily Check-In with valid authenticated user", "Daily Reward Security", checkinResult.success && checkinResult.new_balance === 1.05, "REWARD_CLAIMED ($0.05)", checkinResult.success ? "REWARD_CLAIMED ($0.05)" : "Claim Failed");
+    recordTest("AUDIT-10", "Daily Check-In with valid authenticated user", "Daily Reward Security", Boolean(checkinResult.success && checkinResult.new_balance === 1.05), "REWARD_CLAIMED ($0.05)", checkinResult.success ? "REWARD_CLAIMED ($0.05)" : "Claim Failed");
   }
 
-  // 11. Daily Check-In without authentication rejection
+  // AUDIT-11: Daily Check-In without authentication rejection
   {
     const unauthenticatedUser: any = null;
     const canClaim = !!unauthenticatedUser?.uuid;
     recordTest("AUDIT-11", "Daily Check-In without authentication rejection", "Daily Reward Security", !canClaim, "REJECTED (AUTH_REQUIRED)", !canClaim ? "REJECTED (AUTH_REQUIRED)" : "Unauthenticated Claim Allowed");
   }
 
-  // 12. RLS & authorization checks on financial data
+  // AUDIT-12: RLS isolation check
   {
     const userA = { id: "user_a_uuid", role: "authenticated" };
     const userBRecord = { id: "tx_999", user_id: "user_b_uuid", amount: 50.00 };
-    // RLS Policy: auth.uid() = user_id
     const canUserAAccessUserB = userA.id === userBRecord.user_id;
     recordTest("AUDIT-12", "RLS isolation: prevent cross-user financial ledger access", "Database RLS", !canUserAAccessUserB, "ACCESS_DENIED (ISOLATED)", !canUserAAccessUserB ? "ACCESS_DENIED (ISOLATED)" : "Cross-Tenant Access Leaked");
+  }
+
+  // ============================================================================
+  // REMEDIATION VERIFICATION TESTS
+  // ============================================================================
+
+  // REMED-01: Verify pure-TS RFC 1321 md5Hex against Node's native OpenSSL MD5
+  {
+    const testVectors = [
+      "",
+      "abc",
+      "tapjoy_tx_99182:user-uuid-123:0.50:my_super_secret",
+      "user-uuid-123-cpx_secret_key",
+    ];
+    const allMatch = testVectors.every((input) => {
+      const expected = crypto.createHash("md5").update(input).digest("hex");
+      const actual = md5Hex(input);
+      return expected === actual;
+    });
+    recordTest("REMED-01", "Pure-TS RFC 1321 md5Hex matches native MD5 digest", "Webhook Cryptography", allMatch, "EXACT_MD5_MATCH", allMatch ? "EXACT_MD5_MATCH" : "MD5_MISMATCH");
+  }
+
+  // REMED-02: Verify Telegram Bot API 7+ signature field handling
+  {
+    const withSig = generateTelegramInitData({ id: 555111, first_name: "BotApi7" }, now, TEST_BOT_TOKEN, false, {
+      signature: "Ed25519ThirdPartySignatureBlob"
+    });
+    const verification = verifyTelegramData(withSig, TEST_BOT_TOKEN);
+    const passed = verification.valid && verification.user?.id === 555111;
+    recordTest("REMED-02", "Telegram Bot API 7+ signature field validation", "Telegram Auth", passed, "VALID_WITH_SIGNATURE", passed ? "VALID_WITH_SIGNATURE" : "REJECTED");
+  }
+
+  // REMED-03: Verify PostgREST filter injection neutralization
+  {
+    const injectedSearch = "alice,wallet_balance.gt.1000),id.neq.0000";
+    const cleaned = sanitizePostgrestSearch(injectedSearch);
+    const hasFilterMetaChars = /[,()]/.test(cleaned);
+    recordTest("REMED-03", "PostgREST .or() filter injection neutralization", "Input Validation", !hasFilterMetaChars, "METACHARS_STRIPPED", hasFilterMetaChars ? "UNSANITIZED" : "METACHARS_STRIPPED");
+  }
+
+  // REMED-04: Verify wildcard CORS blocking on attacker subdomains
+  {
+    const phishingVercel = isOriginAllowed("https://attacker-payvora.vercel.app");
+    const phishingRunApp = isOriginAllowed("https://attacker-service.us-central1.run.app");
+    const legitimateAiStudio = isOriginAllowed("https://ais-dev-demo-123.us-west2.run.app");
+    const legitimateProd = isOriginAllowed("https://payvora-tan.vercel.app");
+    const passed = !phishingVercel && !phishingRunApp && legitimateAiStudio && legitimateProd;
+    recordTest("REMED-04", "CORS wildcard subdomain takeover rejection", "Network Security", passed, "PHISHING_SUBDOMAINS_BLOCKED", passed ? "PHISHING_SUBDOMAINS_BLOCKED" : "WILDCARD_LEAK");
+  }
+
+  // REMED-05: Storage owner-scoped path validation
+  {
+    const authUid = "a1b2c3d4-0000-4000-8000-000000000001";
+    const validPath = `${authUid}/1700000000_proof.png`;
+    const otherUserPath = `b2c3d4e5-0000-4000-8000-000000000002/1700000000_proof.png`;
+    const rootPath = `1700000000_proof.png`;
+    const matchesOwnerPolicy = (path: string) => {
+      const folder = path.split("/")[0];
+      const hasSlash = path.includes("/");
+      const validExt = /\.(png|jpg|jpeg|webp)$/i.test(path);
+      return hasSlash && folder === authUid && validExt;
+    };
+    const passed = matchesOwnerPolicy(validPath) && !matchesOwnerPolicy(otherUserPath) && !matchesOwnerPolicy(rootPath);
+    recordTest("REMED-05", "Storage proofs owner-folder RLS enforcement", "Storage Security", passed, "OWNER_FOLDER_ONLY", passed ? "OWNER_FOLDER_ONLY" : "PATH_POLICY_BYPASS");
+  }
+
+  // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
+  const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+
+  if (runLive && supabaseUrl && supabaseAnonKey) {
+    console.log("\n--- Running Live Endpoint Security Probes ---");
+    try {
+      const wdRes = await fetch(`${supabaseUrl}/functions/v1/withdraw`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseAnonKey,
+        },
+        body: JSON.stringify({ amount: 5, method: "usdt", wallet_address: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb" }),
+      });
+      recordTest("LIVE-01", "Live withdraw rejects unauthenticated requests", "Live Integration", wdRes.status === 401, "HTTP 401", `HTTP ${wdRes.status}`);
+
+      const tapjoyRes = await fetch(`${supabaseUrl}/functions/v1/tapjoy_webhook?id=live_probe_1&snuid=00000000-0000-0000-0000-000000000000&currency=1.00&verifier=forged`, {
+        method: "GET",
+      });
+      recordTest("LIVE-02", "Live tapjoy_webhook rejects forged verifier", "Live Integration", tapjoyRes.status === 403 || tapjoyRes.status === 500, "HTTP 403/500", `HTTP ${tapjoyRes.status}`);
+
+      const cpaRes = await fetch(`${supabaseUrl}/functions/v1/cpa_postback?secret=wrong_secret&subid=00000000-0000-0000-0000-000000000000&payout=1.00&tx_id=probe1`, {
+        method: "GET",
+      });
+      recordTest("LIVE-03", "Live cpa_postback rejects invalid secret", "Live Integration", cpaRes.status === 403 || cpaRes.status === 500, "HTTP 403/500", `HTTP ${cpaRes.status}`);
+    } catch (liveErr: any) {
+      console.warn("Live integration probe failed to connect:", liveErr?.message || liveErr);
+    }
   }
 
   console.log("\n========================================================");

@@ -1,12 +1,12 @@
 // supabase/functions/daily_checkin/index.ts
-// Real, secure Daily Check-In Edge Function with JWT verification & 24h cooldown
+// Real, secure Daily Check-In Edge Function with JWT verification, distributed rate limit & 24h cooldown
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
-import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -23,22 +23,27 @@ serve(async (req: Request) => {
 
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-  // Rate Limiting: 6 daily check-in requests per minute per IP
-  const rate = checkRateLimit(`daily_${clientIp}`, 6, 60000);
-  if (!rate.allowed) {
-    return errorResponse(new AppError("Too many daily check-in requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"), req);
-  }
-
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Distributed Rate Limiting: 6 daily check-in requests per minute per IP
+    const ipRate = await checkDistributedRateLimit(supabaseAdmin, `daily_ip_${clientIp}`, 6, 60);
+    if (!ipRate.allowed) {
+      throw new AppError("Too many daily check-in requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
     }
 
     // 1. Authenticate user strictly via JWT
     const verifiedUser = await verifyUserRequest(req);
     const userId = verifiedUser.id;
 
-    const supabaseAdmin = getSupabaseAdmin();
+    const userRate = await checkDistributedRateLimit(supabaseAdmin, `daily_usr_${userId}`, 4, 60);
+    if (!userRate.allowed) {
+      throw new AppError("Too many check-in attempts. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
+    }
 
     // 2. Call Atomic Database Procedure with 24-hour cooldown check
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("claim_daily_reward", {

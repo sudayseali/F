@@ -1,25 +1,28 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-const WEBAPP_URL = "https://your-mini-app-url.com"; // User will need to set this appropriately if they want a Play button. Or we can just send text.
 
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Security: Verify Telegram Webhook secret token if configured
+  // Fail-closed: Enforce Telegram Webhook secret token in constant time
   const webhookSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
-  if (webhookSecret) {
-    const incomingSecret = req.headers.get("x-telegram-bot-api-secret-token");
-    if (!incomingSecret || incomingSecret !== webhookSecret) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+  if (!webhookSecret) {
+    console.error("[TELEGRAM_WEBHOOK_MISCONFIG] TELEGRAM_WEBHOOK_SECRET is not set");
+    return new Response("Server Misconfiguration", { status: 500 });
+  }
+
+  const incomingSecret = req.headers.get("x-telegram-bot-api-secret-token") || "";
+  if (!incomingSecret || !constantTimeCompare(incomingSecret, webhookSecret)) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {
     const update = await req.json();
-    console.log("Received update:", JSON.stringify(update));
+    console.log("Received Telegram update:", update?.update_id ?? "unknown");
 
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
@@ -65,44 +68,39 @@ A modern platform where you can complete various tasks and invite friends to ear
         };
 
         if (BOT_TOKEN) {
-             const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(payload)
-            });
-            const result = await res.json();
-            console.log("Telegram API Start Response:", result);
+          const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          await res.json().catch(() => null);
         } else {
-            console.error("TELEGRAM_BOT_TOKEN is not set in environment variables");
+          console.error("TELEGRAM_BOT_TOKEN is not set in environment variables");
         }
       }
     } else if (update.callback_query) {
-       const callbackQuery = update.callback_query;
-       if (callbackQuery.data === "help") {
-          const helpMessage = `
+      const callbackQuery = update.callback_query;
+      if (callbackQuery.data === "help") {
+        const helpMessage = `
 You need to open the Mini App to see the tasks available for you.
 If you have any questions, please contact the administration.
-          `;
-          if (BOT_TOKEN) {
-             const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ chat_id: callbackQuery.message.chat.id, text: helpMessage })
-            });
-            console.log("Telegram API Help Response:", await res.json());
-          }
-       }
+        `;
+        if (BOT_TOKEN) {
+          const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: callbackQuery.message.chat.id, text: helpMessage })
+          });
+          await res.json().catch(() => null);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error) {
-    console.error("Error processing request:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  } catch (error: any) {
+    console.error("Error processing request:", error?.message || error);
+    return new Response(JSON.stringify({ error: "Webhook processing failed" }), { status: 500 });
   }
 });

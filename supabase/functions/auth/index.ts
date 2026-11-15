@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 import { getCorsHeaders, handleCors } from "../_shared/cors.ts";
 import { verifyTelegramInitData } from "../_shared/telegram-verification.ts";
-import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
@@ -25,15 +25,17 @@ serve(async (req: Request) => {
 
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-  // Rate Limiting: 20 auth attempts per minute per IP
-  const rate = checkRateLimit(`auth_${clientIp}`, 20, 60000);
-  if (!rate.allowed) {
-    return errorResponse(new AppError("Too many authentication attempts. Please try again later.", 429, "RATE_LIMIT_EXCEEDED"), req);
-  }
-
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Distributed Rate Limiting: 20 auth attempts per minute per IP
+    const rate = await checkDistributedRateLimit(supabaseAdmin, `auth_ip_${clientIp}`, 20, 60);
+    if (!rate.allowed) {
+      throw new AppError("Too many authentication attempts. Please try again later.", 429, "RATE_LIMIT_EXCEEDED");
     }
 
     const BOT_TOKEN = (Deno.env.get("TELEGRAM_BOT_TOKEN") || "").trim().replace(/^["']|["']$/g, '').trim();
@@ -53,8 +55,6 @@ serve(async (req: Request) => {
     if (!JWT_SECRET) {
       throw new AppError("Server configuration error: JWT_SECRET is not set.", 500, "CONFIG_ERROR");
     }
-
-    const supabaseAdmin = getSupabaseAdmin();
 
     // 1. Cryptographic HMAC-SHA256 Verification with Clock Tolerance & Replay Check
     const verification = await verifyTelegramInitData(initData, BOT_TOKEN);

@@ -6,9 +6,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
-import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
-import { validatePositiveAmount, sanitizeString, isValidUuid } from "../_shared/validation.ts";
+import { validatePositiveAmount, sanitizeString, sanitizePostgrestSearch, isValidUuid } from "../_shared/validation.ts";
 import { AdminRole } from "../_shared/permissions.ts";
 
 function getSupabaseAdmin() {
@@ -24,19 +24,19 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const supabaseAdmin = getSupabaseAdmin();
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-
-  // Rate limiting for admin requests (120 reqs / minute per IP)
-  const rate = checkRateLimit(`admin_${clientIp}`, 120, 60000);
-  if (!rate.allowed) {
-    return errorResponse(new AppError("Too many admin requests. Rate limit exceeded.", 429, "RATE_LIMIT_EXCEEDED"));
-  }
-
   try {
+    const supabaseAdmin = getSupabaseAdmin();
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+    // Distributed rate limiting for admin requests (120 reqs / 60s per IP)
+    const rate = await checkDistributedRateLimit(supabaseAdmin, `admin_ip_${clientIp}`, 120, 60);
+    if (!rate.allowed) {
+      return errorResponse(new AppError("Too many admin requests. Rate limit exceeded.", 429, "RATE_LIMIT_EXCEEDED"), req);
+    }
+
     const url = new URL(req.url);
     const body = req.method !== "GET" ? await req.json().catch(() => ({})) : {};
-    
+
     // Support either path routing (/admin_api/get_users) or action payload ({ action: "get_users" })
     const pathAction = url.pathname.split("/").filter(Boolean).pop();
     const action = body.action || (pathAction !== "admin_api" && pathAction !== "admin_action" ? pathAction : null);
@@ -89,7 +89,7 @@ serve(async (req: Request) => {
           totalPaidOut: totalPaidOut,
         },
         recentTransactions: recentTransactions || []
-      });
+      }, 200, req);
     }
 
     // ========================================================================
@@ -99,12 +99,17 @@ serve(async (req: Request) => {
       await verifyAdminRequest(req, "manage_users");
       const page = Math.max(1, parseInt(body.page || url.searchParams.get("page") || "1"));
       const limit = Math.min(100, Math.max(1, parseInt(body.limit || url.searchParams.get("limit") || "20")));
-      const search = body.search || url.searchParams.get("search");
+      const rawSearch = body.search || url.searchParams.get("search");
+      const cleanSearch = sanitizePostgrestSearch(rawSearch);
       const offset = (page - 1) * limit;
 
       let query = supabaseAdmin.from("users").select("*", { count: "exact" });
-      if (search) {
-        query = query.or(`username.ilike.%${search}%,first_name.ilike.%${search}%,telegram_id.eq.${parseInt(search) || 0}`);
+      if (cleanSearch) {
+        const filters = [`username.ilike.%${cleanSearch}%`, `first_name.ilike.%${cleanSearch}%`];
+        if (/^\d+$/.test(cleanSearch)) {
+          filters.push(`telegram_id.eq.${cleanSearch}`);
+        }
+        query = query.or(filters.join(","));
       }
 
       const { data: users, count, error } = await query
@@ -112,7 +117,7 @@ serve(async (req: Request) => {
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return successResponse({ users, total: count, page, limit });
+      return successResponse({ users, total: count, page, limit }, 200, req);
     }
 
     if (action === "update_user_status") {
@@ -139,27 +144,33 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse({ message: `User status updated to ${status}.` });
+      return successResponse({ message: `User status updated to ${status}.` }, 200, req);
     }
 
     if (action === "adjust_user_balance") {
       const admin = await verifyAdminRequest(req, "manage_balances");
-      const { userId, amount, reason, type } = body;
+      const { userId, amount, reason, type, idempotencyKey } = body;
 
       if (!userId || !isValidUuid(userId)) throw new AppError("Valid userId is required.", 400, "INVALID_USER_ID");
       const numAmount = validatePositiveAmount(amount, 0.01, 10000.0);
       const isDeduction = type === "deduct";
       const finalAmount = isDeduction ? -numAmount : numAmount;
+      const safeKey = typeof idempotencyKey === "string" && /^[a-zA-Z0-9_-]{8,100}$/.test(idempotencyKey)
+        ? `adj_${idempotencyKey}`
+        : `adj_${crypto.randomUUID()}_${userId}`;
 
       const { data: rpcResult, error } = await supabaseAdmin.rpc("atomic_wallet_credit", {
         p_user_id: userId,
         p_amount: finalAmount,
         p_type: "manual_adjustment",
-        p_idempotency_key: `adj_${Date.now()}_${userId}`,
+        p_idempotency_key: safeKey,
         p_description: `Admin adjustment (${admin.email}): ${sanitizeString(reason || "Manual update")}`
       });
 
       if (error) throw error;
+      if (rpcResult && rpcResult.success === false) {
+        throw new AppError(rpcResult.error || "Balance adjustment failed.", 400, "ADJUSTMENT_FAILED");
+      }
 
       await logAuditEvent({
         actorId: admin.id,
@@ -171,7 +182,7 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse(rpcResult);
+      return successResponse(rpcResult, 200, req);
     }
 
     // ========================================================================
@@ -197,7 +208,7 @@ serve(async (req: Request) => {
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return successResponse({ withdrawals, total: count, page, limit });
+      return successResponse({ withdrawals, total: count, page, limit }, 200, req);
     }
 
     if (action === "approve_withdrawal") {
@@ -216,7 +227,7 @@ serve(async (req: Request) => {
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Approval failed", 400, "APPROVAL_FAILED");
 
-      return successResponse(result);
+      return successResponse(result, 200, req);
     }
 
     if (action === "reject_withdrawal") {
@@ -235,7 +246,7 @@ serve(async (req: Request) => {
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Rejection failed", 400, "REJECTION_FAILED");
 
-      return successResponse(result);
+      return successResponse(result, 200, req);
     }
 
     // ========================================================================
@@ -249,7 +260,7 @@ serve(async (req: Request) => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return successResponse({ tasks });
+      return successResponse({ tasks }, 200, req);
     }
 
     if (action === "create_task") {
@@ -287,7 +298,7 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse({ task: newTask });
+      return successResponse({ task: newTask }, 200, req);
     }
 
     if (action === "update_task_status") {
@@ -300,7 +311,17 @@ serve(async (req: Request) => {
       const { error } = await supabaseAdmin.from("tasks").update({ status }).eq("id", taskId);
       if (error) throw error;
 
-      return successResponse({ message: `Task status updated to ${status}.` });
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "task_status_updated",
+        targetType: "task",
+        targetId: taskId,
+        details: { status },
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ message: `Task status updated to ${status}.` }, 200, req);
     }
 
     if (action === "get_submissions") {
@@ -323,7 +344,7 @@ serve(async (req: Request) => {
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return successResponse({ submissions, total: count, page, limit });
+      return successResponse({ submissions, total: count, page, limit }, 200, req);
     }
 
     if (action === "review_submission") {
@@ -343,7 +364,7 @@ serve(async (req: Request) => {
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Review failed", 400, "REVIEW_FAILED");
 
-      return successResponse(result);
+      return successResponse(result, 200, req);
     }
 
     // ========================================================================
@@ -353,17 +374,17 @@ serve(async (req: Request) => {
       await verifyAdminRequest(req, "manage_settings");
       const { data: settings, error } = await supabaseAdmin.from("app_settings").select("*");
       if (error) throw error;
-      return successResponse({ settings });
+      return successResponse({ settings }, 200, req);
     }
 
     if (action === "update_setting") {
       const admin = await verifyAdminRequest(req, "manage_settings");
       const { key, value } = body;
-      if (!key || typeof value !== "object") throw new AppError("Key and JSON object value required.", 400, "INVALID_SETTINGS");
+      if (!key || typeof value !== "object" || value === null) throw new AppError("Key and JSON object value required.", 400, "INVALID_SETTINGS");
 
       const { error } = await supabaseAdmin
         .from("app_settings")
-        .upsert({ key, value, updated_at: new Date().toISOString() });
+        .upsert({ key: sanitizeString(key, 64), value, updated_at: new Date().toISOString() });
 
       if (error) throw error;
 
@@ -377,7 +398,7 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse({ message: `Setting '${key}' updated successfully.` });
+      return successResponse({ message: `Setting '${key}' updated successfully.` }, 200, req);
     }
 
     if (action === "get_audit_logs") {
@@ -393,7 +414,7 @@ serve(async (req: Request) => {
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return successResponse({ logs, total: count, page, limit });
+      return successResponse({ logs, total: count, page, limit }, 200, req);
     }
 
     // ========================================================================
@@ -407,7 +428,7 @@ serve(async (req: Request) => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return successResponse({ admins });
+      return successResponse({ admins }, 200, req);
     }
 
     if (action === "update_admin_role") {
@@ -455,12 +476,12 @@ serve(async (req: Request) => {
         ipAddress: clientIp,
       });
 
-      return successResponse({ message: "Administrator permissions updated successfully." });
+      return successResponse({ message: "Administrator permissions updated successfully." }, 200, req);
     }
 
     throw new AppError(`Unknown admin action: '${action}'`, 404, "UNKNOWN_ACTION");
 
   } catch (err) {
-    return errorResponse(err);
+    return errorResponse(err, req);
   }
 });

@@ -62,6 +62,15 @@ export function sanitizeString(val: any, maxLength = 500): string {
   return str.replace(/<[^>]*>?/gm, '').slice(0, maxLength);
 }
 
+export function sanitizePostgrestSearch(val: any, maxLength = 64): string {
+  if (val === null || val === undefined) return '';
+  // Allow only safe identifier/name characters so PostgREST .or() filter syntax cannot be injected
+  return String(val)
+    .trim()
+    .replace(/[^a-zA-Z0-9 _@.-]/g, '')
+    .slice(0, maxLength);
+}
+
 export function isValidUuid(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);

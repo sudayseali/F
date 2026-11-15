@@ -1,19 +1,37 @@
-import { 
-  ArrowDownLeft, ShieldCheck, Wallet as WalletIcon, 
-  History, ArrowLeft, ChevronRight, Loader2, Coins 
+import {
+  ArrowDownLeft, ArrowUpRight, ShieldCheck, Wallet as WalletIcon
 } from "lucide-react";
-import React, { useState, useMemo, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { supabase } from "../lib/supabase";
+import { supabase, invokeEdgeFunction } from "../lib/supabase";
 import { tgHaptics } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
 import { PayvoraSpinner, PayvoraLoadingState } from "../components";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
-import type { PaymentMethod, ModalState } from "../types";
+import type { PaymentMethod } from "../types";
 
 const METHODS = APP_CONFIG.payouts.supportedMethods;
+
+function validateClientAddress(method: PaymentMethod, addr: string): string | null {
+  const clean = addr.trim();
+  if (!clean) return "Please enter your recipient wallet address.";
+  if (method === "usdt" || method === "trx") {
+    if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(clean)) {
+      return "Please enter a valid TRON (TRC20 / TRX) address starting with 'T' (34 characters).";
+    }
+  } else if (method === "usdt_bep20") {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(clean)) {
+      return "Please enter a valid BNB Smart Chain (BEP20) address starting with '0x' (42 characters).";
+    }
+  } else if (method === "payeer") {
+    if (!/^P[0-9]{7,12}$/i.test(clean)) {
+      return "Please enter a valid Payeer account number (e.g. P10000000).";
+    }
+  }
+  return null;
+}
 
 export function Wallet() {
   const { user, refreshUser } = useTelegram();
@@ -27,7 +45,6 @@ export function Wallet() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal feedback
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -40,31 +57,42 @@ export function Wallet() {
     type: "info"
   });
 
-  useEffect(() => {
-    async function fetchTransactions() {
-      if (!user?.uuid) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.uuid)
-          .order("created_at", { ascending: false });
-        if (data) setTransactions(data);
-      } catch (err) {
-        console.error("Error fetching transactions:", err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchTransactions = useCallback(async () => {
+    if (!user?.uuid) {
+      setLoading(false);
+      return;
     }
-    fetchTransactions();
+    try {
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.uuid)
+        .order("created_at", { ascending: false });
+      if (data) setTransactions(data);
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user?.uuid]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     tgHaptics.impact("medium");
+
+    if (!user?.uuid) {
+      setModalState({
+        isOpen: true,
+        title: "Authentication Required",
+        message: `Please launch Payvora from @${APP_CONFIG.telegram.botUsername} to submit a withdrawal.`,
+        type: "error"
+      });
+      return;
+    }
 
     const numAmount = parseFloat(amount);
     if (!method) {
@@ -77,11 +105,11 @@ export function Wallet() {
       return;
     }
 
-    if (!numAmount || numAmount < 1.0) {
+    if (!Number.isFinite(numAmount) || numAmount < APP_CONFIG.payouts.minWithdrawalUsd) {
       setModalState({
         isOpen: true,
         title: "Minimum Amount",
-        message: "The minimum withdrawal amount is $1.00.",
+        message: `The minimum withdrawal amount is $${APP_CONFIG.payouts.minWithdrawalUsd.toFixed(2)}.`,
         type: "error"
       });
       return;
@@ -97,38 +125,39 @@ export function Wallet() {
       return;
     }
 
-    if (!address.trim()) {
+    const addressErr = validateClientAddress(method, address);
+    if (addressErr) {
       setModalState({
         isOpen: true,
-        title: "Address Required",
-        message: "Please enter your recipient wallet address or phone number.",
+        title: "Invalid Address",
+        message: addressErr,
         type: "error"
       });
       return;
     }
 
+    const cleanAddress = address.trim();
+    const idempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `wd_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
     setIsProcessing(true);
     try {
-      const res = await supabase.functions.invoke("withdraw", {
-        body: { amount: numAmount, method, wallet_address: address }
+      await invokeEdgeFunction("withdraw", {
+        amount: numAmount,
+        method,
+        wallet_address: cleanAddress,
+        idempotency_key: idempotencyKey,
       });
-      
-      if (res.error) {
-        throw new Error(res.error.message || "Withdrawal request failed");
-      }
 
-      const resData = res.data;
-      if (resData && !resData.success && resData.error) {
-        throw new Error(resData.error);
-      }
-
-      await refreshUser();
+      await Promise.all([refreshUser(), fetchTransactions()]);
       tgHaptics.notification("success");
 
       setModalState({
         isOpen: true,
-        title: "Withdrawal Submitted! 🚀",
-        message: `Your withdrawal of $${numAmount.toFixed(2)} via ${method.toUpperCase()} has been submitted. Funds will be verified and sent to ${address}.`,
+        title: "Withdrawal Submitted!",
+        message: `Your withdrawal of $${numAmount.toFixed(2)} via ${method.toUpperCase()} has been submitted and queued for review.`,
         type: "success"
       });
 
@@ -150,11 +179,10 @@ export function Wallet() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Wallet Balance Hero Card matching Screen 4 */}
+      {/* Wallet Balance Hero Card */}
       <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
         <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Left: 3D Telegram Wallet Asset */}
         <div className="shrink-0 -ml-2 -my-2 relative">
           <img
             src={ASSETS_3D.telegramWallet}
@@ -163,7 +191,6 @@ export function Wallet() {
           />
         </div>
 
-        {/* Right Info matching Screen 4 */}
         <div className="flex-1 pl-3 text-right">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-white/90 mb-1 border border-white/10">
             <WalletIcon className="w-3.5 h-3.5 text-sky-200" />
@@ -225,7 +252,6 @@ export function Wallet() {
             <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
           </div>
 
-          {/* Payment Methods matching Screen 4 with USDT replacing Zaad */}
           <div className="space-y-2.5">
             {/* USDT (TRC20) */}
             <div
@@ -251,6 +277,37 @@ export function Wallet() {
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-400">Direct Tether USD payout to your TRC20 wallet</div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="badge-green-pill text-[10px] font-bold px-2 py-0.5 rounded-full">Min $1.00</span>
+              </div>
+            </div>
+
+            {/* USDT (BEP20) */}
+            <div
+              onClick={() => {
+                tgHaptics.impact("light");
+                setMethod("usdt_bep20");
+              }}
+              className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center justify-between ${
+                method === "usdt_bep20"
+                  ? "bg-amber-500/15 border-amber-400 text-white shadow-lg shadow-amber-500/10"
+                  : "bg-[#0c162e] border-white/5 text-slate-400 hover:border-white/15"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#d97706] to-[#f59e0b] text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                  ₮
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <span>USDT (BEP20)</span>
+                    <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-extrabold px-1.5 py-0.2 rounded-md">
+                      BSC
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">Direct Tether USD payout on BNB Smart Chain</div>
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -334,7 +391,7 @@ export function Wallet() {
                   />
                   <button
                     type="button"
-                    onClick={() => setAmount(balance.toString())}
+                    onClick={() => setAmount(balance.toFixed(2))}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-sky-500/20 text-[#38bdf8] text-[10px] font-bold hover:bg-sky-500/30 active:scale-95 transition"
                   >
                     MAX
@@ -346,6 +403,8 @@ export function Wallet() {
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
                   {method === "usdt"
                     ? "USDT Address (TRC20)"
+                    : method === "usdt_bep20"
+                    ? "USDT Address (BEP20 / BSC)"
                     : method === "trx"
                     ? "TRON (TRX) Wallet Address"
                     : "Payeer Account Number (P...)"}
@@ -396,32 +455,64 @@ export function Wallet() {
             </div>
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="p-3 rounded-xl bg-[#0c162e] border border-white/5 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-                      <ArrowDownLeft className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-white capitalize">{tx.type}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {new Date(tx.created_at).toLocaleDateString()}
+              {transactions.map((tx) => {
+                const rawAmount = Number(tx.amount || 0);
+                const isDebit =
+                  rawAmount < 0 ||
+                  tx.type === "withdrawal_request" ||
+                  tx.type === "withdrawal";
+                const absAmount = Math.abs(rawAmount).toFixed(2);
+                const statusLower = String(tx.status || "completed").toLowerCase();
+                const statusStyle =
+                  statusLower === "pending" || statusLower === "processing"
+                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                    : statusLower === "rejected" || statusLower === "reversed" || statusLower === "failed"
+                    ? "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                    : "badge-green-pill";
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="p-3 rounded-xl bg-[#0c162e] border border-white/5 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isDebit
+                            ? "bg-amber-500/15 text-amber-400"
+                            : "bg-emerald-500/15 text-emerald-400"
+                        }`}
+                      >
+                        {isDebit ? (
+                          <ArrowUpRight className="w-4 h-4" />
+                        ) : (
+                          <ArrowDownLeft className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-white capitalize truncate">
+                          {String(tx.type || "transaction").replace(/_/g, " ")}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {new Date(tx.created_at).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs font-bold text-emerald-400 tabular-nums">
-                      +${Number(tx.amount).toFixed(2)}
+                    <div className="text-right shrink-0">
+                      <div
+                        className={`text-xs font-bold tabular-nums ${
+                          isDebit ? "text-amber-400" : "text-emerald-400"
+                        }`}
+                      >
+                        {isDebit ? `-$${absAmount}` : `+$${absAmount}`}
+                      </div>
+                      <span className={`${statusStyle} text-[9px] font-bold px-2 py-0.5 rounded-full uppercase`}>
+                        {tx.status || "Completed"}
+                      </span>
                     </div>
-                    <span className="badge-green-pill text-[9px] font-bold px-2 py-0.5 rounded-full uppercase">
-                      {tx.status || "Completed"}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </motion.div>

@@ -1,12 +1,19 @@
+// supabase/functions/tapjoy_webhook/index.ts
+// Fail-closed Tapjoy Server-to-Server Callback with real MD5 verification & replay defense
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
+import { md5Hex } from "../_shared/crypto.ts";
+import { logAuditEvent } from "../_shared/audit-log.ts";
 
-/**
- * Tapjoy Server-to-Server Callback
- * https://dev.tapjoy.com/en/publisher/server-to-server-callbacks
- */
 serve(async (req) => {
+  if (req.method !== "GET" && req.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
   try {
     const url = new URL(req.url);
 
@@ -16,74 +23,103 @@ serve(async (req) => {
     const verifier = url.searchParams.get("verifier");
     const tapjoySecret = Deno.env.get("TAPJOY_SECRET_KEY") || Deno.env.get("TAPJOY_SECRET");
 
-    if (!userId || !currency) {
-      return new Response("Missing required parameters (snuid or currency)", { status: 400 });
+    // Fail-closed: refuse callbacks if server secret is not configured
+    if (!tapjoySecret) {
+      console.error("[TAPJOY_MISCONFIG] TAPJOY_SECRET is not configured");
+      return new Response("500 Server Misconfiguration - TAPJOY_SECRET not set", { status: 500 });
     }
 
-    // Security Verification: Tapjoy MD5 hash of id:snuid:currency:secret_key
-    if (tapjoySecret) {
-      if (!verifier) {
-        return new Response("403 Forbidden - Missing required verifier signature", { status: 403 });
-      }
+    if (!userId || !currency || !transactionId) {
+      return new Response("Missing required parameters (snuid, currency, or id)", { status: 400 });
+    }
 
-      const rawString = `${transactionId || ""}:${userId}:${currency}:${tapjoySecret}`;
-      const tapjoyEncoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("MD5", tapjoyEncoder.encode(rawString)).catch(() => null);
-      
-      if (hashBuffer) {
-        const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-        if (!constantTimeCompare(verifier.toLowerCase(), hashHex.toLowerCase())) {
-          return new Response("403 Forbidden - Invalid Tapjoy Verifier Signature", { status: 403 });
-        }
-      }
+    if (!verifier) {
+      return new Response("403 Forbidden - Missing required verifier signature", { status: 403 });
+    }
+
+    // Security Verification: Tapjoy official MD5(id:snuid:currency:secret_key)
+    const rawString = `${transactionId}:${userId}:${currency}:${tapjoySecret}`;
+    const expectedHash = md5Hex(rawString);
+
+    if (!constantTimeCompare(verifier.toLowerCase(), expectedHash.toLowerCase())) {
+      await logAuditEvent({
+        actorType: "offerwall",
+        action: "tapjoy_invalid_signature",
+        targetType: "postback",
+        targetId: transactionId,
+        details: { userId, currency },
+        ipAddress: clientIp,
+      });
+      return new Response("403 Forbidden - Invalid Tapjoy Verifier Signature", { status: 403 });
     }
 
     const payout = parseFloat(currency);
-
-    if (payout <= 0) {
+    if (isNaN(payout) || !isFinite(payout) || payout <= 0 || payout > 1000) {
       return new Response("Invalid payout amount", { status: 400 });
     }
 
-    // Initialize Supabase admin client to bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supabaseUrl || !serviceKey) {
+      return new Response("500 Server Misconfiguration", { status: 500 });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     // Fetch user (support UUID or Telegram ID)
-    let targetUserId = userId;
-    if (/^\d+$/.test(userId)) {
+    let targetUserId: string | null = null;
+    if (/^\d+$/.test(userId.trim())) {
       const { data: userByTg } = await supabaseAdmin
         .from("users")
         .select("id")
-        .eq("telegram_id", parseInt(userId, 10))
+        .eq("telegram_id", parseInt(userId.trim(), 10))
         .maybeSingle();
       if (userByTg) targetUserId = userByTg.id;
+    } else {
+      const { data: userByUuid } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("id", userId.trim())
+        .maybeSingle();
+      if (userByUuid) targetUserId = userByUuid.id;
     }
 
-    const { data: user, error: uErr } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("id", targetUserId)
-      .maybeSingle();
-
-    if (uErr || !user) {
+    if (!targetUserId) {
       return new Response("User not found", { status: 404 });
     }
 
-    const idempotencyKey = transactionId ? `tapjoy_${transactionId}` : `tapjoy_${Date.now()}`;
+    // Replay defense via offerwall_logs
+    const { data: existingLog } = await supabaseAdmin
+      .from("offerwall_logs")
+      .select("id")
+      .eq("provider", "tapjoy")
+      .eq("external_transaction_id", transactionId)
+      .maybeSingle();
 
-    // Atomic credit with duplicate defense
+    if (existingLog) {
+      return new Response("OK", { status: 200 });
+    }
+
+    const idempotencyKey = `tapjoy_${transactionId}`;
     const { error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
-      p_user_id: user.id,
+      p_user_id: targetUserId,
       p_amount: payout,
       p_type: "offer_reward",
       p_idempotency_key: idempotencyKey,
       p_reference_id: transactionId,
-      p_description: `Tapjoy Offer Reward (Tx: ${transactionId || "direct"})`
+      p_description: `Tapjoy Offer Reward (Tx: ${transactionId})`
     });
 
     if (creditError) throw creditError;
+
+    await supabaseAdmin.from("offerwall_logs").insert({
+      provider: "tapjoy",
+      external_transaction_id: transactionId,
+      user_id: targetUserId,
+      amount: payout,
+      status: "credited",
+      raw_payload: Object.fromEntries(url.searchParams.entries()),
+    });
 
     return new Response("OK", { status: 200 });
   } catch (error: any) {

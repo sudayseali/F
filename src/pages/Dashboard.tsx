@@ -1,13 +1,10 @@
-import { 
-  CheckCircle2, Clock, Wallet, Coins, Layers, Users, 
-  ChevronRight, Gift, Flame, Play, Star, Calendar, 
-  BarChart3, CheckCircle, TrendingUp, Sparkles, ArrowRight
+import {
+  Clock, Wallet, CheckCircle, TrendingUp, ArrowRight, ChevronRight
 } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { motion } from "motion/react";
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
-import { Link, useNavigate } from "react-router-dom";
+import { supabase, invokeEdgeFunction } from "../lib/supabase";
+import { Link } from "react-router-dom";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
@@ -15,20 +12,18 @@ import { TelegramModal } from "../components/TelegramModal";
 import { PayvoraSpinner } from "../components";
 
 export function Dashboard() {
-  const navigate = useNavigate();
   const { user, refreshUser } = useTelegram();
   const balance = user?.balance || 0;
-  
+
   const [stats, setStats] = useState({
     completed: 0,
     pending: 0,
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [isClaiming, setIsClaiming] = useState(false);
   const [dailyClaimed, setDailyClaimed] = useState(false);
 
-  // Modal feedback state
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -42,42 +37,55 @@ export function Dashboard() {
   });
 
   useEffect(() => {
-    async function fetchStats() {
+    async function fetchStatsAndDailyState() {
       if (!user?.uuid) {
         setLoading(false);
         return;
       }
-      
+
       try {
-        const { data: subs } = await supabase
-          .from('submissions')
-          .select('status')
-          .eq('user_id', user.uuid);
-          
-        if (subs) {
+        const [subsRes, userRes] = await Promise.all([
+          supabase
+            .from("submissions")
+            .select("status")
+            .eq("user_id", user.uuid),
+          supabase
+            .from("users")
+            .select("last_daily_claim_at")
+            .eq("id", user.uuid)
+            .maybeSingle(),
+        ]);
+
+        if (subsRes.data) {
           setStats({
-            completed: subs.filter(s => s.status === 'approved').length,
-            pending: subs.filter(s => s.status === 'pending').length,
+            completed: subsRes.data.filter(s => s.status === "approved").length,
+            pending: subsRes.data.filter(s => s.status === "pending").length,
           });
         }
+
+        if (userRes.data?.last_daily_claim_at) {
+          const lastClaimMs = new Date(userRes.data.last_daily_claim_at).getTime();
+          if (Number.isFinite(lastClaimMs) && Date.now() - lastClaimMs < 24 * 3600 * 1000) {
+            setDailyClaimed(true);
+          }
+        }
       } catch (err) {
-        console.error("Error fetching stats:", err);
+        console.error("Error fetching dashboard data:", err);
       } finally {
         setLoading(false);
       }
     }
-    fetchStats();
+    fetchStatsAndDailyState();
   }, [user?.uuid]);
 
   const handleClaimDaily = async () => {
     if (isClaiming || dailyClaimed) return;
 
-    // Security Check: Guard against unauthenticated state
     if (!user?.uuid) {
       setModalState({
         isOpen: true,
         title: "Authentication Required",
-        message: "Please open Payvora via the official Telegram Bot (@PayvoraBot) to authenticate your session before claiming rewards.",
+        message: `Please open Payvora via @${APP_CONFIG.telegram.botUsername} to authenticate your session before claiming rewards.`,
         type: "error"
       });
       return;
@@ -87,44 +95,47 @@ export function Dashboard() {
     setIsClaiming(true);
 
     try {
-      const res = await supabase.functions.invoke("daily_checkin", {});
-      
-      if (res.error) {
-        throw new Error(res.error.message || "Failed to claim daily check-in");
-      }
+      await invokeEdgeFunction("daily_checkin", {});
+      setDailyClaimed(true);
+      await refreshUser();
+      tgHaptics.notification("success");
+      setModalState({
+        isOpen: true,
+        title: "Daily Reward Claimed!",
+        message: "You have received +50 Points ($0.05) credited directly to your Payvora wallet balance.",
+        type: "success"
+      });
+    } catch (err: any) {
+      const rawMsg = err?.message || "";
+      const code = err?.code || "";
+      const isAlreadyClaimed =
+        code === "ALREADY_CLAIMED" ||
+        rawMsg.toLowerCase().includes("already claimed") ||
+        rawMsg.toLowerCase().includes("hours");
 
-      const resData = res.data;
-      if (resData?.success) {
-        setDailyClaimed(true);
-        await refreshUser();
-        tgHaptics.notification("success");
-        setModalState({
-          isOpen: true,
-          title: "Daily Reward Claimed! 🎉",
-          message: "You have received +50 Points ($0.05) credited directly to your Payvora wallet balance.",
-          type: "success"
-        });
-      } else {
-        const msg = resData?.error || "Daily reward already claimed today.";
+      if (isAlreadyClaimed) {
         setDailyClaimed(true);
         setModalState({
           isOpen: true,
           title: "Daily Check-In",
-          message: msg,
+          message: rawMsg || "Daily reward already claimed today.",
           type: "info"
         });
+      } else {
+        const isAuthIssue =
+          code === "UNAUTHORIZED" ||
+          rawMsg.includes("INVALID_SESSION") ||
+          rawMsg.includes("JWS") ||
+          rawMsg.includes("Unauthorized");
+        setModalState({
+          isOpen: true,
+          title: isAuthIssue ? "Session Expired" : "Daily Check-In",
+          message: isAuthIssue
+            ? `Your Telegram session has expired or is invalid. Please restart the app from @${APP_CONFIG.telegram.botUsername}.`
+            : (rawMsg || "Could not claim daily reward right now. Please try again later."),
+          type: "error"
+        });
       }
-    } catch (err: any) {
-      const rawMsg = err.message || "";
-      const isAuthIssue = rawMsg.includes("INVALID_SESSION") || rawMsg.includes("JWS") || rawMsg.includes("Unauthorized");
-      setModalState({
-        isOpen: true,
-        title: isAuthIssue ? "Session Expired" : "Daily Check-In",
-        message: isAuthIssue 
-          ? "Your Telegram session has expired or is invalid. Please restart the app from @PayvoraBot."
-          : (err.message || "Could not claim daily reward right now. Please try again later."),
-        type: "error"
-      });
     } finally {
       setIsClaiming(false);
     }
@@ -132,12 +143,10 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Hero Balance Card with 3D Wallet Icon */}
+      {/* Hero Balance Card */}
       <div className="hero-balance-card p-5 relative overflow-hidden flex items-center justify-between">
-        {/* Ambient subtle blur glow inside */}
         <div className="absolute top-0 right-0 w-44 h-44 bg-cyan-400/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Left: User-Provided 3D Telegram Wallet with Gold Star Coins */}
         <div className="shrink-0 -ml-2 -my-2 relative">
           <img
             src={ASSETS_3D.telegramWallet}
@@ -146,7 +155,6 @@ export function Dashboard() {
           />
         </div>
 
-        {/* Right: Available Balance & Conversion */}
         <div className="flex-1 pl-3 text-right">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-white/90 mb-1 border border-white/10 shadow-sm">
             <Wallet className="w-3.5 h-3.5 text-sky-200" />
@@ -163,7 +171,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Right Circular Action Chevron */}
         <Link
           to="/wallet"
           onClick={() => tgHaptics.selection()}
@@ -173,7 +180,7 @@ export function Dashboard() {
         </Link>
       </div>
 
-      {/* 4 Square Quick Action Buttons with 3D Icons */}
+      {/* 4 Quick Action Buttons */}
       <div className="grid grid-cols-4 gap-2.5">
         <Link
           to="/offerwall"
@@ -236,9 +243,8 @@ export function Dashboard() {
         </Link>
       </div>
 
-      {/* Daily Check-In Banner with 3D Calendar Icon */}
+      {/* Daily Check-In Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0369a1] via-[#1d4ed8] to-[#2563eb] p-3.5 flex items-center justify-between border border-sky-400/30 shadow-lg">
-        {/* Subtle sparkle effects */}
         <div className="absolute right-16 top-2 text-sky-200/40 text-xs select-none">✦</div>
         <div className="absolute right-24 bottom-2 text-sky-200/40 text-[10px] select-none">✦</div>
 
@@ -295,7 +301,6 @@ export function Dashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
-          {/* Card 1: CPX Surveys */}
           <Link
             to="/offerwall"
             onClick={() => tgHaptics.selection()}
@@ -329,7 +334,6 @@ export function Dashboard() {
             </div>
           </Link>
 
-          {/* Card 2: ayeT - Studios */}
           <Link
             to="/offerwall"
             onClick={() => tgHaptics.selection()}
@@ -367,7 +371,6 @@ export function Dashboard() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 gap-2.5">
-        {/* Approved Tasks */}
         <div className="card-glass-dark p-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-[#34d399] flex items-center justify-center border border-emerald-500/20 shrink-0">
@@ -383,7 +386,6 @@ export function Dashboard() {
           <TrendingUp className="w-6 h-6 text-sky-500/30" />
         </div>
 
-        {/* Pending Review with 3D Coin Stack */}
         <div className="card-glass-dark p-3.5 rounded-2xl flex items-center justify-between relative overflow-hidden">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-[#fbbf24] flex items-center justify-center border border-amber-500/20 shrink-0">
@@ -400,9 +402,8 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Invite Friends & Earn Banner with 3D Purple Gift Box Icon */}
+      {/* Invite Friends & Earn Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4c1d95] via-[#3b0764] to-[#1e1b4b] border border-purple-500/30 p-4 flex items-center justify-between shadow-xl">
-        {/* Sparkles */}
         <div className="absolute left-1/3 top-2 text-purple-300/40 text-xs">✦</div>
 
         <div className="flex items-center gap-3">

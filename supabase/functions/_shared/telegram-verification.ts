@@ -174,26 +174,38 @@ export async function verifyTelegramInitData(
     // If still not matched, test raw string parsing to avoid URLSearchParams space/plus mangling
     if (!matched) {
       const rawParts = rawInitData.split('&');
-      const rawPairs: string[] = [];
+      const rawPairsAll: string[] = [];
+      const rawPairsNoSig: string[] = [];
       for (const part of rawParts) {
         const eqIdx = part.indexOf('=');
         if (eqIdx !== -1) {
           const k = decodeURIComponent(part.slice(0, eqIdx));
           if (k !== 'hash') {
             const rawVal = part.slice(eqIdx + 1);
+            let decodedVal = rawVal;
             try {
-              rawPairs.push(`${k}=${decodeURIComponent(rawVal)}`);
+              decodedVal = decodeURIComponent(rawVal);
             } catch {
-              rawPairs.push(`${k}=${rawVal}`);
+              decodedVal = rawVal;
+            }
+            rawPairsAll.push(`${k}=${decodedVal}`);
+            if (k !== 'signature') {
+              rawPairsNoSig.push(`${k}=${decodedVal}`);
             }
           }
         }
       }
-      if (rawPairs.length > 0) {
-        rawPairs.sort();
-        const rawSigBuf = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(rawPairs.join('\n')));
+      if (rawPairsAll.length > 0) {
+        rawPairsAll.sort();
+        const rawSigBuf = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(rawPairsAll.join('\n')));
         const rawHash = Array.from(new Uint8Array(rawSigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
         matched = constantTimeCompare(rawHash.toLowerCase(), hash.toLowerCase());
+      }
+      if (!matched && rawPairsNoSig.length > 0 && rawPairsNoSig.length !== rawPairsAll.length) {
+        rawPairsNoSig.sort();
+        const rawSigBufB = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(rawPairsNoSig.join('\n')));
+        const rawHashB = Array.from(new Uint8Array(rawSigBufB)).map(b => b.toString(16).padStart(2, '0')).join('');
+        matched = constantTimeCompare(rawHashB.toLowerCase(), hash.toLowerCase());
       }
     }
 

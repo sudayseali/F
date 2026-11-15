@@ -1,17 +1,17 @@
-import { 
-  Layers, Zap, Globe, Shield, Star, Play, Gift, 
-  ChevronRight, ArrowLeft, Loader2, ExternalLink, RotateCw, Sparkles, BarChart3 
+import {
+  Layers, Zap, Shield, Play, Gift,
+  ChevronRight, ArrowLeft, ExternalLink, RotateCw, Sparkles, BarChart3
 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { supabase } from "../lib/supabase";
+import { invokeEdgeFunction } from "../lib/supabase";
 import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
 import { TelegramModal } from "../components/TelegramModal";
-import { PayvoraSpinner, PayvoraLoadingState } from "../components";
+import { PayvoraSpinner } from "../components";
 import { ASSETS_3D } from "../lib/assets";
 import { APP_CONFIG } from "../config/appConfig";
-import type { Provider, ModalState } from "../types";
+import type { Provider } from "../types";
 
 const PROVIDERS: Provider[] = [
   {
@@ -110,14 +110,11 @@ export function Offerwall() {
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(true);
 
-  // Modal feedback state
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     title: string;
     message: string;
     type: "info" | "error" | "success";
-    actionText?: string;
-    onAction?: () => void;
   }>({
     isOpen: false,
     title: "",
@@ -125,7 +122,6 @@ export function Offerwall() {
     type: "info"
   });
 
-  // Handle Telegram Back Button when Offerwall is open
   useEffect(() => {
     if (activeOfferwallUrl) {
       const handleBack = () => {
@@ -149,75 +145,66 @@ export function Offerwall() {
 
   const handleProviderClick = async (provider: Provider) => {
     tgHaptics.impact("medium");
-    const userId = user?.id || 123456789;
 
-    if (provider.id === "cpx") {
-      setLoadingProvider("cpx");
+    if (!user?.uuid) {
+      setModalState({
+        isOpen: true,
+        title: "Authentication Required",
+        message: `Please open Payvora via @${APP_CONFIG.telegram.botUsername} so your rewards are credited to your verified account.`,
+        type: "error"
+      });
+      return;
+    }
+
+    const verifiedUserUuid = encodeURIComponent(user.uuid);
+
+    if (provider.id === "cpx" || provider.id === "cpa") {
+      setLoadingProvider(provider.id);
       try {
-        let urlToUse: string | null = null;
-        try {
-          const { data, error } = await supabase.functions.invoke("get_cpx_url", {});
-          if (!error && data?.url) {
-            urlToUse = data.url;
-          }
-        } catch {
-          // Fallback to direct link
-        }
-
+        const res = await invokeEdgeFunction<{ url?: string }>("get_cpx_url", {});
+        let urlToUse = res?.url;
         if (!urlToUse) {
-          const appId = APP_CONFIG.offerwalls.cpx.appId;
-          urlToUse = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${appId}&ext_user_id=${userId}`;
+          throw new Error("Could not generate a signed offerwall session URL.");
         }
-
-        setActiveProviderName("CPX Research");
+        if (provider.id === "cpa") {
+          urlToUse += `&subid_1=${encodeURIComponent(provider.id)}`;
+        }
+        setActiveProviderName(provider.name);
         setActiveOfferwallUrl(urlToUse);
         setIframeLoading(true);
       } catch (err: any) {
         setModalState({
           isOpen: true,
-          title: "CPX Research",
-          message: "Unable to load surveys. Please check your network connection.",
-          type: "error",
-          actionText: "Understood"
+          title: provider.name,
+          message: err?.message || "Unable to load offers. Please try again in a moment.",
+          type: "error"
         });
       } finally {
         setLoadingProvider(null);
       }
-    } else if (provider.id === "ayet") {
-      setLoadingProvider("ayet");
-      const ayetUrl = `${APP_CONFIG.offerwalls.ayet.baseUrl}?external_identifier=${userId}`;
+      return;
+    }
+
+    if (provider.id === "ayet") {
+      const ayetUrl = `${APP_CONFIG.offerwalls.ayet.baseUrl}?external_identifier=${verifiedUserUuid}`;
       setActiveProviderName("ayeT-Studios");
       setActiveOfferwallUrl(ayetUrl);
       setIframeLoading(true);
-      setLoadingProvider(null);
     } else if (provider.id === "torox") {
-      setLoadingProvider("torox");
-      const toroxUrl = `${APP_CONFIG.offerwalls.torox.baseUrl}?pub_id=${APP_CONFIG.offerwalls.torox.pubId}&user_id=${userId}`;
+      const toroxUrl = `${APP_CONFIG.offerwalls.torox.baseUrl}?pub_id=${APP_CONFIG.offerwalls.torox.pubId}&user_id=${verifiedUserUuid}`;
       setActiveProviderName("Torox Offers");
       setActiveOfferwallUrl(toroxUrl);
       setIframeLoading(true);
-      setLoadingProvider(null);
     } else if (provider.id === "adgate") {
-      setLoadingProvider("adgate");
-      const adgateUrl = `https://wall.adgaterewards.com/naPR/${userId}`;
+      const adgateUrl = `https://wall.adgaterewards.com/naPR/${verifiedUserUuid}`;
       setActiveProviderName("AdGate Media");
       setActiveOfferwallUrl(adgateUrl);
       setIframeLoading(true);
-      setLoadingProvider(null);
     } else if (provider.id === "lootably") {
-      setLoadingProvider("lootably");
-      const lootablyUrl = `https://wall.lootably.com/?placementID=24128&sid=${userId}`;
+      const lootablyUrl = `https://wall.lootably.com/?placementID=24128&sid=${verifiedUserUuid}`;
       setActiveProviderName("Lootably");
       setActiveOfferwallUrl(lootablyUrl);
       setIframeLoading(true);
-      setLoadingProvider(null);
-    } else {
-      setLoadingProvider(provider.id);
-      const realProviderUrl = `${APP_CONFIG.offerwalls.cpx.baseUrl}?app_id=${APP_CONFIG.offerwalls.cpx.appId}&ext_user_id=${userId}&subid_1=${encodeURIComponent(provider.id)}`;
-      setActiveProviderName(provider.name);
-      setActiveOfferwallUrl(realProviderUrl);
-      setIframeLoading(true);
-      setLoadingProvider(null);
     }
   };
 
@@ -228,10 +215,10 @@ export function Offerwall() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Telegram Hero Banner matching Screen 2 */}
+      {/* Hero Banner */}
       <div className="hero-balance-card p-4.5 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-400/20 rounded-full blur-2xl pointer-events-none" />
-        
+
         <div className="flex items-center justify-between mb-2">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[10px] font-bold text-sky-200 border border-white/10">
             <Sparkles className="w-3 h-3 text-sky-300" />
@@ -273,7 +260,7 @@ export function Offerwall() {
         })}
       </div>
 
-      {/* Providers Grid / List */}
+      {/* Providers List */}
       <div className="space-y-2.5">
         {filteredProviders.map((provider) => {
           const Icon = provider.icon;
@@ -286,7 +273,6 @@ export function Offerwall() {
               onClick={() => handleProviderClick(provider)}
               className="card-glass-dark p-3.5 flex items-center gap-3.5 cursor-pointer hover:border-sky-500/40 transition-all duration-200 group active:bg-[#0f1d3d]"
             >
-              {/* Provider 3D Logo / Badge */}
               <div className={`w-11 h-11 rounded-xl ${provider.iconBg} flex items-center justify-center shrink-0 border border-white/10 shadow-sm overflow-hidden`}>
                 {isLoading ? (
                   <PayvoraSpinner size="sm" />
@@ -301,7 +287,6 @@ export function Offerwall() {
                 )}
               </div>
 
-              {/* Provider Info matching Mockup Screen 2 */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <h3 className="text-sm font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
@@ -315,7 +300,7 @@ export function Offerwall() {
                     {provider.badge}
                   </span>
                 </div>
-                
+
                 <p className="text-[11px] text-slate-400 truncate">
                   {provider.description}
                 </p>
@@ -325,7 +310,6 @@ export function Offerwall() {
                 </div>
               </div>
 
-              {/* Action Button */}
               <div className="shrink-0">
                 <div className="w-8 h-8 rounded-xl bg-white/5 group-hover:bg-[#0284c7]/20 group-hover:text-[#38bdf8] text-slate-400 flex items-center justify-center transition-colors">
                   <ChevronRight className="w-4 h-4" />
@@ -336,7 +320,7 @@ export function Offerwall() {
         })}
       </div>
 
-      {/* Telegram Mini App In-App Offerwall Viewer Modal */}
+      {/* In-App Offerwall Viewer Modal */}
       <AnimatePresence>
         {activeOfferwallUrl && (
           <motion.div
@@ -346,7 +330,6 @@ export function Offerwall() {
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-50 bg-[#030712] flex flex-col"
           >
-            {/* Telegram In-App Top Bar */}
             <div className="h-12 bg-[#0c162e] border-b border-white/10 px-3 flex items-center justify-between shrink-0">
               <button
                 onClick={closeOfferwall}
@@ -383,7 +366,6 @@ export function Offerwall() {
               </div>
             </div>
 
-            {/* Iframe Container */}
             <div className="flex-1 relative bg-white">
               {iframeLoading && (
                 <div className="absolute inset-0 bg-[#030712] z-10 flex flex-col items-center justify-center gap-3">

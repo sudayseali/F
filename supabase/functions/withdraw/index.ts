@@ -1,5 +1,5 @@
 // supabase/functions/withdraw/index.ts
-// Secure user withdrawal endpoint with server-side authentication & validation
+// Secure user withdrawal endpoint with server-side authentication, distributed rate limiting & validation
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -7,7 +7,7 @@ import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { validatePositiveAmount, validatePayoutAddress } from "../_shared/validation.ts";
-import { checkRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
 function getSupabaseAdmin() {
@@ -25,21 +25,28 @@ serve(async (req: Request) => {
 
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-  // Rate limiting (max 5 withdrawal requests per minute per IP)
-  const rate = checkRateLimit(`wd_${clientIp}`, 5, 60000);
-  if (!rate.allowed) {
-    return errorResponse(new AppError("Too many withdrawal requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED"), req);
-  }
-
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
     }
 
-    // 1. SEC-01: Authenticate user exclusively via verified Supabase JWT
-    // Never trust client-supplied user_uuid fallback
+    const supabaseAdmin = getSupabaseAdmin();
+
+    // Distributed rate limiting (max 5 withdrawal requests per 60s per IP)
+    const ipRate = await checkDistributedRateLimit(supabaseAdmin, `wd_ip_${clientIp}`, 5, 60);
+    if (!ipRate.allowed) {
+      throw new AppError("Too many withdrawal requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
+    }
+
+    // 1. Authenticate user exclusively via verified Supabase JWT
     const verifiedUser = await verifyUserRequest(req);
     const authenticatedUserId = verifiedUser.id;
+
+    // Per-user distributed rate limit (max 3 requests per 60s)
+    const userRate = await checkDistributedRateLimit(supabaseAdmin, `wd_usr_${authenticatedUserId}`, 3, 60);
+    if (!userRate.allowed) {
+      throw new AppError("Please wait a minute before submitting another withdrawal.", 429, "RATE_LIMIT_EXCEEDED");
+    }
 
     const body = await req.json().catch(() => ({}));
     const { amount, wallet_address, method, user_uuid, idempotency_key } = body;
@@ -79,19 +86,19 @@ serve(async (req: Request) => {
       throw new AppError("You already have an active pending withdrawal in queue. Please wait for it to be processed.", 400, "DUPLICATE_PENDING_WITHDRAWAL");
     }
 
-    // Check optional idempotency key
-    const safeIdempotencyKey = idempotency_key && typeof idempotency_key === "string" 
-      ? idempotency_key.slice(0, 100) 
-      : `wd_req_${authenticatedUserId}_${Date.now()}`;
+    // Validate optional client idempotency key
+    let safeIdempotencyKey = `wd_req_${authenticatedUserId}_${crypto.randomUUID()}`;
+    if (typeof idempotency_key === "string" && /^[a-zA-Z0-9_-]{8,100}$/.test(idempotency_key.trim())) {
+      safeIdempotencyKey = `wd_${authenticatedUserId}_${idempotency_key.trim()}`;
+    }
 
-    // 5. Call Atomic Database RPC with Row Locking (FOR UPDATE)
-    // Ensures concurrent requests cannot double-spend or create negative balances
-    const supabaseAdmin = getSupabaseAdmin();
+    // 5. Call Atomic Database RPC with Row Locking (FOR UPDATE) & Idempotency
     const { data: dbResult, error: rpcError } = await supabaseAdmin.rpc("request_withdrawal", {
       user_id_param: authenticatedUserId,
       amount_param: cleanAmount,
       method: method,
-      wallet_address: cleanAddress
+      wallet_address: cleanAddress,
+      p_idempotency_key: safeIdempotencyKey,
     });
 
     if (rpcError) {
@@ -101,7 +108,7 @@ serve(async (req: Request) => {
 
     if (!dbResult || !dbResult.success) {
       const safeErrorMessage = dbResult?.error || "Withdrawal failed due to insufficient balance or account restrictions.";
-      throw new AppError(safeErrorMessage, 400, "WITHDRAWAL_FAILED");
+      throw new AppError(safeErrorMessage, 400, dbResult?.code || "WITHDRAWAL_FAILED");
     }
 
     // 6. Immutable Audit Log
