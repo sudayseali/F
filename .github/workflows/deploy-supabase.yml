@@ -99,7 +99,7 @@ jobs:
           fi
 
           echo "Checking remote Supabase migration history..."
-          MIG_LIST=$(supabase migration list 2>&1 || true)
+          MIG_LIST=$(supabase migration list --remote --password "$SUPABASE_DB_PASSWORD" 2>&1 || true)
           echo "$MIG_LIST"
 
           # Detect if remote database already has core tables initialized (e.g. from earlier SQL Editor setup)
@@ -120,9 +120,9 @@ jobs:
           fi
 
           if [ "$DB_INITIALIZED" = "0" ]; then
-            if supabase inspect db table-stats 2>/dev/null | grep -qiE '\busers\b'; then
+            if supabase inspect db table-stats --remote 2>/dev/null | grep -qiE '\busers\b'; then
               DB_INITIALIZED=1
-            elif supabase db dump --schema public --schema-only -f /tmp/remote_schema.sql 2>/dev/null && grep -qE 'CREATE TABLE.*"users"|CREATE TABLE.*public\.users' /tmp/remote_schema.sql; then
+            elif supabase db dump --remote --password "$SUPABASE_DB_PASSWORD" --schema public --schema-only -f /tmp/remote_schema.sql 2>/dev/null && grep -qE 'CREATE TABLE.*"users"|CREATE TABLE.*public\.users' /tmp/remote_schema.sql; then
               DB_INITIALIZED=1
             fi
             rm -f /tmp/remote_schema.sql
@@ -132,6 +132,7 @@ jobs:
           # so CLI never re-runs destructive legacy scripts (like 20260503000003 DROP TABLE users).
           if [ "$DB_INITIALIZED" = "1" ]; then
             echo "Existing database detected. Reconciling pre-20260508 baseline migrations if needed..."
+            TO_REPAIR=""
             for ver in \
               20240101000000 \
               20260430000001 \
@@ -144,14 +145,17 @@ jobs:
               20260507000001 \
               20260507000002; do
               if ! echo "$MIG_LIST" | grep -qE "^[[:space:]]*${ver}[[:space:]]*\|[[:space:]]*${ver}"; then
-                echo "Marking baseline migration ${ver} as applied..."
-                supabase migration repair --status applied "$ver" || true
+                TO_REPAIR="$TO_REPAIR $ver"
               fi
             done
+            if [ -n "$TO_REPAIR" ]; then
+              echo "Marking baseline migrations as applied:$TO_REPAIR"
+              supabase migration repair --remote --password "$SUPABASE_DB_PASSWORD" --status applied $TO_REPAIR
+            fi
           fi
 
-          echo "Pushing pending SQL migrations automatically to Supabase..."
-          supabase db push --include-all --yes
+          echo "Pushing pending SQL migrations automatically to remote Supabase..."
+          supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --include-all --yes
           echo "✅ All pending SQL migrations applied to Supabase."
 
 
