@@ -101,6 +101,8 @@ jobs:
           echo "Checking remote Supabase migration history..."
           MIG_LIST=$(supabase migration list --remote --password "$SUPABASE_DB_PASSWORD" 2>&1 || true)
           echo "$MIG_LIST"
+          # Supabase CLI v3 prints Markdown-formatted tables with backticks (`version` | ` `)
+          CLEAN_LIST=$(printf '%s\n' "$MIG_LIST" | tr -d '\140')
 
           # Detect if remote database already has core tables initialized (e.g. from earlier SQL Editor setup)
           DB_INITIALIZED=0
@@ -120,7 +122,9 @@ jobs:
           fi
 
           if [ "$DB_INITIALIZED" = "0" ]; then
-            if supabase inspect db table-stats --remote 2>/dev/null | grep -qiE '\busers\b'; then
+            if printf '%s\n' "$CLEAN_LIST" | grep -qE '\|[[:space:]]*[0-9]{8,}'; then
+              DB_INITIALIZED=1
+            elif supabase inspect db table-stats --remote 2>/dev/null | grep -qiE '\busers\b'; then
               DB_INITIALIZED=1
             elif supabase db dump --remote --password "$SUPABASE_DB_PASSWORD" --schema public --schema-only -f /tmp/remote_schema.sql 2>/dev/null && grep -qE 'CREATE TABLE.*"users"|CREATE TABLE.*public\.users' /tmp/remote_schema.sql; then
               DB_INITIALIZED=1
@@ -131,7 +135,7 @@ jobs:
           # If DB is already initialized, mark legacy pre-20260508 bootstrap files as applied
           # so CLI never re-runs destructive legacy scripts (like 20260503000003 DROP TABLE users).
           if [ "$DB_INITIALIZED" = "1" ]; then
-            echo "Existing database detected. Reconciling pre-20260508 baseline migrations if needed..."
+            echo "Existing database detected. Checking pre-20260508 baseline migrations..."
             TO_REPAIR=""
             for ver in \
               20240101000000 \
@@ -144,7 +148,7 @@ jobs:
               20260507000000 \
               20260507000001 \
               20260507000002; do
-              if ! echo "$MIG_LIST" | grep -qE "^[[:space:]]*${ver}[[:space:]]*\|[[:space:]]*${ver}"; then
+              if ! printf '%s\n' "$CLEAN_LIST" | grep -qE "^[[:space:]]*${ver}[[:space:]]*\|[[:space:]]*${ver}"; then
                 TO_REPAIR="$TO_REPAIR $ver"
               fi
             done
@@ -154,15 +158,16 @@ jobs:
             fi
           fi
 
-          # Remove orphan remote-only tracking entries (migrations deleted/created outside repo,
+          # Remove orphan remote-only tracking entries (migrations created outside this repo,
           # such as 20261110191540 / 20261110191657) from schema_migrations so db push proceeds.
           # Note: 'repair --status reverted' only updates the tracking ledger; it never alters DB tables/data.
-          ORPHAN_REMOTE=$(echo "$MIG_LIST" | awk -F'|' '
+          LOCAL_VERS=$(ls -1 supabase/migrations/*.sql 2>/dev/null | xargs -n1 basename | cut -d'_' -f1 | tr '\n' ' ')
+          ORPHAN_REMOTE=$(printf '%s\n' "$CLEAN_LIST" | awk -F'|' -v locals=" $LOCAL_VERS " '
             NF >= 2 {
               local_col = $1; remote_col = $2;
-              gsub(/^[ \t]+|[ \t]+$/, "", local_col);
-              gsub(/^[ \t]+|[ \t]+$/, "", remote_col);
-              if (local_col == "" && remote_col ~ /^[0-9]+$/) {
+              gsub(/^[ \t\r]+|[ \t\r]+$/, "", local_col);
+              gsub(/^[ \t\r]+|[ \t\r]+$/, "", remote_col);
+              if (remote_col ~ /^[0-9]+$/ && (local_col == "" || index(locals, " " remote_col " ") == 0)) {
                 printf "%s ", remote_col
               }
             }' | xargs)
