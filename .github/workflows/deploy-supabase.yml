@@ -91,18 +91,68 @@ jobs:
           echo "Linking Supabase CLI to project $PROJECT_ID..."
           echo "$SUPABASE_DB_PASSWORD" | supabase link --project-ref "$PROJECT_ID"
 
-      - name: Validate Migration History
+      - name: Reconcile Migration History & Push SQL Migrations
         run: |
-          echo "Checking migration history before deployment..."
-
           if [ ! -d "supabase/migrations" ]; then
             echo "ERROR: Migration directory is missing."
             exit 1
           fi
 
-          echo "Migration directory exists."
-          echo "Database migrations are NOT automatically pushed."
-          echo "Resolve remote migration history separately before enabling db push."
+          echo "Checking remote Supabase migration history..."
+          MIG_LIST=$(supabase migration list 2>&1 || true)
+          echo "$MIG_LIST"
+
+          # Detect if remote database already has core tables initialized (e.g. from earlier SQL Editor setup)
+          DB_INITIALIZED=0
+          API_URL="${{ secrets.SUPABASE_URL }}"
+          if [ -z "$API_URL" ]; then
+            API_URL="https://${PROJECT_ID}.supabase.co"
+          fi
+
+          if [ -n "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              "${API_URL}/rest/v1/users?select=id&limit=1" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              DB_INITIALIZED=1
+            fi
+          fi
+
+          if [ "$DB_INITIALIZED" = "0" ]; then
+            if supabase inspect db table-stats 2>/dev/null | grep -qiE '\busers\b'; then
+              DB_INITIALIZED=1
+            elif supabase db dump --schema public --schema-only -f /tmp/remote_schema.sql 2>/dev/null && grep -qE 'CREATE TABLE.*"users"|CREATE TABLE.*public\.users' /tmp/remote_schema.sql; then
+              DB_INITIALIZED=1
+            fi
+            rm -f /tmp/remote_schema.sql
+          fi
+
+          # If DB is already initialized, mark legacy pre-20260508 bootstrap files as applied
+          # so CLI never re-runs destructive legacy scripts (like 20260503000003 DROP TABLE users).
+          if [ "$DB_INITIALIZED" = "1" ]; then
+            echo "Existing database detected. Reconciling pre-20260508 baseline migrations if needed..."
+            for ver in \
+              20240101000000 \
+              20260430000001 \
+              20260430000002 \
+              20260502000000 \
+              20260503000003 \
+              20260506000000 \
+              20260506000001 \
+              20260507000000 \
+              20260507000001 \
+              20260507000002; do
+              if ! echo "$MIG_LIST" | grep -qE "^[[:space:]]*${ver}[[:space:]]*\|[[:space:]]*${ver}"; then
+                echo "Marking baseline migration ${ver} as applied..."
+                supabase migration repair --status applied "$ver" || true
+              fi
+            done
+          fi
+
+          echo "Pushing pending SQL migrations automatically to Supabase..."
+          supabase db push --include-all --yes
+          echo "✅ All pending SQL migrations applied to Supabase."
 
 
       - name: Deploy Edge Functions
