@@ -11,6 +11,18 @@ import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 
+function isMissingColumnError(err: any, columnName?: string): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = String(err.code || "");
+  const msg = String(err.message || "");
+  if (code === "42703" || code === "PGRST204") {
+    return columnName ? msg.toLowerCase().includes(columnName.toLowerCase()) : true;
+  }
+  return columnName
+    ? new RegExp(`column .*${columnName}.* does not exist|could not find the '${columnName}' column`, "i").test(msg)
+    : /column .* does not exist|could not find the '.*' column/i.test(msg);
+}
+
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -75,14 +87,43 @@ serve(async (req: Request) => {
 
     const tgUser = verification.user;
 
-    // 2. Lookup existing user by telegram_id
-    const { data: existingUser, error: lookupErr } = await supabaseAdmin
+    // 2. Lookup existing user by telegram_id (resilient if channel_joined migration is pending)
+    let hasChannelJoinedCol = true;
+    let existingUser: any = null;
+
+    const lookupRes = await supabaseAdmin
       .from("users")
       .select("id, status, channel_joined, wallet_balance, total_earned, total_withdrawn")
       .eq("telegram_id", tgUser.id)
       .maybeSingle();
 
-    if (lookupErr) throw lookupErr;
+    if (lookupRes.error) {
+      if (isMissingColumnError(lookupRes.error)) {
+        hasChannelJoinedCol = !isMissingColumnError(lookupRes.error, "channel_joined");
+        const fallbackLookup = await supabaseAdmin
+          .from("users")
+          .select("id, status, wallet_balance")
+          .eq("telegram_id", tgUser.id)
+          .maybeSingle();
+
+        if (fallbackLookup.error) {
+          // Last-resort minimal schema lookup
+          const minimalLookup = await supabaseAdmin
+            .from("users")
+            .select("id")
+            .eq("telegram_id", tgUser.id)
+            .maybeSingle();
+          if (minimalLookup.error) throw minimalLookup.error;
+          existingUser = minimalLookup.data;
+        } else {
+          existingUser = fallbackLookup.data;
+        }
+      } else {
+        throw lookupRes.error;
+      }
+    } else {
+      existingUser = lookupRes.data;
+    }
 
     const isNewUser = !existingUser;
 
@@ -98,20 +139,57 @@ serve(async (req: Request) => {
       throw new AppError("This account has been suspended. Please contact support.", 403, "ACCOUNT_SUSPENDED");
     }
 
-    // 3. Upsert User Profile securely via Server Admin Client
-    const { data: userRow, error: upsertErr } = await supabaseAdmin
+    // 3. Upsert User Profile securely via Server Admin Client (resilient across schema versions)
+    const upsertPayload: Record<string, unknown> = {
+      telegram_id: tgUser.id,
+      username: tgUser.username ?? null,
+      first_name: tgUser.first_name ?? "Telegram User",
+      last_name: tgUser.last_name ?? null,
+      last_active_at: new Date().toISOString(),
+    };
+
+    const selectCols = hasChannelJoinedCol
+      ? "id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, channel_joined, created_at"
+      : "id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, created_at";
+
+    let userRow: any = null;
+    const upsertRes = await supabaseAdmin
       .from("users")
-      .upsert({
-        telegram_id: tgUser.id,
-        username: tgUser.username,
-        first_name: tgUser.first_name,
-        last_name: tgUser.last_name,
-        last_active_at: new Date().toISOString()
-      }, { onConflict: "telegram_id" })
-      .select("id, telegram_id, username, first_name, last_name, wallet_balance, total_earned, total_withdrawn, status, channel_joined, created_at")
+      .upsert(upsertPayload, { onConflict: "telegram_id" })
+      .select(selectCols)
       .single();
 
-    if (upsertErr || !userRow) throw upsertErr || new Error("Failed to persist user profile");
+    if (upsertRes.error || !upsertRes.data) {
+      if (upsertRes.error && isMissingColumnError(upsertRes.error)) {
+        hasChannelJoinedCol = false;
+        const { last_active_at: _omit, ...baseUpsertPayload } = upsertPayload;
+        const retryPayload = isMissingColumnError(upsertRes.error, "last_active_at")
+          ? baseUpsertPayload
+          : upsertPayload;
+
+        const fallbackUpsert = await supabaseAdmin
+          .from("users")
+          .upsert(retryPayload, { onConflict: "telegram_id" })
+          .select("id, telegram_id, username, first_name, last_name")
+          .single();
+
+        if (fallbackUpsert.error || !fallbackUpsert.data) {
+          throw fallbackUpsert.error || new Error("Failed to persist user profile");
+        }
+        userRow = {
+          ...fallbackUpsert.data,
+          wallet_balance: existingUser?.wallet_balance ?? 0,
+          total_earned: existingUser?.total_earned ?? 0,
+          total_withdrawn: existingUser?.total_withdrawn ?? 0,
+          status: existingUser?.status ?? "active",
+          channel_joined: false,
+        };
+      } else {
+        throw upsertRes.error || new Error("Failed to persist user profile");
+      }
+    } else {
+      userRow = upsertRes.data;
+    }
 
     // 4. Handle Referrals for New Users (recorded immediately so attribution is never lost)
     if (isNewUser && start_param) {
@@ -146,17 +224,20 @@ serve(async (req: Request) => {
     }
 
     // 5. Mandatory Official Channel Membership Verification for New / Unverified Users
-    if (!userRow.channel_joined) {
+    const alreadyVerifiedInDb = hasChannelJoinedCol ? Boolean(userRow.channel_joined) : !isNewUser;
+    if (!alreadyVerifiedInDb) {
       const membership = await checkTelegramChannelMembership(BOT_TOKEN, tgUser.id);
 
       if (membership.ok && membership.isMember) {
-        await supabaseAdmin
-          .from("users")
-          .update({
-            channel_joined: true,
-            channel_verified_at: new Date().toISOString(),
-          })
-          .eq("id", userRow.id);
+        if (hasChannelJoinedCol) {
+          await supabaseAdmin
+            .from("users")
+            .update({
+              channel_joined: true,
+              channel_verified_at: new Date().toISOString(),
+            })
+            .eq("id", userRow.id);
+        }
 
         await logAuditEvent({
           actorId: userRow.id,

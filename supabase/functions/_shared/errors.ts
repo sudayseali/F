@@ -28,9 +28,20 @@ export function errorResponse(err: unknown, req?: Request): Response {
     message = err.message;
     statusCode = 400;
     code = 'BAD_REQUEST';
+  } else if (typeof err === 'object' && err !== null && 'message' in err) {
+    const obj = err as { message?: unknown; code?: unknown; status?: unknown; details?: unknown };
+    if (typeof obj.message === 'string' && obj.message.trim().length > 0) {
+      message = obj.message;
+    }
+    if (typeof obj.code === 'string' && obj.code.trim().length > 0) {
+      code = obj.code;
+    }
+    if (typeof obj.status === 'number' && obj.status >= 400 && obj.status < 600) {
+      statusCode = obj.status;
+    }
   }
 
-  console.error(`[API_ERROR] ${code} (${statusCode}):`, message);
+  console.error(`[API_ERROR] ${code} (${statusCode}):`, message, err);
 
   const headers = req ? getCorsHeaders(req) : corsHeaders;
 

@@ -120,6 +120,9 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       tg.setBackgroundColor?.('#030712');
       tg.enableClosingConfirmation?.();
 
+      // Always clear any stale local JWT before re-authenticating via fresh Telegram initData
+      clearSupabaseToken();
+
       try {
         // All Telegram authentication MUST pass through the trusted server-side Edge Function.
         // Never trust tg.initDataUnsafe before server cryptographic verification completes.
@@ -137,7 +140,12 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           const ctx = (invokeErr as any)?.context;
           if (ctx && typeof ctx.clone === 'function') {
             const ctxJson = await ctx.clone().json().catch(() => null);
-            if (ctxJson) effectiveData = ctxJson;
+            if (ctxJson) {
+              effectiveData = ctxJson;
+            } else {
+              const ctxText = await ctx.clone().text().catch(() => '');
+              if (ctxText) effectiveData = { error: ctxText };
+            }
           }
 
           if (!effectiveData?.error && !effectiveData?.success) {
