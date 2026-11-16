@@ -14,6 +14,8 @@ interface TaskRecord {
   reward: number;
   max_completions?: number;
   current_completions?: number;
+  pending_submissions?: number;
+  remaining_slots?: number;
   target_url?: string | null;
   job_length?: number | null;
   proof_instructions?: string | null;
@@ -83,19 +85,29 @@ export function TaskDetails() {
       }
       setLoadingTask(true);
       try {
-        const { data: taskData, error: taskErr } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("id", id)
+        let taskData: TaskRecord | null = null;
+        const { data: rpcTask, error: rpcErr } = await supabase
+          .rpc("get_task_with_slots", { p_task_id: id })
           .maybeSingle();
 
-        if (!active) return;
-        if (taskErr) {
-          console.error("Failed to fetch task:", taskErr);
-          setTask(null);
+        if (!rpcErr && rpcTask) {
+          taskData = rpcTask as TaskRecord;
         } else {
-          setTask(taskData as TaskRecord | null);
+          const { data: fallbackData, error: taskErr } = await supabase
+            .from("tasks")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (taskErr) {
+            console.error("Failed to fetch task:", taskErr);
+          } else {
+            taskData = fallbackData as TaskRecord | null;
+          }
         }
+
+        if (!active) return;
+        setTask(taskData);
 
         if (user?.uuid && taskData) {
           const { data: subData } = await supabase
@@ -187,6 +199,18 @@ export function TaskDetails() {
         telegram_username: username.trim()
       });
 
+      setTask((prev) => {
+        if (!prev) return prev;
+        const nextPending = (prev.pending_submissions || 0) + 1;
+        const maxC = prev.max_completions || 100;
+        const currC = prev.current_completions || 0;
+        return {
+          ...prev,
+          pending_submissions: nextPending,
+          remaining_slots: Math.max(0, maxC - currC - nextPending),
+        };
+      });
+
       tgHaptics.notification("success");
       setStatus("success");
     } catch (err: any) {
@@ -234,8 +258,12 @@ export function TaskDetails() {
   }
 
   const maxSlots = task.max_completions || 100;
-  const usedSlots = task.current_completions || 0;
-  const remainingSlots = Math.max(0, maxSlots - usedSlots);
+  const approvedSlots = task.current_completions || 0;
+  const pendingSlots = task.pending_submissions || 0;
+  const remainingSlots =
+    typeof task.remaining_slots === "number"
+      ? Math.max(0, task.remaining_slots)
+      : Math.max(0, maxSlots - approvedSlots - pendingSlots);
   const safeTargetUrl = isSafeHttpUrl(task.target_url);
 
   return (
@@ -273,11 +301,19 @@ export function TaskDetails() {
           {task.description}
         </p>
 
-        <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-2 border-t border-white/5">
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400 pt-2 border-t border-white/5">
           <div className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5 text-[#38bdf8]" />
-            <span>{remainingSlots}/{maxSlots} Slots Left</span>
+            <span className={remainingSlots === 0 ? "text-amber-400 font-semibold" : ""}>
+              {remainingSlots}/{maxSlots} Slots Left
+            </span>
           </div>
+          {pendingSlots > 0 && (
+            <>
+              <span>·</span>
+              <span className="text-amber-300/90">{pendingSlots} in review</span>
+            </>
+          )}
           <span>·</span>
           <div className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-[#38bdf8]" />
@@ -348,7 +384,9 @@ export function TaskDetails() {
           </div>
         ) : task.status !== "active" || remainingSlots <= 0 ? (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-center text-xs text-amber-200">
-            All available slots for this task have been filled.
+            {pendingSlots > 0 && remainingSlots <= 0
+              ? `All remaining slots (${pendingSlots}) are currently reserved by submissions under review.`
+              : "All available slots for this task have been filled."}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-white/5">

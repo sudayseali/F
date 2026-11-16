@@ -47,6 +47,7 @@ export interface TaskItem {
   pay: string;
   timeToComplete: string;
   available: number;
+  pendingCount?: number;
   total: number;
   status: string;
 }

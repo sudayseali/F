@@ -21,14 +21,22 @@ export function Tasks() {
   useEffect(() => {
     async function fetchTasks() {
       try {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-          
-        if (data) {
-          const mapped = data.filter(task => {
+        let rawTasks: any[] | null = null;
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('get_active_tasks_with_slots');
+
+        if (!rpcErr && Array.isArray(rpcData)) {
+          rawTasks = rpcData;
+        } else {
+          const { data: fallbackData } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+          rawTasks = fallbackData;
+        }
+
+        if (rawTasks) {
+          const mapped = rawTasks.filter(task => {
              if (task.allowed_countries && Array.isArray(task.allowed_countries) && task.allowed_countries.length > 0) {
                  if (!task.allowed_countries.includes('International')) {
                      if (!location) return true;
@@ -36,16 +44,27 @@ export function Tasks() {
                  }
              }
              return true;
-          }).map(task => ({
-            id: task.id,
-            category: task.category || "Other",
-            title: task.title,
-            pay: `$${Number(task.reward).toFixed(2)}`,
-            timeToComplete: task.job_length ? `${task.job_length}m` : "5m",
-            available: (task.max_completions || 100) - (task.current_completions || 0),
-            total: task.max_completions || 100,
-            status: task.status
-          }));
+          }).map(task => {
+            const total = task.max_completions || 100;
+            const approved = task.current_completions || 0;
+            const pending = Number(task.pending_submissions || 0);
+            const available =
+              typeof task.remaining_slots === 'number'
+                ? Math.max(0, task.remaining_slots)
+                : Math.max(0, total - approved - pending);
+
+            return {
+              id: task.id,
+              category: task.category || "Other",
+              title: task.title,
+              pay: `$${Number(task.reward).toFixed(2)}`,
+              timeToComplete: task.job_length ? `${task.job_length}m` : "5m",
+              available,
+              pendingCount: pending,
+              total,
+              status: task.status
+            };
+          });
           setJobs(mapped);
         }
 
@@ -222,8 +241,17 @@ export function Tasks() {
                   {job.title}
                 </h3>
 
-                <div className="text-[10px] text-slate-400 mt-1">
-                  {job.available} slots available
+                <div className="flex items-center gap-2 text-[10px] mt-1">
+                  <span className={job.available > 0 ? "text-slate-400" : "text-amber-400 font-semibold"}>
+                    {job.available > 0
+                      ? `${job.available}/${job.total} slots left`
+                      : "0 slots left (All reserved)"}
+                  </span>
+                  {(job.pendingCount ?? 0) > 0 && (
+                    <span className="text-amber-300/90">
+                      · {job.pendingCount} in review
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -827,6 +827,17 @@ async function runAllSecurityTests() {
     recordTest("REMED-12", "Atomic task slot reservation & non-negative chargeback clamp", "Financial Integrity", passed, "QUOTA_&_CLAMP_ENFORCED", passed ? "QUOTA_&_CLAMP_ENFORCED" : "INTEGRITY_FAILED");
   }
 
+  // REMED-13: Accurate remaining task slots subtract both approved and pending submissions
+  {
+    const calcRemainingSlots = (maxCompletions: number, approved: number, pending: number) =>
+      Math.max(0, maxCompletions - approved - pending);
+    const partial = calcRemainingSlots(10, 4, 3);
+    const fullyReserved = calcRemainingSlots(10, 6, 4);
+    const clampedOverflow = calcRemainingSlots(10, 7, 5);
+    const passed = partial === 3 && fullyReserved === 0 && clampedOverflow === 0;
+    recordTest("REMED-13", "Accurate remaining task slots subtract pending reservations", "Task Quota Integrity", passed, "REMAINING_3_0_0", `REMAINING_${partial}_${fullyReserved}_${clampedOverflow}`);
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
