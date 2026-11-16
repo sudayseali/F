@@ -52,6 +52,20 @@ export interface TaskItem {
   status: string;
 }
 
+export interface UserTaskSubmissionItem {
+  submission_id: string;
+  task_id: string;
+  task_title: string;
+  task_category: string;
+  task_reward: number;
+  task_status: string;
+  submission_status: "pending" | "approved" | "rejected";
+  earned_amount: number;
+  admin_comment?: string | null;
+  submitted_at: string;
+  reviewed_at?: string | null;
+}
+
 export interface TransactionItem {
   id: string;
   user_id: string;

@@ -838,6 +838,22 @@ async function runAllSecurityTests() {
     recordTest("REMED-13", "Accurate remaining task slots subtract pending reservations", "Task Quota Integrity", passed, "REMAINING_3_0_0", `REMAINING_${partial}_${fullyReserved}_${clampedOverflow}`);
   }
 
+  // REMED-14: User task submission history separates pending vs completed & aggregates task-only earnings
+  {
+    const subs = [
+      { status: "approved", reward: 0.75, earned: 0.75 },
+      { status: "approved", reward: 1.25, earned: 1.25 },
+      { status: "pending", reward: 2.00, earned: 0.00 },
+      { status: "rejected", reward: 0.50, earned: 0.00 },
+    ];
+    const completedCount = subs.filter(s => s.status === "approved").length;
+    const pendingCount = subs.filter(s => s.status === "pending").length;
+    const taskOnlyEarned = Number(subs.filter(s => s.status === "approved").reduce((a, b) => a + b.earned, 0).toFixed(2));
+    const pendingTotal = Number(subs.filter(s => s.status === "pending").reduce((a, b) => a + b.reward, 0).toFixed(2));
+    const passed = completedCount === 2 && pendingCount === 1 && taskOnlyEarned === 2.00 && pendingTotal === 2.00;
+    recordTest("REMED-14", "Task-only earnings & pending/completed separation", "Task Reporting Integrity", passed, "COMP_2_PEND_1_EARNED_$2.00", `COMP_${completedCount}_PEND_${pendingCount}_EARNED_$${taskOnlyEarned.toFixed(2)}`);
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

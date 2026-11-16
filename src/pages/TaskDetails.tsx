@@ -364,10 +364,30 @@ export function TaskDetails() {
         )}
 
         {existingSubmission ? (
-          <div className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 text-center space-y-1.5">
-            <CheckCircle className="w-7 h-7 mx-auto text-sky-400" />
+          <div
+            className={`rounded-2xl p-4 text-center space-y-1.5 border ${
+              existingSubmission.status === "approved"
+                ? "bg-emerald-500/10 border-emerald-500/30"
+                : existingSubmission.status === "pending"
+                ? "bg-amber-500/10 border-amber-500/30"
+                : "bg-rose-500/10 border-rose-500/30"
+            }`}
+          >
+            <CheckCircle
+              className={`w-7 h-7 mx-auto ${
+                existingSubmission.status === "approved"
+                  ? "text-emerald-400"
+                  : existingSubmission.status === "pending"
+                  ? "text-amber-400"
+                  : "text-rose-400"
+              }`}
+            />
             <h4 className="text-sm font-bold text-white capitalize">
-              Submission {existingSubmission.status}
+              {existingSubmission.status === "approved"
+                ? `Completed · +$${Number(task.reward || 0).toFixed(2)} Earned`
+                : existingSubmission.status === "pending"
+                ? `Pending Review · +$${Number(task.reward || 0).toFixed(2)}`
+                : "Submission Declined"}
             </h4>
             <p className="text-xs text-slate-300">
               Submitted on {new Date(existingSubmission.submitted_at).toLocaleDateString()}.
