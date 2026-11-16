@@ -3,14 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
-import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { md5Hex } from "../_shared/crypto.ts";
 
 serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
 
   try {
     if (req.method !== "POST" && req.method !== "GET") {
@@ -29,15 +29,14 @@ serve(async (req) => {
 
     const verifiedUser = await verifyUserRequest(req);
     const appId = Deno.env.get("CPX_APP_ID") || "24128";
-    const cpxSecret = Deno.env.get("CPX_SECRET") || "";
+    const cpxSecret = (Deno.env.get("CPX_SECRET") || "").trim();
 
-    let cpxUrl = `https://offers.cpx-research.com/index.php?app_id=${encodeURIComponent(appId)}&ext_user_id=${encodeURIComponent(verifiedUser.id)}`;
-
-    // Include CPX secure_hash (md5(ext_user_id + '-' + secret)) when CPX_SECRET is configured
-    if (cpxSecret) {
-      const secureHash = md5Hex(`${verifiedUser.id}-${cpxSecret}`);
-      cpxUrl += `&secure_hash=${secureHash}`;
+    if (!cpxSecret) {
+      throw new AppError("CPX Research offerwall is temporarily unavailable (configuration missing).", 500, "CONFIG_ERROR");
     }
+
+    const secureHash = md5Hex(`${verifiedUser.id}-${cpxSecret}`);
+    const cpxUrl = `https://offers.cpx-research.com/index.php?app_id=${encodeURIComponent(appId)}&ext_user_id=${encodeURIComponent(verifiedUser.id)}&secure_hash=${secureHash}`;
 
     return successResponse({ url: cpxUrl }, 200, req);
   } catch (error: any) {

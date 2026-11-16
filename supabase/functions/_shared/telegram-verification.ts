@@ -41,13 +41,13 @@ export function constantTimeCompare(a: string, b: string): boolean {
  * 
  * @param initData Raw query string from window.Telegram.WebApp.initData
  * @param botToken Official bot token issued by BotFather
- * @param maxAgeSeconds Maximum allowed age of auth_date (default: 86400s / 24h)
+ * @param maxAgeSeconds Maximum allowed age of auth_date (default: 3600s / 1h)
  * @param clockToleranceSeconds Allowed future clock drift (default: 300s / 5m)
  */
 export async function verifyTelegramInitData(
   initData: string,
   botToken: string,
-  maxAgeSeconds = 86400,
+  maxAgeSeconds = 3600,
   clockToleranceSeconds = 300
 ): Promise<VerificationResult> {
   if (!initData || typeof initData !== 'string' || initData.trim() === '') {

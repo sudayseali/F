@@ -10,6 +10,27 @@ export interface RateLimitResult {
 }
 
 /**
+ * Extracts and sanitizes client IP prioritizing edge-set headers over spoofable leftmost XFF.
+ */
+export function getClientIp(req: Request): string {
+  const cfIp = req.headers.get('cf-connecting-ip')?.trim();
+  if (cfIp && /^[a-fA-F0-9.:]{3,45}$/.test(cfIp)) return cfIp;
+
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp && /^[a-fA-F0-9.:]{3,45}$/.test(realIp)) return realIp;
+
+  const xff = req.headers.get('x-forwarded-for');
+  if (xff) {
+    const hops = xff.split(',').map((s) => s.trim()).filter(Boolean);
+    const candidate = hops.length > 0 ? hops[0] : '';
+    if (candidate && /^[a-fA-F0-9.:]{3,45}$/.test(candidate)) {
+      return candidate;
+    }
+  }
+  return 'unknown';
+}
+
+/**
  * Fast in-memory L1 sliding-window rate limit
  */
 export function checkRateLimit(

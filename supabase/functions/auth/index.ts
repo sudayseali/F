@@ -7,7 +7,7 @@ import * as jose from "https://deno.land/x/jose@v4.14.4/index.ts";
 import { handleCors } from "../_shared/cors.ts";
 import { verifyTelegramInitData } from "../_shared/telegram-verification.ts";
 import { checkTelegramChannelMembership } from "../_shared/channel-check.ts";
-import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
@@ -37,7 +37,7 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
 
   try {
     if (req.method !== "POST") {
@@ -309,7 +309,7 @@ serve(async (req: Request) => {
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
-      .setExpirationTime("24h")
+      .setExpirationTime("4h")
       .sign(secret);
 
     // 7. Return Verified Session and Profile

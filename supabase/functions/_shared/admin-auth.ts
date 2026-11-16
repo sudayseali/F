@@ -5,6 +5,7 @@ import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AppError } from './errors.ts';
 import { AdminRole, AdminPermission, hasPermission } from './permissions.ts';
+import { isValidUuid } from './validation.ts';
 
 export interface VerifiedAdmin {
   id: string;
@@ -38,19 +39,22 @@ export async function verifyAdminRequest(
     throw new AppError('Server configuration missing for authentication.', 500, 'CONFIG_ERROR');
   }
 
-  // 1. Verify Cryptographic JWT Signature
+  // 1. Verify Cryptographic JWT Signature (pinned to HS256 & authenticated audience)
   let payload: jose.JWTPayload;
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload: verifiedPayload } = await jose.jwtVerify(token, secret);
+    const { payload: verifiedPayload } = await jose.jwtVerify(token, secret, {
+      algorithms: ['HS256'],
+      audience: 'authenticated',
+    });
     payload = verifiedPayload;
   } catch (err: any) {
     throw new AppError(`Invalid or expired administrator session: ${err.message}`, 401, 'INVALID_TOKEN');
   }
 
   const authUserId = payload.sub;
-  if (!authUserId) {
-    throw new AppError('Token subject identifier is missing.', 401, 'INVALID_TOKEN');
+  if (!authUserId || !isValidUuid(authUserId)) {
+    throw new AppError('Token subject identifier is missing or invalid.', 401, 'INVALID_TOKEN');
   }
 
   // Explicitly reject standard Telegram user tokens from accessing admin routes

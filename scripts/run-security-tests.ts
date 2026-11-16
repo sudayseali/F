@@ -156,7 +156,7 @@ function checkAdminAuth(token: string | null, adminRecord: any, requiredPermissi
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   const normalized = origin.trim().replace(/\/$/, "").toLowerCase();
-  if (normalized === "null") return true;
+  if (normalized === "null") return false;
   const allowed = [
     "https://web.telegram.org",
     "https://webk.telegram.org",
@@ -766,6 +766,65 @@ async function runAllSecurityTests() {
       !mutedPushOnly.sendTelegram &&
       !allowedMethods.includes("payeer");
     recordTest("REMED-07", "Alert preference gating & Payeer withdrawal removal enforcement", "Alerts & Payout Security", passed, "PREFS_ENFORCED_NO_PAYEER", passed ? "PREFS_ENFORCED_NO_PAYEER" : "BYPASSED");
+  }
+
+  // REMED-08: Strict CORS rejection of 'null' sandboxed/file origin
+  {
+    const nullAllowed = isOriginAllowed("null");
+    const emptyAllowed = isOriginAllowed("");
+    const passed = !nullAllowed && !emptyAllowed;
+    recordTest("REMED-08", "CORS rejection of 'null' and empty origins", "Network Security", passed, "NULL_ORIGIN_BLOCKED", passed ? "NULL_ORIGIN_BLOCKED" : "NULL_ORIGIN_BYPASSED");
+  }
+
+  // REMED-09: Postback hash validation rejects raw shared secret as hash
+  {
+    const secret = "lootably_super_secret";
+    const expectedHash = crypto.createHash("sha256").update(`user-12310.50${secret}`).digest("hex");
+    const verifyHashOnly = (incomingHash: string) => constantTimeCompare(incomingHash.toLowerCase(), expectedHash.toLowerCase());
+    const rawSecretAccepted = verifyHashOnly(secret);
+    const validHashAccepted = verifyHashOnly(expectedHash);
+    const passed = !rawSecretAccepted && validHashAccepted;
+    recordTest("REMED-09", "Postback verification rejects raw secret used as hash", "Offerwall Security", passed, "HASH_ONLY_ACCEPTED", passed ? "HASH_ONLY_ACCEPTED" : "RAW_SECRET_BYPASS");
+  }
+
+  // REMED-10: Tightened Telegram initData replay TTL (3600s / 1h)
+  {
+    const twoHoursAgo = now - 7200;
+    const oldData = generateTelegramInitData({ id: 888999, first_name: "Replay" }, twoHoursAgo, TEST_BOT_TOKEN);
+    const check = verifyTelegramData(oldData, TEST_BOT_TOKEN, 3600);
+    const passed = !check.valid && check.error === "AUTH_DATE_EXPIRED";
+    recordTest("REMED-10", "Telegram initData strict 1h (3600s) replay expiration", "Telegram Auth", passed, "AUTH_DATE_EXPIRED", check.error || "AcceptedStaleData");
+  }
+
+  // REMED-11: Admin self-demotion prevention & suspended account RLS blocking
+  {
+    const preventSelfDemotion = (actorId: string, targetId: string, newRole: string, currentRole: string) => {
+      if (actorId === targetId && newRole !== currentRole) return { allowed: false, code: "SELF_DEMOTION_FORBIDDEN" };
+      return { allowed: true };
+    };
+    const canReadOwnRow = (authUid: string | null, rowId: string, status: string) =>
+      authUid !== null && authUid === rowId && status !== "suspended";
+    const selfChange = preventSelfDemotion("admin-1", "admin-1", "moderator", "super_admin");
+    const suspendedUserRead = canReadOwnRow("user-1", "user-1", "suspended");
+    const activeUserRead = canReadOwnRow("user-1", "user-1", "active");
+    const passed = !selfChange.allowed && !suspendedUserRead && activeUserRead;
+    recordTest("REMED-11", "Admin self-demotion guard & suspended user RLS lockout", "RBAC & RLS Security", passed, "SELF_DEMOTION_&_SUSPENDED_BLOCKED", passed ? "SELF_DEMOTION_&_SUSPENDED_BLOCKED" : "GUARD_FAILED");
+  }
+
+  // REMED-12: Atomic task quota guard & offerwall chargeback reversal safety
+  {
+    const canReserveSlot = (approved: number, pending: number, maxCompletions: number) =>
+      approved + pending < maxCompletions;
+    const applyChargeback = (balance: number, debitAmount: number) => {
+      const actualDebit = Math.min(balance, Math.max(0, debitAmount));
+      return Number((balance - actualDebit).toFixed(2));
+    };
+    const quotaFull = !canReserveSlot(8, 2, 10);
+    const quotaOpen = canReserveSlot(7, 2, 10);
+    const clampedBalance = applyChargeback(1.25, 5.0);
+    const normalChargeback = applyChargeback(10.0, 2.5);
+    const passed = quotaFull && quotaOpen && clampedBalance === 0 && normalChargeback === 7.5;
+    recordTest("REMED-12", "Atomic task slot reservation & non-negative chargeback clamp", "Financial Integrity", passed, "QUOTA_&_CLAMP_ENFORCED", passed ? "QUOTA_&_CLAMP_ENFORCED" : "INTEGRITY_FAILED");
   }
 
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1

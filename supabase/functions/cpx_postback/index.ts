@@ -7,13 +7,14 @@ import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { md5Hex, sha256Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
+import { getClientIp } from "../_shared/rate-limit.ts";
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
   const CPX_SECRET = Deno.env.get("CPX_SECRET") || "";
 
   // Fail-closed: never accept unauthenticated CPX postbacks
@@ -108,17 +109,17 @@ serve(async (req) => {
       .eq("external_transaction_id", transId)
       .maybeSingle();
 
-    if (existingLog) {
+    if (existingLog && status !== "2") {
       return new Response("OK - Already processed", { status: 200 });
     }
 
-    // 4. Atomic Financial Credit
+    // 4. Atomic Financial Credit or Chargeback Reversal
     if (status === "1") {
       if (isNaN(amountLocal) || !isFinite(amountLocal) || amountLocal <= 0 || amountLocal > 1000) {
         return new Response("Invalid payout amount", { status: 400 });
       }
 
-      const { error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
+      const { data: creditData, error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
         p_user_id: targetUserId,
         p_amount: amountLocal,
         p_type: "survey_reward",
@@ -128,8 +129,11 @@ serve(async (req) => {
       });
 
       if (creditError) throw creditError;
+      if (creditData?.already_processed) {
+        return new Response("OK - Already processed", { status: 200 });
+      }
 
-      await supabaseAdmin.from("offerwall_logs").insert({
+      const { error: logErr } = await supabaseAdmin.from("offerwall_logs").insert({
         provider: "cpx",
         external_transaction_id: transId,
         user_id: targetUserId,
@@ -137,6 +141,9 @@ serve(async (req) => {
         status: "credited",
         raw_payload: Object.fromEntries(url.searchParams.entries())
       });
+      if (logErr && (logErr as any).code !== "23505") {
+        console.error("[CPX_LOG_INSERT_ERROR]", logErr);
+      }
 
       await sendUserAlert(supabaseAdmin, {
         userId: targetUserId,
@@ -152,26 +159,40 @@ serve(async (req) => {
 
       await notifyReferrerOfCommission(supabaseAdmin, targetUserId, amountLocal, "a CPX Research survey");
     } else if (status === "2") {
-      await logAuditEvent({
-        actorId: targetUserId,
-        actorType: "offerwall",
-        action: "cpx_chargeback_received",
-        targetType: "postback",
-        targetId: transId,
-        details: { amountLocal },
-        ipAddress: clientIp,
+      const safeReversalAmount = isNaN(amountLocal) || !isFinite(amountLocal) || amountLocal <= 0 ? 0 : Math.min(amountLocal, 1000);
+      const { data: revData, error: revErr } = await supabaseAdmin.rpc("handle_offer_chargeback", {
+        p_user_id: targetUserId,
+        p_provider: "cpx",
+        p_external_tx_id: transId,
+        p_amount: safeReversalAmount,
       });
 
-      await sendUserAlert(supabaseAdmin, {
-        userId: targetUserId,
-        category: "offer",
-        eventKey: "offer_chargeback",
-        title: "CPX Survey Reversal Notice",
-        message: `CPX Research reported a reversal for transaction ${transId}.`,
-        actionUrl: "/offerwall",
-        ctaLabel: "🎁 View Offers",
-        metadata: { provider: "cpx", trans_id: transId, amount: amountLocal },
-      });
+      if (revErr) {
+        console.error("[CPX_CHARGEBACK_RPC_ERROR]", revErr);
+      }
+
+      if (!revData?.already_processed) {
+        await logAuditEvent({
+          actorId: targetUserId,
+          actorType: "offerwall",
+          action: "cpx_chargeback_received",
+          targetType: "postback",
+          targetId: transId,
+          details: { amountLocal: safeReversalAmount, deducted: revData?.deducted ?? 0 },
+          ipAddress: clientIp,
+        });
+
+        await sendUserAlert(supabaseAdmin, {
+          userId: targetUserId,
+          category: "offer",
+          eventKey: "offer_chargeback",
+          title: "CPX Survey Reversal Notice",
+          message: `CPX Research reported a reversal for transaction ${transId}.`,
+          actionUrl: "/offerwall",
+          ctaLabel: "🎁 View Offers",
+          metadata: { provider: "cpx", trans_id: transId, amount: safeReversalAmount, deducted: revData?.deducted ?? 0 },
+        });
+      }
     }
 
     return new Response("OK", { status: 200 });

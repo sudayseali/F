@@ -8,6 +8,7 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -22,9 +23,17 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
+  const clientIp = getClientIp(req);
+
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const ipRate = await checkDistributedRateLimit(supabaseAdmin, `verify_sub_ip_${clientIp}`, 60, 60);
+    if (!ipRate.allowed) {
+      throw new AppError("Too many requests. Rate limit exceeded.", 429, "RATE_LIMIT_EXCEEDED");
     }
 
     // 1. Enforce Administrator Authentication & Review Permission
@@ -43,8 +52,6 @@ serve(async (req: Request) => {
     if (!["approved", "rejected"].includes(finalDecision)) {
       throw new AppError("Decision must be either 'approved' or 'rejected'.", 400, "INVALID_DECISION");
     }
-
-    const supabaseAdmin = getSupabaseAdmin();
 
     // Lookup submission + task before atomic review
     const { data: subInfo } = await supabaseAdmin

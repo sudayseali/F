@@ -7,6 +7,7 @@ import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { md5Hex, sha256Hex, hmacSha256Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
+import { getClientIp } from "../_shared/rate-limit.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -22,7 +23,7 @@ serve(async (req) => {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
 
   try {
     const supabaseAdmin = getSupabaseAdmin();
@@ -103,8 +104,7 @@ serve(async (req) => {
         const providedLower = params.hash.toLowerCase();
         isSecure =
           constantTimeCompare(providedLower, expectedSha.toLowerCase()) ||
-          constantTimeCompare(providedLower, expectedMd5.toLowerCase()) ||
-          constantTimeCompare(params.hash, lootablySecret);
+          constantTimeCompare(providedLower, expectedMd5.toLowerCase());
       }
     }
     // --- 5. CPX RESEARCH ---
@@ -122,8 +122,7 @@ serve(async (req) => {
         const providedLower = providedHash.toLowerCase();
         isSecure =
           constantTimeCompare(providedLower, expectedMd5.toLowerCase()) ||
-          constantTimeCompare(providedLower, expectedSha.toLowerCase()) ||
-          constantTimeCompare(providedHash, cpxSecret);
+          constantTimeCompare(providedLower, expectedSha.toLowerCase());
       }
     } else {
       // Generic fallback: MUST supply a valid server generic secret
@@ -202,7 +201,7 @@ serve(async (req) => {
     }
 
     // 3. Atomic Financial Credit via Database RPC
-    const { error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
+    const { data: creditData, error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
       p_user_id: targetUserId,
       p_amount: rewardAmount,
       p_type: "offer_reward",
@@ -212,9 +211,12 @@ serve(async (req) => {
     });
 
     if (creditError) throw creditError;
+    if (creditData?.already_processed) {
+      return new Response("200 OK - Duplicate transaction, already credited", { status: 200 });
+    }
 
     // 4. Record in offerwall_logs table
-    await supabaseAdmin.from("offerwall_logs").insert({
+    const { error: logErr } = await supabaseAdmin.from("offerwall_logs").insert({
       provider,
       external_transaction_id: safeTxId,
       user_id: targetUserId,
@@ -222,6 +224,9 @@ serve(async (req) => {
       status: "credited",
       raw_payload: params
     });
+    if (logErr && (logErr as any).code !== "23505") {
+      console.error("[POSTBACK_LOG_INSERT_ERROR]", logErr);
+    }
 
     const providerLabel = provider.toUpperCase();
     await sendUserAlert(supabaseAdmin, {

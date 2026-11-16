@@ -6,13 +6,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
+import { getClientIp } from "../_shared/rate-limit.ts";
 
 serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
   const CPA_SECRET = Deno.env.get("CPA_SECRET") || "";
 
   // Fail-closed in ALL environments: never accept unsigned CPA postbacks
@@ -102,7 +103,7 @@ serve(async (req) => {
     }
 
     // 3. Atomic credit
-    const { error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
+    const { data: creditData, error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
       p_user_id: targetUserId,
       p_amount: payout,
       p_type: "offer_reward",
@@ -112,9 +113,12 @@ serve(async (req) => {
     });
 
     if (creditError) throw creditError;
+    if (creditData?.already_processed) {
+      return new Response("OK - Already processed", { status: 200 });
+    }
 
     // 4. Record log
-    await supabaseAdmin.from("offerwall_logs").insert({
+    const { error: logErr } = await supabaseAdmin.from("offerwall_logs").insert({
       provider: network,
       external_transaction_id: safeTxId,
       user_id: targetUserId,
@@ -122,6 +126,9 @@ serve(async (req) => {
       status: "credited",
       raw_payload: Object.fromEntries(url.searchParams.entries())
     });
+    if (logErr && (logErr as any).code !== "23505") {
+      console.error("[CPA_LOG_INSERT_ERROR]", logErr);
+    }
 
     await sendUserAlert(supabaseAdmin, {
       userId: targetUserId,

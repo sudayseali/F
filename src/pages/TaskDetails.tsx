@@ -170,8 +170,9 @@ export function TaskDetails() {
     setStatus("submitting");
 
     try {
-      const fileExt = (file.name.split(".").pop() || "png").toLowerCase();
-      // Store inside user's authenticated UUID folder to comply with storage RLS
+      const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
+      const fileExt = ALLOWED_IMAGE_EXTS.has(rawExt) ? rawExt : "png";
+      // Store inside user's authenticated UUID folder in private bucket (admin views via signed URLs)
       const objectPath = `${user.uuid}/${Date.now()}_${Math.random().toString(36).slice(2, 9)}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
@@ -180,13 +181,9 @@ export function TaskDetails() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("proofs")
-        .getPublicUrl(objectPath);
-
       await invokeEdgeFunction("submit_task", {
         task_id: task.id,
-        proof_text: publicUrl,
+        proof_text: objectPath,
         telegram_username: username.trim()
       });
 

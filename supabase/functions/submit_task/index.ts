@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
-import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
@@ -24,7 +24,7 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const clientIp = getClientIp(req);
 
   try {
     if (req.method !== "POST") {
@@ -68,73 +68,32 @@ serve(async (req: Request) => {
     const cleanProof = sanitizeString(proofContent, 2000);
     const cleanTgUsername = sanitizeString(telegram_username || "", 64);
 
-    // 3. Verify Task Exists, is Active, and Has Remaining Slots
-    const { data: task, error: taskErr } = await supabaseAdmin
-      .from("tasks")
-      .select("id, title, status, max_completions, current_completions")
-      .eq("id", task_id)
-      .maybeSingle();
+    // 3. Atomic task slot check, duplicate prevention & submission creation under FOR UPDATE lock
+    const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc("submit_task_atomic", {
+      p_user_id: userId,
+      p_task_id: task_id,
+      p_proof_text: cleanProof,
+    });
 
-    if (taskErr || !task) {
-      throw new AppError("Task not found.", 404, "TASK_NOT_FOUND");
+    if (rpcErr) throw rpcErr;
+
+    if (!rpcRes?.success) {
+      const errCode = rpcRes?.code || "SUBMISSION_FAILED";
+      const statusCode = errCode === "TASK_NOT_FOUND" ? 404 : errCode === "ACCOUNT_SUSPENDED" ? 403 : 400;
+      throw new AppError(rpcRes?.error || "Failed to submit task proof.", statusCode, errCode);
     }
 
-    if (task.status !== "active") {
-      throw new AppError("This task is currently paused or completed.", 400, "TASK_NOT_ACTIVE");
-    }
+    const submissionId = rpcRes.submission_id;
+    const taskTitle = rpcRes.task_title || "Task";
 
-    if (typeof task.max_completions === "number" && typeof task.current_completions === "number" && task.current_completions >= task.max_completions) {
-      throw new AppError("All available slots for this task have been filled.", 400, "TASK_QUOTA_FULL");
-    }
-
-    // 4. Check for Existing Duplicate Submission
-    const { data: existingSub, error: subCheckErr } = await supabaseAdmin
-      .from("submissions")
-      .select("id, status")
-      .eq("task_id", task_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (subCheckErr) throw subCheckErr;
-
-    if (existingSub) {
-      throw new AppError(
-        `You have already submitted proof for this task (Status: ${existingSub.status}).`,
-        400,
-        "DUPLICATE_SUBMISSION"
-      );
-    }
-
-    // 5. Insert Submission Record
-    const { data: newSubmission, error: insertErr } = await supabaseAdmin
-      .from("submissions")
-      .insert({
-        task_id: task_id,
-        user_id: userId,
-        proof_text: cleanProof,
-        status: "pending",
-        submitted_at: new Date().toISOString()
-      })
-      .select("id, status, submitted_at")
-      .single();
-
-    if (insertErr) {
-      if ((insertErr as any).code === "23505") {
-        throw new AppError("You have already submitted proof for this task.", 400, "DUPLICATE_SUBMISSION");
-      }
-      throw insertErr;
-    }
-
-    if (!newSubmission) throw new Error("Failed to record submission");
-
-    // 6. Audit Log & In-App Task Alert
+    // 4. Audit Log & In-App Task Alert
     await logAuditEvent({
       actorId: userId,
       actorType: "user",
       action: "task_submitted",
       targetType: "task",
       targetId: task_id,
-      details: { submissionId: newSubmission.id, taskTitle: task.title, telegramUsername: cleanTgUsername || undefined },
+      details: { submissionId, taskTitle, telegramUsername: cleanTgUsername || undefined },
       ipAddress: clientIp,
     });
 
@@ -143,15 +102,15 @@ serve(async (req: Request) => {
       category: "task",
       eventKey: "task_submitted",
       title: "Task Proof Under Review",
-      message: `Your proof for "${task.title}" was submitted and is awaiting verification.`,
+      message: `Your proof for "${taskTitle}" was submitted and is awaiting verification.`,
       actionUrl: `/tasks/${task_id}`,
       telegramPush: false,
-      metadata: { task_id, submission_id: newSubmission.id },
+      metadata: { task_id, submission_id: submissionId },
     });
 
     return successResponse({
       message: "Proof submitted successfully and queued for review.",
-      submission_id: newSubmission.id,
+      submission_id: submissionId,
       status: "pending"
     }, 200, req);
 

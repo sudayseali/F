@@ -6,11 +6,35 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyAdminRequest } from "../_shared/admin-auth.ts";
-import { checkDistributedRateLimit } from "../_shared/rate-limit.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { validatePositiveAmount, sanitizeString, sanitizePostgrestSearch, isValidUuid } from "../_shared/validation.ts";
 import { AdminRole } from "../_shared/permissions.ts";
 import { sendUserAlert, notifyReferrerOfCommission, broadcastNewTaskAlert } from "../_shared/alerts.ts";
+
+function validateOptionalHttpUrl(raw: unknown): string {
+  const clean = sanitizeString(raw || "", 300);
+  if (!clean) return "";
+  try {
+    const parsed = new URL(clean);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new AppError("Task target URL must use http:// or https://.", 400, "INVALID_TARGET_URL");
+    }
+    return parsed.toString();
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError("Invalid task target URL format.", 400, "INVALID_TARGET_URL");
+  }
+}
+
+function extractProofObjectPath(rawProof: unknown): string | null {
+  if (typeof rawProof !== "string" || !rawProof.trim()) return null;
+  const trimmed = rawProof.trim();
+  const markerMatch = trimmed.match(/\/storage\/v1\/object\/(?:public|sign)\/proofs\/([^?#]+)/i);
+  if (markerMatch?.[1]) return decodeURIComponent(markerMatch[1]);
+  if (/^[0-9a-f-]{36}\/[^?#]+\.(png|jpg|jpeg|webp)$/i.test(trimmed)) return trimmed;
+  return null;
+}
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -27,7 +51,7 @@ serve(async (req: Request) => {
 
   try {
     const supabaseAdmin = getSupabaseAdmin();
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const clientIp = getClientIp(req);
 
     // Distributed rate limiting for admin requests (120 reqs / 60s per IP)
     const rate = await checkDistributedRateLimit(supabaseAdmin, `admin_ip_${clientIp}`, 120, 60);
@@ -52,42 +76,27 @@ serve(async (req: Request) => {
     if (action === "get_admin_data" || action === "get_dashboard_stats") {
       const admin = await verifyAdminRequest(req, "view_dashboard");
 
-      const [
-        { count: totalUsers },
-        { count: totalTasks },
-        { count: pendingWithdrawals },
-        { count: pendingSubmissions },
-        { data: balanceStats },
-        { data: withdrawalStats }
-      ] = await Promise.all([
-        supabaseAdmin.from("users").select("*", { count: "exact", head: true }),
-        supabaseAdmin.from("tasks").select("*", { count: "exact", head: true }).eq("status", "active"),
-        supabaseAdmin.from("withdrawals").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabaseAdmin.from("submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabaseAdmin.from("users").select("wallet_balance, total_earned"),
-        supabaseAdmin.from("withdrawals").select("amount").eq("status", "completed")
+      const [{ data: aggData, error: aggErr }, { data: recentTransactions }] = await Promise.all([
+        supabaseAdmin.rpc("get_admin_dashboard_aggregates"),
+        supabaseAdmin
+          .from("transactions")
+          .select("*, user:users(telegram_id, username, first_name)")
+          .order("created_at", { ascending: false })
+          .limit(10)
       ]);
 
-      const totalBalance = balanceStats?.reduce((acc, curr) => acc + Number(curr.wallet_balance || 0), 0) || 0;
-      const totalEarned = balanceStats?.reduce((acc, curr) => acc + Number(curr.total_earned || 0), 0) || 0;
-      const totalPaidOut = withdrawalStats?.reduce((acc, curr) => acc + Number(curr.amount || 0), 0) || 0;
-
-      const { data: recentTransactions } = await supabaseAdmin
-        .from("transactions")
-        .select("*, user:users(telegram_id, username, first_name)")
-        .order("created_at", { ascending: false })
-        .limit(10);
+      if (aggErr) throw aggErr;
 
       return successResponse({
         admin: { email: admin.email, role: admin.role, fullName: admin.fullName },
         stats: {
-          totalUsers: totalUsers || 0,
-          activeTasks: totalTasks || 0,
-          pendingWithdrawals: pendingWithdrawals || 0,
-          pendingSubmissions: pendingSubmissions || 0,
-          totalTreasuryBalance: totalBalance,
-          totalPlatformEarned: totalEarned,
-          totalPaidOut: totalPaidOut,
+          totalUsers: Number(aggData?.totalUsers || 0),
+          activeTasks: Number(aggData?.activeTasks || 0),
+          pendingWithdrawals: Number(aggData?.pendingWithdrawals || 0),
+          pendingSubmissions: Number(aggData?.pendingSubmissions || 0),
+          totalTreasuryBalance: Number(aggData?.totalTreasuryBalance || 0),
+          totalPlatformEarned: Number(aggData?.totalPlatformEarned || 0),
+          totalPaidOut: Number(aggData?.totalPaidOut || 0),
         },
         recentTransactions: recentTransactions || []
       }, 200, req);
@@ -270,6 +279,7 @@ serve(async (req: Request) => {
 
       if (!title || !description) throw new AppError("Task title and description are required.", 400, "MISSING_FIELDS");
       const cleanReward = validatePositiveAmount(reward, 0.01, 100.0);
+      const safeTargetUrl = validateOptionalHttpUrl(targetUrl);
 
       const { data: newTask, error } = await supabaseAdmin
         .from("tasks")
@@ -279,7 +289,7 @@ serve(async (req: Request) => {
           category: sanitizeString(category || "Other", 40),
           reward: cleanReward,
           max_completions: Math.max(1, parseInt(maxCompletions) || 100),
-          target_url: sanitizeString(targetUrl || "", 300),
+          target_url: safeTargetUrl,
           job_length: Math.max(1, parseInt(jobLength) || 5),
           proof_instructions: sanitizeString(proofInstructions || "", 500),
           status: "active"
@@ -352,7 +362,28 @@ serve(async (req: Request) => {
         .range(offset, offset + limit - 1);
 
       if (error) throw error;
-      return successResponse({ submissions, total: count, page, limit }, 200, req);
+
+      // Sign private proof URLs (1-hour expiry) so admin panel can display screenshots securely
+      const signedSubmissions = await Promise.all(
+        (submissions || []).map(async (sub: any) => {
+          const objectPath = extractProofObjectPath(sub?.proof_text);
+          if (!objectPath) return sub;
+          const { data: signedData } = await supabaseAdmin.storage
+            .from("proofs")
+            .createSignedUrl(objectPath, 3600);
+          if (signedData?.signedUrl) {
+            return {
+              ...sub,
+              proof_text: signedData.signedUrl,
+              proof_signed_url: signedData.signedUrl,
+              proof_object_path: objectPath,
+            };
+          }
+          return sub;
+        })
+      );
+
+      return successResponse({ submissions: signedSubmissions, total: count, page, limit }, 200, req);
     }
 
     if (action === "review_submission") {
@@ -489,9 +520,14 @@ serve(async (req: Request) => {
         throw new AppError("Valid targetAdminId required.", 400, "INVALID_ADMIN_ID");
       }
 
-      // Prevent super_admin demoting or locking themselves out
-      if (targetAdminId === admin.id && status === "suspended") {
-        throw new AppError("Cannot suspend your own administrator account.", 400, "CANNOT_SELF_SUSPEND");
+      // Prevent super_admin from suspending or demoting themselves (lockout protection)
+      if (targetAdminId === admin.id) {
+        if (status === "suspended") {
+          throw new AppError("Cannot suspend your own administrator account.", 400, "CANNOT_SELF_SUSPEND");
+        }
+        if (role && role !== admin.role) {
+          throw new AppError("Cannot change your own administrator role.", 400, "CANNOT_SELF_DEMOTE");
+        }
       }
 
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };

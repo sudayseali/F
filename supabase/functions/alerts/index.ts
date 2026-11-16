@@ -8,6 +8,7 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { isValidUuid } from "../_shared/validation.ts";
 import { DEFAULT_ALERT_PREFS, normalizeAlertPrefs } from "../_shared/alerts.ts";
+import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -22,13 +23,25 @@ serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
+  const clientIp = getClientIp(req);
+
   try {
     if (req.method !== "POST") {
       throw new AppError("Method Not Allowed", 405, "METHOD_NOT_ALLOWED");
     }
 
-    const user = await verifyUserRequest(req);
     const supabaseAdmin = getSupabaseAdmin();
+    const ipRate = await checkDistributedRateLimit(supabaseAdmin, `alerts_ip_${clientIp}`, 60, 60);
+    if (!ipRate.allowed) {
+      throw new AppError("Too many requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
+    }
+
+    const user = await verifyUserRequest(req);
+    const userRate = await checkDistributedRateLimit(supabaseAdmin, `alerts_usr_${user.id}`, 30, 60);
+    if (!userRate.allowed) {
+      throw new AppError("Too many alert requests. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = body.action || "list";
 

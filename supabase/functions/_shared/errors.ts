@@ -25,23 +25,23 @@ export function errorResponse(err: unknown, req?: Request): Response {
     statusCode = err.statusCode;
     code = err.code;
   } else if (err instanceof Error) {
-    message = err.message;
-    statusCode = 400;
-    code = 'BAD_REQUEST';
-  } else if (typeof err === 'object' && err !== null && 'message' in err) {
-    const obj = err as { message?: unknown; code?: unknown; status?: unknown; details?: unknown };
-    if (typeof obj.message === 'string' && obj.message.trim().length > 0) {
-      message = obj.message;
-    }
-    if (typeof obj.code === 'string' && obj.code.trim().length > 0) {
+    message = 'An internal error occurred while processing your request.';
+    statusCode = 500;
+    code = 'INTERNAL_ERROR';
+  } else if (typeof err === 'object' && err !== null && 'code' in err) {
+    const obj = err as { code?: unknown; status?: unknown };
+    if (typeof obj.code === 'string' && obj.code.trim().length > 0 && obj.code.length <= 40) {
       code = obj.code;
     }
     if (typeof obj.status === 'number' && obj.status >= 400 && obj.status < 600) {
       statusCode = obj.status;
     }
+    message = statusCode >= 500
+      ? 'An internal error occurred while processing your request.'
+      : 'Invalid request parameters.';
   }
 
-  console.error(`[API_ERROR] ${code} (${statusCode}):`, message, err);
+  console.error(`[API_ERROR] ${code} (${statusCode}):`, err);
 
   const headers = req ? getCorsHeaders(req) : corsHeaders;
 

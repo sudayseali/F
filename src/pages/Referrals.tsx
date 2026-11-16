@@ -31,15 +31,19 @@ export function Referrals() {
         return;
       }
       try {
-        const { data } = await supabase
-          .from("referrals")
-          .select("*, referred:referred_user_id(first_name, username)")
-          .eq("referrer_id", user.uuid)
-          .order("created_at", { ascending: false });
+        const { data, error } = await supabase.rpc("get_my_referrals");
+        if (error) throw error;
 
         if (data) {
-          setReferrals(data);
-          const earned = data.reduce((acc, curr) => acc + Number(curr.total_commission_earned || 0), 0);
+          const normalized = (data as any[]).map((row) => ({
+            ...row,
+            referred: {
+              first_name: row.referred_first_name,
+              username: row.referred_username,
+            },
+          }));
+          setReferrals(normalized);
+          const earned = normalized.reduce((acc, curr) => acc + Number(curr.total_commission_earned || 0), 0);
           setTotalEarned(earned);
         }
       } catch (err) {

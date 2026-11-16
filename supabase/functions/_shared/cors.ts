@@ -17,9 +17,9 @@ const DEFAULT_ALLOWED_ORIGINS = [
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   const normalized = origin.trim().replace(/\/$/, '').toLowerCase();
-  
-  // Mobile Telegram Mini Apps send 'null' origin from sandboxed webviews
-  if (normalized === 'null') return true;
+
+  // Reject opaque 'null' origins (e.g., sandboxed iframe cross-origin abuse)
+  if (normalized === 'null') return false;
 
   const frontendUrl = (Deno.env.get('FRONTEND_URL') || '').trim().replace(/\/$/, '').toLowerCase();
   const envOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '')
