@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase, invokeEdgeFunction } from "../lib/supabase";
 import { useTelegram } from "./TelegramContext";
 import { tgHaptics } from "../lib/telegram";
@@ -43,11 +43,9 @@ interface AlertsContextType {
   savingPrefs: boolean;
   isDrawerOpen: boolean;
   drawerTab: "inbox" | "prefs";
-  liveToast: UserNotification | null;
   openAlertsDrawer: (tab?: "inbox" | "prefs") => void;
   closeAlertsDrawer: () => void;
   setDrawerTab: (tab: "inbox" | "prefs") => void;
-  dismissToast: () => void;
   refreshAlerts: () => Promise<void>;
   markAsRead: (notificationId?: string) => Promise<void>;
   updatePrefs: (patch: Partial<AlertPreferences>) => Promise<void>;
@@ -60,12 +58,10 @@ const AlertsContext = createContext<AlertsContextType>({
   loading: false,
   savingPrefs: false,
   isDrawerOpen: false,
-  drawerTab: "inbox",
-  liveToast: null,
+  drawerTab: "prefs",
   openAlertsDrawer: () => {},
   closeAlertsDrawer: () => {},
   setDrawerTab: () => {},
-  dismissToast: () => {},
   refreshAlerts: async () => {},
   markAsRead: async () => {},
   updatePrefs: async () => {},
@@ -81,9 +77,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<"inbox" | "prefs">("inbox");
-  const [liveToast, setLiveToast] = useState<UserNotification | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [drawerTab, setDrawerTab] = useState<"inbox" | "prefs">("prefs");
 
   const refreshAlerts = useCallback(async () => {
     if (!user?.uuid) {
@@ -121,7 +115,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     refreshAlerts();
   }, [refreshAlerts]);
 
-  // Real-time subscription for instant Referral, Task & Offer alerts
+  // Silently sync wallet balance when rewards credit (alerts are delivered in Telegram Bot chat)
   useEffect(() => {
     if (!user?.uuid) return;
 
@@ -143,29 +137,20 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             if (prev.some((n) => n.id === incoming.id)) return prev;
             return [incoming, ...prev].slice(0, 40);
           });
-          setUnreadCount((c) => c + 1);
-          setLiveToast(incoming);
-          tgHaptics.notification("success");
 
           if (typeof incoming.amount === "number" && incoming.amount > 0) {
             refreshUser();
           }
-
-          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-          toastTimerRef.current = setTimeout(() => {
-            setLiveToast(null);
-          }, 5000);
         }
       )
       .subscribe();
 
     return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       supabase.removeChannel(channel);
     };
   }, [user?.uuid, refreshUser]);
 
-  const openAlertsDrawer = useCallback((tab: "inbox" | "prefs" = "inbox") => {
+  const openAlertsDrawer = useCallback((tab: "inbox" | "prefs" = "prefs") => {
     tgHaptics.impact("light");
     setDrawerTab(tab);
     setIsDrawerOpen(true);
@@ -174,11 +159,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const closeAlertsDrawer = useCallback(() => {
     setIsDrawerOpen(false);
-  }, []);
-
-  const dismissToast = useCallback(() => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setLiveToast(null);
   }, []);
 
   const markAsRead = useCallback(
@@ -244,11 +224,9 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         savingPrefs,
         isDrawerOpen,
         drawerTab,
-        liveToast,
         openAlertsDrawer,
         closeAlertsDrawer,
         setDrawerTab,
-        dismissToast,
         refreshAlerts,
         markAsRead,
         updatePrefs,

@@ -227,15 +227,40 @@ serve(async (req: Request) => {
 
       if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.", 400, "INVALID_WITHDRAWAL_ID");
 
+      const { data: wdInfo } = await supabaseAdmin
+        .from("withdrawals")
+        .select("user_id, amount, method")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      const cleanTxHash = sanitizeString(txHash || "", 100);
       const { data: result, error } = await supabaseAdmin.rpc("admin_approve_withdrawal", {
         p_admin_id: admin.id,
         p_withdrawal_id: withdrawalId,
-        p_tx_hash: sanitizeString(txHash || "", 100),
+        p_tx_hash: cleanTxHash,
         p_note: sanitizeString(note || "", 250)
       });
 
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Approval failed", 400, "APPROVAL_FAILED");
+
+      if (wdInfo?.user_id) {
+        const amt = Number(wdInfo.amount || 0);
+        const methodLabel =
+          wdInfo.method === "usdt" ? "USDT (TRC20)" : wdInfo.method === "usdt_bep20" ? "USDT (BEP20)" : "TRX";
+        const txLine = cleanTxHash ? ` Tx Hash: ${cleanTxHash}` : "";
+        await sendUserAlert(supabaseAdmin, {
+          userId: wdInfo.user_id,
+          category: "system",
+          eventKey: "withdrawal_approved",
+          title: "Withdrawal Approved & Sent!",
+          message: `Your $${amt.toFixed(2)} ${methodLabel} payout has been processed.${txLine}`,
+          amount: amt,
+          actionUrl: "/wallet",
+          ctaLabel: "💰 View Wallet",
+          metadata: { withdrawal_id: withdrawalId, tx_hash: cleanTxHash || undefined },
+        });
+      }
 
       return successResponse(result, 200, req);
     }
@@ -247,14 +272,35 @@ serve(async (req: Request) => {
       if (!withdrawalId || !isValidUuid(withdrawalId)) throw new AppError("Valid withdrawalId required.", 400, "INVALID_WITHDRAWAL_ID");
       if (!reason || reason.trim().length < 3) throw new AppError("Rejection reason is required.", 400, "MISSING_REASON");
 
+      const { data: wdInfo } = await supabaseAdmin
+        .from("withdrawals")
+        .select("user_id, amount, method")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      const cleanReason = sanitizeString(reason, 250);
       const { data: result, error } = await supabaseAdmin.rpc("admin_reject_withdrawal", {
         p_admin_id: admin.id,
         p_withdrawal_id: withdrawalId,
-        p_reason: sanitizeString(reason, 250)
+        p_reason: cleanReason
       });
 
       if (error) throw error;
       if (!result?.success) throw new AppError(result?.error || "Rejection failed", 400, "REJECTION_FAILED");
+
+      if (wdInfo?.user_id) {
+        const amt = Number(wdInfo.amount || 0);
+        await sendUserAlert(supabaseAdmin, {
+          userId: wdInfo.user_id,
+          category: "system",
+          eventKey: "withdrawal_rejected",
+          title: "Withdrawal Declined & Refunded",
+          message: `Your $${amt.toFixed(2)} withdrawal was declined and refunded to your wallet. Reason: ${cleanReason}`,
+          actionUrl: "/wallet",
+          ctaLabel: "💰 View Wallet",
+          metadata: { withdrawal_id: withdrawalId, reason: cleanReason },
+        });
+      }
 
       return successResponse(result, 200, req);
     }

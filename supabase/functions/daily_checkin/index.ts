@@ -7,6 +7,7 @@ import { handleCors } from "../_shared/cors.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
+import { sendUserAlert } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -58,6 +59,21 @@ serve(async (req: Request) => {
     if (!result?.success) {
       return errorResponse(new AppError(result?.error || "Daily reward already claimed.", 400, "ALREADY_CLAIMED"), req);
     }
+
+    const rewardAmount = Number(result.reward_amount ?? 0.05);
+    const ptsAmount = Number(result.points ?? 50);
+
+    await sendUserAlert(supabaseAdmin, {
+      userId,
+      category: "system",
+      eventKey: "daily_checkin_claimed",
+      title: "Daily Check-In Claimed!",
+      message: `You received +${ptsAmount} PTS (+$${rewardAmount.toFixed(2)}). New wallet balance: $${Number(result.new_balance || 0).toFixed(2)}.`,
+      amount: rewardAmount,
+      actionUrl: "/wallet",
+      ctaLabel: "💰 View Wallet",
+      metadata: { points: ptsAmount, claimed_at: result.claimed_at },
+    });
 
     return successResponse({
       message: "Daily reward claimed successfully! +50 PTS ($0.05) added to your wallet balance.",

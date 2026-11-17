@@ -72,15 +72,37 @@ function isCategoryEnabled(prefs: AlertPrefs, category: AlertCategory): boolean 
   return true;
 }
 
+function buildTelegramWebAppUrl(actionUrl?: string): string {
+  const base = getSafeWebAppUrl().replace(/\/$/, "");
+  if (!actionUrl || typeof actionUrl !== "string") return `${base}/`;
+  const trimmed = actionUrl.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return `${base}/`;
+  return `${base}${trimmed}`;
+}
+
+function getCategoryBadge(category: AlertCategory): string {
+  switch (category) {
+    case "referral":
+      return "🤝 <b>Payvora Referral Alert</b>";
+    case "task":
+      return "📌 <b>Payvora Task Alert</b>";
+    case "offer":
+      return "🎁 <b>Payvora Offer Alert</b>";
+    default:
+      return "💳 <b>Payvora Wallet & System Alert</b>";
+  }
+}
+
 async function pushTelegramAlert(
   telegramId: number,
   htmlText: string,
-  ctaLabel = "🚀 Open Payvora"
+  ctaLabel = "🚀 Open Payvora",
+  actionUrl?: string
 ): Promise<boolean> {
   const botToken = getBotToken();
   if (!botToken || !telegramId || telegramId <= 0) return false;
 
-  const appUrl = getSafeWebAppUrl();
+  const appUrl = buildTelegramWebAppUrl(actionUrl);
   try {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
@@ -116,7 +138,7 @@ async function pushTelegramAlert(
 }
 
 /**
- * Sends a persistent in-app notification + optional Telegram Bot DM push.
+ * Sends a notification directly to the user's @PayvoraBot Telegram chat and logs it in user_notifications.
  * Completely non-throwing so financial/auth flows are never disrupted if alerts fail or migration is pending.
  */
 export async function sendUserAlert(
@@ -185,12 +207,13 @@ export async function sendUserAlert(
 
     if (shouldPushTelegram && telegramId) {
       const amountLine =
-        amountVal !== null && amountVal > 0 ? `\n💵 Reward: <b>+$${amountVal.toFixed(2)}</b>` : "";
-      const defaultHtml = `<b>${escapeHtml(params.title)}</b>\n\n${escapeHtml(params.message)}${amountLine}`;
+        amountVal !== null && amountVal > 0 ? `\n💵 Amount: <b>+$${amountVal.toFixed(2)}</b>` : "";
+      const defaultHtml = `${getCategoryBadge(params.category)}\n\n<b>${escapeHtml(params.title)}</b>\n${escapeHtml(params.message)}${amountLine}`;
       telegramSent = await pushTelegramAlert(
         telegramId,
         params.telegramText || defaultHtml,
-        params.ctaLabel || "🚀 Open Payvora"
+        params.ctaLabel || "🚀 Open Payvora",
+        params.actionUrl
       );
 
       if (telegramSent && notificationId) {
@@ -261,7 +284,7 @@ export async function notifyReferrerOfCommission(
 }
 
 /**
- * Broadcasts a New Task Drop alert to active subscribers who have Task Alerts enabled.
+ * Broadcasts a New Task Drop alert directly to subscribers' @PayvoraBot chats.
  * Processes in rate-safe chunks without throwing.
  */
 export async function broadcastNewTaskAlert(
@@ -286,8 +309,9 @@ export async function broadcastNewTaskAlert(
     const rewardNum = Number(task.reward || 0);
     const title = `New Task: ${task.title}`;
     const message = `Earn +$${rewardNum.toFixed(2)} in the ${task.category || "Tasks"} category before available slots fill up.`;
+    const actionUrl = `/tasks/${task.id}`;
 
-    // Batch insert in-app notifications
+    // Log notifications in DB
     const rows = eligible.map((u: any) => ({
       user_id: u.id,
       category: "task",
@@ -295,12 +319,20 @@ export async function broadcastNewTaskAlert(
       title: title.slice(0, 140),
       message: message.slice(0, 500),
       amount: rewardNum > 0 ? rewardNum : null,
-      action_url: `/tasks/${task.id}`,
+      action_url: actionUrl,
       metadata: { task_id: task.id, category: task.category || "Other" },
       telegram_sent: false,
     }));
 
-    await supabaseAdmin.from("user_notifications").insert(rows);
+    const { data: insertedRows } = await supabaseAdmin
+      .from("user_notifications")
+      .insert(rows)
+      .select("id, user_id");
+
+    const notifIdByUser = new Map<string, string>();
+    for (const r of insertedRows || []) {
+      notifIdByUser.set(r.user_id, r.id);
+    }
 
     // Rate-safe Telegram DM push in chunks of 20
     const pushTargets = eligible.filter(
@@ -317,14 +349,28 @@ export async function broadcastNewTaskAlert(
       "⚡ Complete it now before slots run out!",
     ].join("\n");
 
+    const deliveredNotifIds: string[] = [];
     for (let i = 0; i < pushTargets.length; i += 20) {
       const batch = pushTargets.slice(i, i + 20);
       await Promise.all(
-        batch.map((u: any) => pushTelegramAlert(u.telegram_id, htmlText, "📌 Open Task"))
+        batch.map(async (u: any) => {
+          const sent = await pushTelegramAlert(u.telegram_id, htmlText, "📌 Open Task", actionUrl);
+          if (sent) {
+            const nId = notifIdByUser.get(u.id);
+            if (nId) deliveredNotifIds.push(nId);
+          }
+        })
       );
     }
 
-    return { notified: eligible.length };
+    if (deliveredNotifIds.length > 0) {
+      await supabaseAdmin
+        .from("user_notifications")
+        .update({ telegram_sent: true })
+        .in("id", deliveredNotifIds);
+    }
+
+    return { notified: deliveredNotifIds.length || eligible.length };
   } catch (err: any) {
     console.warn("[BROADCAST_TASK_ALERT_WARN]", err?.message || err);
     return { notified: 0 };

@@ -1,7 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { CheckSquare, Layers, Wallet, User as UserIcon, Check, Home, Bell } from "lucide-react";
+import { CheckSquare, Layers, Wallet, User as UserIcon, Check, Home } from "lucide-react";
 import { useTelegram } from "../contexts/TelegramContext";
-import { useAlerts } from "../contexts/AlertsContext";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
 
@@ -16,7 +15,6 @@ const navItems = [
 export function Navigation() {
   const location = useLocation();
   const { user } = useTelegram();
-  const { unreadCount, openAlertsDrawer } = useAlerts();
   const displayName = user?.first_name 
     ? `${user.first_name} ${user.last_name || ""}`.trim() 
     : (user?.username ? `@${user.username}` : "Payvora Member");
@@ -58,21 +56,8 @@ export function Navigation() {
           </div>
         </div>
 
-        {/* Right: Alerts Bell + Golden 3D Coin Pill ($0.00) */}
+        {/* Right: Golden 3D Coin Pill ($0.00) */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => openAlertsDrawer("inbox")}
-            aria-label="Open alerts center"
-            className="relative w-9 h-9 rounded-full bg-[#0c162e] border border-white/10 hover:border-sky-400/40 flex items-center justify-center text-slate-200 transition active:scale-95 cursor-pointer"
-          >
-            <Bell className="w-4 h-4 text-[#38bdf8]" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#0284c7] border border-[#030712] text-[10px] font-extrabold text-white flex items-center justify-center tabular-nums shadow-md">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
 
           <Link
             to="/wallet"

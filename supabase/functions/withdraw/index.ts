@@ -9,6 +9,7 @@ import { verifyUserRequest } from "../_shared/auth.ts";
 import { validatePositiveAmount, validatePayoutAddress } from "../_shared/validation.ts";
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
+import { sendUserAlert } from "../_shared/alerts.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -120,6 +121,25 @@ serve(async (req: Request) => {
       targetId: dbResult.withdrawal_id,
       details: { amount: cleanAmount, method, wallet_address: cleanAddress, idempotencyKey: safeIdempotencyKey },
       ipAddress: clientIp,
+    });
+
+    const methodLabel =
+      method === "usdt" ? "USDT (TRC20)" : method === "usdt_bep20" ? "USDT (BEP20)" : "TRX (TRC20)";
+    const maskedAddr =
+      cleanAddress.length > 12
+        ? `${cleanAddress.slice(0, 6)}...${cleanAddress.slice(-4)}`
+        : cleanAddress;
+
+    await sendUserAlert(supabaseAdmin, {
+      userId: authenticatedUserId,
+      category: "system",
+      eventKey: "withdrawal_requested",
+      title: "Withdrawal Request Submitted",
+      message: `Your withdrawal of $${cleanAmount.toFixed(2)} via ${methodLabel} to ${maskedAddr} is queued for admin review.`,
+      amount: cleanAmount,
+      actionUrl: "/wallet",
+      ctaLabel: "💰 View Wallet",
+      metadata: { withdrawal_id: dbResult.withdrawal_id, method, amount: cleanAmount },
     });
 
     return successResponse({

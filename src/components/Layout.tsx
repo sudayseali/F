@@ -1,28 +1,11 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { Navigation } from "./Navigation";
 import { AlertsDrawer } from "./AlertsDrawer";
 import { useTelegram } from "../contexts/TelegramContext";
-import { useAlerts } from "../contexts/AlertsContext";
-import { AlertTriangle, Bell, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AlertTriangle } from "lucide-react";
 
 export function Layout() {
   const { authError } = useTelegram();
-  const { liveToast, dismissToast, openAlertsDrawer, markAsRead } = useAlerts();
-  const navigate = useNavigate();
-
-  const handleToastClick = () => {
-    if (!liveToast) return;
-    const url = liveToast.action_url;
-    const id = liveToast.id;
-    dismissToast();
-    markAsRead(id);
-    if (url) {
-      navigate(url);
-    } else {
-      openAlertsDrawer("inbox");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#030712] text-[#f8fafc] flex flex-col items-center relative overflow-x-hidden">
@@ -35,53 +18,6 @@ export function Layout() {
 
       <div className="w-full max-w-md min-h-screen flex flex-col bg-[#030712] relative shadow-2xl">
         <Navigation />
-
-        {/* Live Foreground Realtime Alert Toast */}
-        <AnimatePresence>
-          {liveToast && (
-            <motion.div
-              initial={{ opacity: 0, y: -12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.2 }}
-              className="mx-4 mt-2 p-3 rounded-2xl bg-[#0c162e]/95 border border-sky-400/35 shadow-xl flex items-start gap-2.5 backdrop-blur-md"
-            >
-              <button
-                type="button"
-                onClick={handleToastClick}
-                className="flex-1 flex items-start gap-2.5 text-left min-w-0 cursor-pointer"
-              >
-                <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-[#38bdf8] shrink-0">
-                  <Bell className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-white truncate">
-                      {liveToast.title}
-                    </span>
-                    {typeof liveToast.amount === "number" && liveToast.amount > 0 && (
-                      <span className="text-[11px] font-extrabold text-[#34d399] tabular-nums shrink-0">
-                        +${liveToast.amount.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-300 line-clamp-2 mt-0.5">
-                    {liveToast.message}
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={dismissToast}
-                aria-label="Dismiss alert"
-                className="p-1 text-slate-400 hover:text-white cursor-pointer shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {authError && (
           <div className="mx-4 mt-2 p-3 bg-red-500/15 border border-red-500/30 rounded-xl text-red-200 text-xs flex items-center gap-2.5">

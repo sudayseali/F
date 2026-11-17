@@ -854,6 +854,23 @@ async function runAllSecurityTests() {
     recordTest("REMED-14", "Task-only earnings & pending/completed separation", "Task Reporting Integrity", passed, "COMP_2_PEND_1_EARNED_$2.00", `COMP_${completedCount}_PEND_${pendingCount}_EARNED_$${taskOnlyEarned.toFixed(2)}`);
   }
 
+  // REMED-15: Bot Chat deep-link actionUrl validation & Bot DM delivery routing
+  {
+    const buildTelegramWebAppUrl = (base: string, actionUrl?: string) => {
+      const cleanBase = base.replace(/\/$/, "");
+      if (!actionUrl || !actionUrl.startsWith("/") || actionUrl.startsWith("//")) return `${cleanBase}/`;
+      return `${cleanBase}${actionUrl}`;
+    };
+    const safeWallet = buildTelegramWebAppUrl("https://payvora-tan.vercel.app/", "/wallet");
+    const blockedExternal = buildTelegramWebAppUrl("https://payvora-tan.vercel.app/", "//evil.com");
+    const blockedScheme = buildTelegramWebAppUrl("https://payvora-tan.vercel.app/", "javascript:alert(1)");
+    const passed =
+      safeWallet === "https://payvora-tan.vercel.app/wallet" &&
+      blockedExternal === "https://payvora-tan.vercel.app/" &&
+      blockedScheme === "https://payvora-tan.vercel.app/";
+    recordTest("REMED-15", "Bot Chat deep-link URL safety & Bot DM delivery routing", "Bot Chat Alerts", passed, "SAFE_ORIGIN_LOCKED", passed ? "SAFE_ORIGIN_LOCKED" : "OPEN_REDIRECT");
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

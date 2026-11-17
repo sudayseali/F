@@ -41,8 +41,8 @@ export function Profile() {
       action: () => openTgLink(APP_CONFIG.telegram.communityUrl)
     },
     {
-      label: "Notification & Alert Settings",
-      subtitle: "Referral, task, offer & Telegram bot alerts",
+      label: "Bot Chat Notifications",
+      subtitle: "Manage alerts sent to @PayvoraBot chat",
       icon3D: ASSETS_3D.bellNotification,
       iconColor: "bg-cyan-500/15",
       action: () => {

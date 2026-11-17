@@ -104,7 +104,7 @@ serve(async (req: Request) => {
       title: "Task Proof Under Review",
       message: `Your proof for "${taskTitle}" was submitted and is awaiting verification.`,
       actionUrl: `/tasks/${task_id}`,
-      telegramPush: false,
+      ctaLabel: "📋 View Task",
       metadata: { task_id, submission_id: submissionId },
     });
 
