@@ -1,7 +1,7 @@
 // Official 3D Asset URLs provided by the user
 export const ASSETS_3D = {
   // Hero Assets
-  telegramWallet: "/assets/aistudio/file_00000000f08082119bdf139bd2ef6756_c37d142e.png",
+  telegramWallet: "/assets/payvora/file_00000000f08082119bdf139bd2ef6756_c37d142e.png",
   
   // 16 Dedicated 3D Transparent Icons
   walletCoins: "/assets/icons3d/wallet_coins.png",
