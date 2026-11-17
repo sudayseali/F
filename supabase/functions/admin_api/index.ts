@@ -11,6 +11,8 @@ import { logAuditEvent } from "../_shared/audit-log.ts";
 import { validatePositiveAmount, sanitizeString, sanitizePostgrestSearch, isValidUuid } from "../_shared/validation.ts";
 import { AdminRole } from "../_shared/permissions.ts";
 import { sendUserAlert, notifyReferrerOfCommission, broadcastNewTaskAlert } from "../_shared/alerts.ts";
+import { getAllProviderStatuses } from "../_shared/providers/registry.ts";
+import { syncAllEnabledProviders, syncProviderOffers } from "../_shared/offers/sync-engine.ts";
 
 function validateOptionalHttpUrl(raw: unknown): string {
   const clean = sanitizeString(raw || "", 300);
@@ -609,6 +611,385 @@ serve(async (req: Request) => {
       });
 
       return successResponse({ message: "Administrator permissions updated successfully." }, 200, req);
+    }
+
+    // ========================================================================
+    // 7. CUSTOM OFFERS ENGINE ADMIN ENDPOINTS (PROVIDERS, SYNC, OFFERS, DISPUTES)
+    // ========================================================================
+    if (action === "get_offer_providers") {
+      await verifyAdminRequest(req, "view_dashboard");
+      const [{ data: providers, error }, { data: commissionSetting }] = await Promise.all([
+        supabaseAdmin.from("offer_providers").select("*").order("display_name", { ascending: true }),
+        supabaseAdmin.from("app_settings").select("value").eq("key", "offerwall_commission_config").maybeSingle(),
+      ]);
+      if (error) throw error;
+
+      const statusMap = new Map(getAllProviderStatuses().map((s) => [s.providerKey, s]));
+      const enriched = (providers || []).map((p: any) => ({
+        ...p,
+        runtimeStatus: statusMap.get(p.provider_key) || null,
+      }));
+
+      return successResponse({
+        providers: enriched,
+        commissionConfig: commissionSetting?.value || null,
+      }, 200, req);
+    }
+
+    if (action === "update_offer_provider") {
+      const admin = await verifyAdminRequest(req, "manage_settings");
+      const { providerKey, status, apiEnabled, customListingEnabled, syncEnabled, commissionOverridePercent, hostedWallUrlTemplate } = body;
+      const cleanKey = sanitizeString(providerKey || "", 32).toLowerCase();
+      if (!cleanKey) throw new AppError("providerKey is required.", 400, "MISSING_PROVIDER_KEY");
+
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (status !== undefined) {
+        if (!["active", "paused", "pending_approval", "disabled"].includes(status)) {
+          throw new AppError("Invalid provider status.", 400, "INVALID_STATUS");
+        }
+        updates.status = status;
+      }
+      if (typeof apiEnabled === "boolean") updates.api_enabled = apiEnabled;
+      if (typeof customListingEnabled === "boolean") updates.custom_listing_enabled = customListingEnabled;
+      if (typeof syncEnabled === "boolean") updates.sync_enabled = syncEnabled;
+      if (commissionOverridePercent !== undefined) {
+        if (commissionOverridePercent === null || commissionOverridePercent === "") {
+          updates.commission_override_percent = null;
+        } else {
+          const pct = Number(commissionOverridePercent);
+          if (!Number.isFinite(pct) || pct < 10 || pct > 100) {
+            throw new AppError("Commission override user share percent must be between 10 and 100.", 400, "INVALID_COMMISSION");
+          }
+          updates.commission_override_percent = Math.round(pct * 100) / 100;
+        }
+      }
+      if (typeof hostedWallUrlTemplate === "string") {
+        updates.hosted_wall_url_template = sanitizeString(hostedWallUrlTemplate, 400) || null;
+      }
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("offer_providers")
+        .update(updates)
+        .eq("provider_key", cleanKey)
+        .select()
+        .single();
+      if (error) throw error;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "offer_provider_updated",
+        targetType: "offer_provider",
+        targetId: cleanKey,
+        details: updates,
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ provider: updated }, 200, req);
+    }
+
+    if (action === "update_commission_config") {
+      const admin = await verifyAdminRequest(req, "manage_settings");
+      const defaultShare = Number(body.default_user_share_percent ?? body.defaultUserSharePercent);
+      const minReward = Number(body.min_user_reward_usd ?? body.minUserRewardUsd ?? 0.01);
+      const maxReward = Number(body.max_user_reward_usd ?? body.maxUserRewardUsd ?? 1000);
+      const rawOverrides = body.provider_user_share_overrides || body.providerUserShareOverrides || {};
+
+      if (!Number.isFinite(defaultShare) || defaultShare < 10 || defaultShare > 100) {
+        throw new AppError("Default user share percent must be between 10 and 100.", 400, "INVALID_COMMISSION");
+      }
+      if (!Number.isFinite(minReward) || minReward < 0.01 || minReward > 10) {
+        throw new AppError("Minimum user reward must be between $0.01 and $10.00.", 400, "INVALID_LIMIT");
+      }
+      if (!Number.isFinite(maxReward) || maxReward < 10 || maxReward > 5000) {
+        throw new AppError("Maximum user reward must be between $10 and $5000.", 400, "INVALID_LIMIT");
+      }
+
+      const cleanOverrides: Record<string, number> = {};
+      if (rawOverrides && typeof rawOverrides === "object") {
+        for (const [k, v] of Object.entries(rawOverrides)) {
+          const pct = Number(v);
+          if (Number.isFinite(pct) && pct >= 10 && pct <= 100) {
+            cleanOverrides[sanitizeString(k, 32).toLowerCase()] = Math.round(pct * 100) / 100;
+          }
+        }
+      }
+
+      const value = {
+        default_user_share_percent: Math.round(defaultShare * 100) / 100,
+        min_user_reward_usd: Math.round(minReward * 100) / 100,
+        max_user_reward_usd: Math.round(maxReward * 100) / 100,
+        provider_user_share_overrides: cleanOverrides,
+      };
+
+      const { error } = await supabaseAdmin
+        .from("app_settings")
+        .upsert({
+          key: "offerwall_commission_config",
+          value,
+          description: "Payvora custom offers reward split & margin rules",
+          updated_at: new Date().toISOString(),
+        });
+      if (error) throw error;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "offer_commission_config_updated",
+        targetType: "setting",
+        targetId: "offerwall_commission_config",
+        details: value,
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ commissionConfig: value }, 200, req);
+    }
+
+    if (action === "trigger_offer_sync") {
+      const admin = await verifyAdminRequest(req, "manage_settings");
+      const providerKey = sanitizeString(body.providerKey || "", 32).toLowerCase();
+      const country = body.country ? sanitizeString(body.country, 2).toUpperCase() : undefined;
+
+      const results = providerKey
+        ? [await syncProviderOffers(supabaseAdmin, providerKey, { country, forceEvenIfSyncDisabled: true })]
+        : await syncAllEnabledProviders(supabaseAdmin);
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "admin_offer_sync_triggered",
+        targetType: "offer_provider",
+        targetId: providerKey || "all_enabled",
+        details: { results },
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ results }, 200, req);
+    }
+
+    if (action === "get_provider_sync_logs") {
+      await verifyAdminRequest(req, "view_dashboard");
+      const limit = Math.min(100, Math.max(1, parseInt(body.limit || url.searchParams.get("limit") || "40")));
+      const { data: logs, error } = await supabaseAdmin
+        .from("provider_sync_logs")
+        .select("*, provider:offer_providers(provider_key, display_name)")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return successResponse({ logs: logs || [] }, 200, req);
+    }
+
+    if (action === "get_admin_offers") {
+      await verifyAdminRequest(req, "view_dashboard");
+      const page = Math.max(1, parseInt(body.page || url.searchParams.get("page") || "1"));
+      const limit = Math.min(100, Math.max(1, parseInt(body.limit || url.searchParams.get("limit") || "30")));
+      const offset = (page - 1) * limit;
+      const category = sanitizeString(body.category || url.searchParams.get("category") || "all", 32).toLowerCase();
+      const cleanSearch = sanitizePostgrestSearch(body.search || url.searchParams.get("search") || "");
+
+      let query = supabaseAdmin
+        .from("offers")
+        .select("*, provider:offer_providers(provider_key, display_name)", { count: "exact" });
+
+      if (category !== "all") query = query.eq("category", category);
+      if (cleanSearch) {
+        query = query.or(`title.ilike.%${cleanSearch}%,external_offer_id.ilike.%${cleanSearch}%`);
+      }
+
+      const { data: offers, count, error } = await query
+        .order("is_active", { ascending: false })
+        .order("is_featured", { ascending: false })
+        .order("user_reward", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) throw error;
+      return successResponse({ offers: offers || [], total: count || 0, page, limit }, 200, req);
+    }
+
+    if (action === "update_admin_offer") {
+      const admin = await verifyAdminRequest(req, "manage_settings");
+      const { offerId, isActive, isFeatured } = body;
+      if (!offerId || !isValidUuid(offerId)) throw new AppError("Valid offerId required.", 400, "INVALID_OFFER_ID");
+
+      const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (typeof isActive === "boolean") updates.is_active = isActive;
+      if (typeof isFeatured === "boolean") updates.is_featured = isFeatured;
+
+      const { data: updated, error } = await supabaseAdmin
+        .from("offers")
+        .update(updates)
+        .eq("id", offerId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "admin_offer_updated",
+        targetType: "offer",
+        targetId: offerId,
+        details: updates,
+        ipAddress: clientIp,
+      });
+
+      return successResponse({ offer: updated }, 200, req);
+    }
+
+    if (action === "get_offer_conversions") {
+      await verifyAdminRequest(req, "view_dashboard");
+      const limit = Math.min(100, Math.max(1, parseInt(body.limit || url.searchParams.get("limit") || "40")));
+      const [{ data: conversions, error: cErr }, { data: postbacks, error: pErr }] = await Promise.all([
+        supabaseAdmin
+          .from("offer_completions")
+          .select("*, user:users(telegram_id, username, first_name), offer:offers(title), provider:offer_providers(provider_key, display_name)")
+          .order("created_at", { ascending: false })
+          .limit(limit),
+        supabaseAdmin
+          .from("provider_postbacks")
+          .select("*, provider:offer_providers(provider_key, display_name)")
+          .order("received_at", { ascending: false })
+          .limit(limit),
+      ]);
+      if (cErr) throw cErr;
+      if (pErr) throw pErr;
+      return successResponse({ conversions: conversions || [], postbacks: postbacks || [] }, 200, req);
+    }
+
+    if (action === "get_offer_disputes") {
+      await verifyAdminRequest(req, "review_submissions");
+      const status = sanitizeString(body.status || url.searchParams.get("status") || "all", 24).toLowerCase();
+      let query = supabaseAdmin
+        .from("offer_disputes")
+        .select("*, user:users(id, telegram_id, username, first_name), offer:offers(title, user_reward), provider:offer_providers(provider_key, display_name)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (status !== "all") query = query.eq("status", status);
+      const { data: disputes, error } = await query;
+      if (error) throw error;
+      return successResponse({ disputes: disputes || [] }, 200, req);
+    }
+
+    if (action === "resolve_offer_dispute") {
+      const admin = await verifyAdminRequest(req, "review_submissions");
+      const { disputeId, status, adminNote, creditAmount } = body;
+      if (!disputeId || !isValidUuid(disputeId)) throw new AppError("Valid disputeId required.", 400, "INVALID_DISPUTE_ID");
+      if (!["open", "investigating", "resolved", "rejected"].includes(status)) {
+        throw new AppError("Invalid dispute status.", 400, "INVALID_STATUS");
+      }
+
+      const { data: disputeRow } = await supabaseAdmin
+        .from("offer_disputes")
+        .select("id, user_id, offer_id, status, offer:offers(title)")
+        .eq("id", disputeId)
+        .maybeSingle();
+
+      if (!disputeRow) throw new AppError("Dispute ticket not found.", 404, "DISPUTE_NOT_FOUND");
+
+      const cleanNote = sanitizeString(adminNote || "", 400);
+      const resolvedAt = status === "resolved" || status === "rejected" ? new Date().toISOString() : null;
+
+      let credited = 0;
+      if (status === "resolved" && creditAmount !== undefined && Number(creditAmount) > 0) {
+        // Explicit permission check for financial credits
+        await verifyAdminRequest(req, "manage_balances");
+        const numCredit = validatePositiveAmount(creditAmount, 0.01, 250.0);
+        const { data: creditRes, error: creditErr } = await supabaseAdmin.rpc("atomic_wallet_credit", {
+          p_user_id: disputeRow.user_id,
+          p_amount: numCredit,
+          p_type: "offer_reward",
+          p_idempotency_key: `dispute_${disputeId}`,
+          p_reference_id: disputeId,
+          p_description: `Missing Offer Reward Resolution (Ticket ${disputeId.slice(0, 8)})`,
+        });
+        if (creditErr) throw creditErr;
+        if (!creditRes?.already_processed) {
+          credited = numCredit;
+        }
+      }
+
+      const { data: updated, error: updErr } = await supabaseAdmin
+        .from("offer_disputes")
+        .update({
+          status,
+          admin_note: cleanNote || null,
+          reviewed_by: admin.id,
+          resolved_at: resolvedAt,
+        })
+        .eq("id", disputeId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "offer_dispute_resolved",
+        targetType: "offer_dispute",
+        targetId: disputeId,
+        details: { status, adminNote: cleanNote, credited },
+        ipAddress: clientIp,
+      });
+
+      const offerObj = Array.isArray(disputeRow.offer) ? disputeRow.offer[0] : disputeRow.offer;
+      const offerTitle = offerObj?.title || "Offer Ticket";
+      if (status === "resolved" || status === "rejected") {
+        await sendUserAlert(supabaseAdmin, {
+          userId: disputeRow.user_id,
+          category: "offer",
+          eventKey: status === "resolved" ? "offer_dispute_resolved" : "offer_dispute_rejected",
+          title: status === "resolved" ? "Missing Reward Ticket Resolved" : "Missing Reward Ticket Closed",
+          message:
+            status === "resolved" && credited > 0
+              ? `Your review for "${offerTitle}" was resolved and +$${credited.toFixed(2)} has been credited to your wallet.`
+              : `Update on "${offerTitle}": ${cleanNote || `Marked as ${status}.`}`,
+          amount: credited > 0 ? credited : null,
+          actionUrl: credited > 0 ? "/wallet" : "/offerwall",
+          ctaLabel: credited > 0 ? "💰 View Wallet" : "🎁 View Offers",
+        });
+      }
+
+      return successResponse({ dispute: updated, credited }, 200, req);
+    }
+
+    if (action === "get_offer_analytics") {
+      await verifyAdminRequest(req, "view_dashboard");
+      const [{ count: totalClicks }, { count: activeOffers }, { data: completions }, { count: openDisputes }] =
+        await Promise.all([
+          supabaseAdmin.from("offer_clicks").select("*", { count: "exact", head: true }),
+          supabaseAdmin.from("offers").select("*", { count: "exact", head: true }).eq("is_active", true),
+          supabaseAdmin.from("offer_completions").select("provider_reward, user_reward, payvora_commission, status, reversed_amount"),
+          supabaseAdmin.from("offer_disputes").select("*", { count: "exact", head: true }).in("status", ["open", "investigating"]),
+        ]);
+
+      let totalProviderPayout = 0;
+      let totalUserRewards = 0;
+      let totalNetMargin = 0;
+      let totalReversedCount = 0;
+      const allComps = completions || [];
+
+      for (const c of allComps) {
+        totalProviderPayout += Number(c.provider_reward || 0);
+        totalUserRewards += Number(c.user_reward || 0);
+        totalNetMargin += Number(c.payvora_commission || 0);
+        if (c.status === "reversed" || c.status === "partially_reversed") {
+          totalReversedCount++;
+        }
+      }
+
+      return successResponse({
+        analytics: {
+          activeOffers: activeOffers || 0,
+          totalClicks: totalClicks || 0,
+          totalConversions: allComps.length,
+          reversalRatePercent: allComps.length > 0 ? Math.round((totalReversedCount / allComps.length) * 10000) / 100 : 0,
+          totalProviderPayout: Math.round(totalProviderPayout * 100) / 100,
+          totalUserRewards: Math.round(totalUserRewards * 100) / 100,
+          totalNetMargin: Math.round(totalNetMargin * 100) / 100,
+          openDisputes: openDisputes || 0,
+        },
+      }, 200, req);
     }
 
     throw new AppError(`Unknown admin action: '${action}'`, 404, "UNKNOWN_ACTION");

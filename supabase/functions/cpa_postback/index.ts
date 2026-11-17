@@ -63,11 +63,18 @@ serve(async (req) => {
       return new Response("Invalid payout amount", { status: 400 });
     }
 
-    // 1. Resolve User
+    // 1. Resolve User (supports opaque pv_ click token, Telegram ID, or UUID)
     let targetUserId: string | null = null;
     const cleanId = rawUserId.replace(/[\[\]{}"]/g, "").trim();
 
-    if (/^\d+$/.test(cleanId)) {
+    if (cleanId.startsWith("pv_")) {
+      const { data: clickRow } = await supabaseAdmin
+        .from("offer_clicks")
+        .select("user_id")
+        .eq("opaque_click_id", cleanId)
+        .maybeSingle();
+      if (clickRow) targetUserId = clickRow.user_id;
+    } else if (/^\d+$/.test(cleanId)) {
       const { data: userByTg } = await supabaseAdmin
         .from("users")
         .select("id")
@@ -117,18 +124,27 @@ serve(async (req) => {
       return new Response("OK - Already processed", { status: 200 });
     }
 
-    // 4. Record log
+    // 4. Record log & forensic provider_postbacks entry
     const { error: logErr } = await supabaseAdmin.from("offerwall_logs").insert({
       provider: network,
       external_transaction_id: safeTxId,
       user_id: targetUserId,
       amount: payout,
       status: "credited",
-      raw_payload: Object.fromEntries(url.searchParams.entries())
+      raw_payload: { tx_id: safeTxId, network }
     });
     if (logErr && (logErr as any).code !== "23505") {
       console.error("[CPA_LOG_INSERT_ERROR]", logErr);
     }
+
+    await supabaseAdmin.from("provider_postbacks").insert({
+      external_transaction_id: safeTxId,
+      event_type: "conversion",
+      signature_valid: true,
+      processing_status: "processed",
+      payload_hash: `${network}:${safeTxId}`,
+      processed_at: new Date().toISOString(),
+    }).catch(() => {});
 
     await sendUserAlert(supabaseAdmin, {
       userId: targetUserId,

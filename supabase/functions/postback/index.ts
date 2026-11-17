@@ -1,13 +1,17 @@
 // supabase/functions/postback/index.ts
-// Secured multi-network offerwall postback handler with cryptographic signatures, required txId, and replay protection
+// Unified Multi-Provider S2S Postback Handler (GET, JSON POST, Form-UrlEncoded POST)
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { constantTimeCompare } from "../_shared/telegram-verification.ts";
-import { md5Hex, sha256Hex, hmacSha256Hex } from "../_shared/crypto.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 import { getClientIp } from "../_shared/rate-limit.ts";
+import {
+  extractPostbackContext,
+  processProviderPostback,
+} from "../_shared/offers/postback-processor.ts";
+import { sha256Hex } from "../_shared/crypto.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -28,223 +32,99 @@ serve(async (req) => {
   try {
     const supabaseAdmin = getSupabaseAdmin();
     const url = new URL(req.url);
-    const provider = (url.searchParams.get("provider") || "generic").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32) || "generic";
-    const params = Object.fromEntries(url.searchParams.entries());
+    const providerParam = (url.searchParams.get("provider") || "").toLowerCase().trim();
 
-    let rawUserId = "";
-    let rewardAmount = 0;
-    let transactionId = "";
-    let isSecure = false;
-    let serverConfigured = false;
-
-    // --- 1. AYET STUDIOS ---
-    if (provider === "ayet") {
-      rawUserId = params.uid ? params.uid.replace(/[\[\]{}"]/g, "") : "";
-      rewardAmount = parseFloat(params.currency_amount || params.payout_usd || "0");
-      transactionId = params.transaction_id || "";
-      const ayetSecret = Deno.env.get("AYET_SECRET") || "";
-      serverConfigured = Boolean(ayetSecret);
-
-      if (ayetSecret) {
-        const ayetSig = req.headers.get("X-Ayetstudios-Security-Hash") || req.headers.get("x-ayetstudios-security-hash") || "";
-        if (ayetSig) {
-          // ayeT official HMAC-SHA256 over sorted query string (excluding provider if routed internally)
-          const sortedQuery = Object.keys(params)
-            .filter((k) => k !== "provider")
-            .sort()
-            .map((k) => `${k}=${params[k]}`)
-            .join("&");
-          const expectedHmac = await hmacSha256Hex(ayetSecret, sortedQuery);
-          isSecure = constantTimeCompare(ayetSig.toLowerCase(), expectedHmac.toLowerCase());
-        } else if (params.secret) {
-          isSecure = constantTimeCompare(params.secret, ayetSecret);
-        }
+    // Generic legacy fallback ONLY when explicitly targeting provider=generic with OFFERWALL_GENERIC_SECRET
+    if (providerParam === "generic") {
+      const ctx = await extractPostbackContext(req, clientIp);
+      const genericSecret = (Deno.env.get("OFFERWALL_GENERIC_SECRET") || "").trim();
+      if (!genericSecret) {
+        return new Response("500 Server Misconfiguration - OFFERWALL_GENERIC_SECRET not set", { status: 500 });
       }
-    }
-    // --- 2. TOROX ---
-    else if (provider === "torox") {
-      rawUserId = params.user_id || "";
-      rewardAmount = parseFloat(params.amount || "0");
-      transactionId = params.tx_id || params.oid || "";
-      const toroxSecret = Deno.env.get("TOROX_SECRET") || "";
-      serverConfigured = Boolean(toroxSecret);
-
-      if (toroxSecret) {
-        if (params.sig && transactionId && rawUserId) {
-          const expectedSig = md5Hex(`${transactionId}-${rawUserId}-${toroxSecret}`);
-          isSecure = constantTimeCompare(params.sig.toLowerCase(), expectedSig.toLowerCase());
-        } else if (params.secret) {
-          isSecure = constantTimeCompare(params.secret, toroxSecret);
-        }
+      if (!ctx.params.secret || !constantTimeCompare(ctx.params.secret, genericSecret)) {
+        await logAuditEvent({
+          actorType: "offerwall",
+          action: "postback_invalid_signature",
+          targetType: "postback",
+          targetId: ctx.params.tx_id || "missing",
+          details: { provider: "generic" },
+          ipAddress: clientIp,
+        });
+        return new Response("403 Forbidden - Security Signature Mismatch for generic", { status: 403 });
       }
-    }
-    // --- 3. ADGATE MEDIA ---
-    else if (provider === "adgate") {
-      rawUserId = params.s1 || "";
-      rewardAmount = parseFloat(params.points || params.payout || "0");
-      transactionId = params.tx_id || "";
-      const adgateSecret = Deno.env.get("ADGATE_SECRET") || "";
-      serverConfigured = Boolean(adgateSecret);
 
-      if (adgateSecret && params.secret) {
-        isSecure = constantTimeCompare(params.secret, adgateSecret);
+      const rawUserId = (ctx.params.user_id || ctx.params.subid || "").trim();
+      const rewardAmount = parseFloat(ctx.params.payout || ctx.params.amount || "0");
+      const safeTxId = (ctx.params.tx_id || ctx.params.trans_id || "").trim();
+
+      if (!rawUserId || safeTxId.length < 2 || !Number.isFinite(rewardAmount) || rewardAmount <= 0 || rewardAmount > 1000) {
+        return new Response("400 Bad Request - Missing or invalid parameters", { status: 400 });
       }
-    }
-    // --- 4. LOOTABLY ---
-    else if (provider === "lootably") {
-      rawUserId = params.userID || "";
-      rewardAmount = parseFloat(params.reward || "0");
-      transactionId = params.transactionId || "";
-      const lootablySecret = Deno.env.get("LOOTABLY_SECRET") || "";
-      serverConfigured = Boolean(lootablySecret);
 
-      if (lootablySecret && params.hash) {
-        const expectedSha = await sha256Hex(`${rawUserId}${params.ip || ""}${params.reward || ""}${lootablySecret}`);
-        const expectedMd5 = md5Hex(`${rawUserId}${params.ip || ""}${params.reward || ""}${lootablySecret}`);
-        const providedLower = params.hash.toLowerCase();
-        isSecure =
-          constantTimeCompare(providedLower, expectedSha.toLowerCase()) ||
-          constantTimeCompare(providedLower, expectedMd5.toLowerCase());
+      let targetUserId: string | null = null;
+      if (/^\d+$/.test(rawUserId)) {
+        const { data: u } = await supabaseAdmin.from("users").select("id").eq("telegram_id", parseInt(rawUserId, 10)).maybeSingle();
+        if (u) targetUserId = u.id;
+      } else {
+        const { data: u } = await supabaseAdmin.from("users").select("id").eq("id", rawUserId).maybeSingle();
+        if (u) targetUserId = u.id;
       }
-    }
-    // --- 5. CPX RESEARCH ---
-    else if (provider === "cpx") {
-      rawUserId = params.ext_user_id || params.user_id || "";
-      rewardAmount = parseFloat(params.amount_local || params.amount || "0");
-      transactionId = params.trans_id || "";
-      const cpxSecret = Deno.env.get("CPX_SECRET") || "";
-      serverConfigured = Boolean(cpxSecret);
-      const providedHash = params.hash || params.secure_hash || "";
 
-      if (cpxSecret && providedHash && transactionId) {
-        const expectedMd5 = md5Hex(`${transactionId}-${cpxSecret}`);
-        const expectedSha = await sha256Hex(`${transactionId}-${cpxSecret}`);
-        const providedLower = providedHash.toLowerCase();
-        isSecure =
-          constantTimeCompare(providedLower, expectedMd5.toLowerCase()) ||
-          constantTimeCompare(providedLower, expectedSha.toLowerCase());
-      }
-    } else {
-      // Generic fallback: MUST supply a valid server generic secret
-      const genericSecret = Deno.env.get("OFFERWALL_GENERIC_SECRET") || "";
-      serverConfigured = Boolean(genericSecret);
-      if (genericSecret && params.secret && constantTimeCompare(params.secret, genericSecret)) {
-        rawUserId = params.user_id || params.subid || "";
-        rewardAmount = parseFloat(params.payout || params.amount || "0");
-        transactionId = params.tx_id || params.trans_id || "";
-        isSecure = true;
-      }
-    }
+      if (!targetUserId) return new Response("404 User Not Found", { status: 404 });
 
-    if (!serverConfigured) {
-      console.error(`[POSTBACK_MISCONFIG] Secret missing for provider '${provider}'`);
-      return new Response(`500 Server Misconfiguration - Secret not set for ${provider}`, { status: 500 });
-    }
-
-    if (!isSecure) {
-      await logAuditEvent({
-        actorType: "offerwall",
-        action: "postback_invalid_signature",
-        targetType: "postback",
-        targetId: transactionId || "missing",
-        details: { provider, rawUserId },
-        ipAddress: clientIp,
+      const { data: creditData, error: creditErr } = await supabaseAdmin.rpc("atomic_wallet_credit", {
+        p_user_id: targetUserId,
+        p_amount: Math.round(rewardAmount * 100) / 100,
+        p_type: "offer_reward",
+        p_idempotency_key: `generic_${safeTxId}`,
+        p_reference_id: safeTxId,
+        p_description: `Partner Offer Completion (Tx: ${safeTxId})`,
       });
-      return new Response(`403 Forbidden - Security Signature Mismatch for ${provider}`, { status: 403 });
+      if (creditErr) throw creditErr;
+
+      const payloadHash = await sha256Hex(JSON.stringify(ctx.params));
+      await supabaseAdmin.from("provider_postbacks").insert({
+        external_transaction_id: safeTxId,
+        event_type: "conversion",
+        signature_valid: true,
+        processing_status: creditData?.already_processed ? "duplicate" : "processed",
+        payload_hash: payloadHash,
+        processed_at: new Date().toISOString(),
+      });
+
+      if (!creditData?.already_processed) {
+        await supabaseAdmin.from("offerwall_logs").insert({
+          provider: "generic",
+          external_transaction_id: safeTxId,
+          user_id: targetUserId,
+          amount: rewardAmount,
+          status: "credited",
+          raw_payload: { tx_id: safeTxId },
+        }).catch(() => {});
+
+        await sendUserAlert(supabaseAdmin, {
+          userId: targetUserId,
+          category: "offer",
+          eventKey: "offer_credited",
+          title: "Offer Reward Credited!",
+          message: `Your partner offer completed and +$${rewardAmount.toFixed(2)} has been credited to your wallet.`,
+          amount: rewardAmount,
+          actionUrl: "/wallet",
+          ctaLabel: "💰 View Wallet",
+        });
+        await notifyReferrerOfCommission(supabaseAdmin, targetUserId, rewardAmount, "a partner offer");
+      }
+
+      return new Response("1", { status: 200 });
     }
 
-    if (!transactionId || transactionId.trim().length < 2) {
-      return new Response("400 Bad Request - Missing required transactionId", { status: 400 });
-    }
-
-    if (!rawUserId || isNaN(rewardAmount) || !isFinite(rewardAmount) || rewardAmount <= 0 || rewardAmount > 1000) {
-      return new Response("400 Bad Request - Missing or invalid parameters", { status: 400 });
-    }
-
-    // 1. Resolve User ID (supports numeric Telegram ID or UUID)
-    let targetUserId: string | null = null;
-    const cleanUserId = rawUserId.replace(/[\[\]{}"]/g, "").trim();
-
-    if (/^\d+$/.test(cleanUserId)) {
-      const { data: userByTg } = await supabaseAdmin
-        .from("users")
-        .select("id")
-        .eq("telegram_id", parseInt(cleanUserId, 10))
-        .maybeSingle();
-      if (userByTg) targetUserId = userByTg.id;
-    } else {
-      const { data: userByUuid } = await supabaseAdmin
-        .from("users")
-        .select("id")
-        .eq("id", cleanUserId)
-        .maybeSingle();
-      if (userByUuid) targetUserId = userByUuid.id;
-    }
-
-    if (!targetUserId) {
-      return new Response("404 User Not Found", { status: 404 });
-    }
-
-    // 2. Replay Defense: Check offerwall_logs for duplicate provider + transactionId
-    const safeTxId = transactionId.trim();
-    const idempotencyKey = `${provider}_${safeTxId}`;
-
-    const { data: existingLog } = await supabaseAdmin
-      .from("offerwall_logs")
-      .select("id")
-      .eq("provider", provider)
-      .eq("external_transaction_id", safeTxId)
-      .maybeSingle();
-
-    if (existingLog) {
-      return new Response("200 OK - Duplicate transaction, already credited", { status: 200 });
-    }
-
-    // 3. Atomic Financial Credit via Database RPC
-    const { data: creditData, error: creditError } = await supabaseAdmin.rpc("atomic_wallet_credit", {
-      p_user_id: targetUserId,
-      p_amount: rewardAmount,
-      p_type: "offer_reward",
-      p_idempotency_key: idempotencyKey,
-      p_reference_id: safeTxId,
-      p_description: `${provider.toUpperCase()} Offer Completion (Tx: ${safeTxId})`
+    const result = await processProviderPostback({
+      req,
+      supabaseAdmin,
+      clientIp,
     });
 
-    if (creditError) throw creditError;
-    if (creditData?.already_processed) {
-      return new Response("200 OK - Duplicate transaction, already credited", { status: 200 });
-    }
-
-    // 4. Record in offerwall_logs table
-    const { error: logErr } = await supabaseAdmin.from("offerwall_logs").insert({
-      provider,
-      external_transaction_id: safeTxId,
-      user_id: targetUserId,
-      amount: rewardAmount,
-      status: "credited",
-      raw_payload: params
-    });
-    if (logErr && (logErr as any).code !== "23505") {
-      console.error("[POSTBACK_LOG_INSERT_ERROR]", logErr);
-    }
-
-    const providerLabel = provider.toUpperCase();
-    await sendUserAlert(supabaseAdmin, {
-      userId: targetUserId,
-      category: "offer",
-      eventKey: "offer_credited",
-      title: `${providerLabel} Offer Reward Credited!`,
-      message: `Your ${providerLabel} offer completed and +$${rewardAmount.toFixed(2)} has been credited to your wallet.`,
-      amount: rewardAmount,
-      actionUrl: "/wallet",
-      ctaLabel: "💰 View Wallet",
-      metadata: { provider, transaction_id: safeTxId },
-    });
-
-    await notifyReferrerOfCommission(supabaseAdmin, targetUserId, rewardAmount, `a ${providerLabel} offer`);
-
-    return new Response("1", { status: 200 });
-
+    return new Response(result.body, { status: result.status });
   } catch (err: any) {
     console.error("[POSTBACK_ERROR]", err);
     return new Response("500 Internal Server Error", { status: 500 });

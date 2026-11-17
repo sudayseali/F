@@ -288,14 +288,14 @@ export function Dashboard() {
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <span className="text-[#38bdf8] text-base">⭐</span>
-            <span className="text-base font-bold text-white tracking-tight">Featured Offers</span>
+            <span className="text-base font-bold text-white tracking-tight">Offers Marketplace</span>
           </div>
           <Link
             to="/offerwall"
             onClick={() => tgHaptics.selection()}
             className="text-xs font-bold text-[#38bdf8] hover:text-sky-300 flex items-center gap-0.5"
           >
-            <span>See All</span>
+            <span>Explore All</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -315,20 +315,20 @@ export function Dashboard() {
                 <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center border border-sky-500/30 shadow-sm">
                   <img src={ASSETS_3D.surveyPencil} alt="Surveys" className="w-7 h-7 object-contain" />
                 </div>
-                <span className="badge-hot-pill text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <span>🔥</span> Hot
+                <span className="text-[10px] font-extrabold text-sky-300 uppercase tracking-wider">
+                  Surveys
                 </span>
               </div>
 
               <h4 className="text-sm font-bold text-white group-hover:text-[#38bdf8] transition-colors">
-                CPX Surveys
+                Paid Surveys
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Complete surveys & earn
+                Live research & instant credit
               </p>
             </div>
 
-            <div className="badge-green-pill text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 mt-3 w-fit">
+            <div className="text-xs font-extrabold text-emerald-400 tabular-nums flex items-center gap-1 mt-3">
               <span>Up to $4.50</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </div>
@@ -348,20 +348,20 @@ export function Dashboard() {
                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30 shadow-sm">
                   <img src={ASSETS_3D.gameController} alt="Games" className="w-7 h-7 object-contain" />
                 </div>
-                <span className="badge-games-pill text-[10px] font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <span>🎮</span> Games
+                <span className="text-[10px] font-extrabold text-purple-300 uppercase tracking-wider">
+                  Games & Apps
                 </span>
               </div>
 
               <h4 className="text-sm font-bold text-white group-hover:text-[#c084fc] transition-colors">
-                ayeT - Studios
+                Partner Offers
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Play games & earn
+                Play games, apps & earn
               </p>
             </div>
 
-            <div className="badge-green-pill text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 mt-3 w-fit">
+            <div className="text-xs font-extrabold text-emerald-400 tabular-nums flex items-center gap-1 mt-3">
               <span>Up to $35.00</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </div>

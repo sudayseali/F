@@ -42,3 +42,11 @@ verify_jwt = false
 [functions.alerts]
 verify_jwt = false
 
+[functions.offers_api]
+verify_jwt = false
+
+[functions.offer_click]
+verify_jwt = false
+
+[functions.sync_offers]
+verify_jwt = false
