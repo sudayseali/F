@@ -11,6 +11,7 @@ import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
+import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 
 function isMissingColumnError(err: any, columnName?: string): boolean {
   if (!err || typeof err !== "object") return false;
@@ -297,7 +298,10 @@ serve(async (req: Request) => {
       }
     }
 
-    // 6. Issue Cryptographically Signed User JWT
+    // 6. Optional Auth-Level VPN Gate & Risk Signal
+    const vpnCheck = await enforceVpnPolicy(supabaseAdmin, req, clientIp, "auth", userRow.id);
+
+    // 7. Issue Cryptographically Signed User JWT
     const secret = new TextEncoder().encode(JWT_SECRET);
     const jwt = await new jose.SignJWT({
       aud: "authenticated",
@@ -312,10 +316,11 @@ serve(async (req: Request) => {
       .setExpirationTime("4h")
       .sign(secret);
 
-    // 7. Return Verified Session and Profile
+    // 8. Return Verified Session and Profile
     return successResponse({
       access_token: jwt,
       user_uuid: userRow.id,
+      vpn_detected: Boolean(vpnCheck.isVpn || vpnCheck.isProxy || vpnCheck.isTor || vpnCheck.isHosting),
       user: {
         id: userRow.id,
         telegram_id: userRow.telegram_id,

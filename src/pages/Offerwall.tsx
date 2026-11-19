@@ -122,6 +122,7 @@ export function Offerwall() {
 
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
+  const [vpnBlockedReason, setVpnBlockedReason] = useState<string | null>(null);
 
   const [selectedOffer, setSelectedOffer] = useState<MarketplaceOffer | null>(null);
   const [startingOfferId, setStartingOfferId] = useState<string | null>(null);
@@ -163,6 +164,8 @@ export function Offerwall() {
         offers?: MarketplaceOffer[];
         partnerWalls?: PartnerWallInfo[];
         userSummary?: OfferUserSummary;
+        vpnBlocked?: boolean;
+        vpnReason?: string | null;
       }>("offers_api", {
         action: "list_marketplace",
         category: "all",
@@ -170,6 +173,9 @@ export function Offerwall() {
       });
 
       setOffers(Array.isArray(res?.offers) ? res.offers : []);
+      setVpnBlockedReason(
+        res?.vpnBlocked ? res.vpnReason || "VPN or Proxy detected. Turn off your VPN to unlock offers." : null
+      );
       if (Array.isArray(res?.partnerWalls) && res.partnerWalls.length > 0) {
         setPartnerWalls(res.partnerWalls);
       }
@@ -422,6 +428,27 @@ export function Offerwall() {
           </div>
         </div>
       </div>
+
+      {vpnBlockedReason && (
+        <div className="card-glass-dark p-3.5 border-rose-500/40 bg-rose-950/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs text-rose-200">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <div>
+              <div className="font-bold text-rose-100">VPN / Proxy Detected</div>
+              <div className="text-[11px] text-rose-200/80">
+                Please disable your VPN or proxy connection, then tap Retry to start earning.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={loadMarketplace}
+            className="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-400/30 text-xs font-bold text-rose-100 shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Primary Section Navigation */}
       <div className="grid grid-cols-3 gap-2 bg-[#0b1329] p-1 rounded-2xl border border-white/10">

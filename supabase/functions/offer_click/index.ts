@@ -9,6 +9,7 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { isValidUuid } from "../_shared/validation.ts";
 import { sha256Hex } from "../_shared/crypto.ts";
+import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 import {
   buildHostedWallLaunchUrl,
   getProviderAdapter,
@@ -59,15 +60,21 @@ serve(async (req: Request) => {
       throw new AppError("Too many offer launches. Please wait a minute.", 429, "RATE_LIMIT_EXCEEDED");
     }
 
+    // Multi-layer VPN / Proxy / Tor / Datacenter Block
+    const vpnCheck = await enforceVpnPolicy(supabaseAdmin, req, clientIp, "offer_click", verifiedUser.id);
+
     const body = await req.json().catch(() => ({}));
     const offerId = body.offerId ? String(body.offerId).trim() : null;
     const providerKey = body.providerKey ? String(body.providerKey).toLowerCase().trim() : null;
     const headerCountry = (req.headers.get("cf-ipcountry") || req.headers.get("x-vercel-ip-country") || "").trim().toUpperCase();
+    const ipIntelCountry = (vpnCheck.countryCode || "").trim().toUpperCase();
     const bodyCountry = typeof body.country === "string" ? body.country.trim().toUpperCase() : "";
-    const country = /^[A-Z]{2}$/.test(bodyCountry)
-      ? bodyCountry
-      : /^[A-Z]{2}$/.test(headerCountry)
+    const country = /^[A-Z]{2}$/.test(headerCountry)
       ? headerCountry
+      : /^[A-Z]{2}$/.test(ipIntelCountry)
+      ? ipIntelCountry
+      : /^[A-Z]{2}$/.test(bodyCountry)
+      ? bodyCountry
       : undefined;
     const device = detectDevice(req, typeof body.device === "string" ? body.device : undefined);
 

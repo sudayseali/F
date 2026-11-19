@@ -8,6 +8,7 @@ import { verifyUserRequest } from "../_shared/auth.ts";
 import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { isValidUuid, sanitizeString } from "../_shared/validation.ts";
+import { checkIpReputation } from "../_shared/vpn-check.ts";
 import { getAllProviderStatuses, getProviderAdapter } from "../_shared/providers/registry.ts";
 import { buildRewardCalculator, loadCommissionConfig } from "../_shared/offers/reward-engine.ts";
 import type { DeviceType } from "../_shared/providers/types.ts";
@@ -145,16 +146,21 @@ serve(async (req: Request) => {
     }
 
     const verifiedUser = await verifyUserRequest(req);
+    const vpnCheck = await checkIpReputation(supabaseAdmin, clientIp, "offers_api");
+
     const url = new URL(req.url);
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const action = String(body.action || url.searchParams.get("action") || "list_marketplace").trim();
 
     const headerCountry = (req.headers.get("cf-ipcountry") || req.headers.get("x-vercel-ip-country") || "").trim().toUpperCase();
+    const ipIntelCountry = (vpnCheck.countryCode || "").trim().toUpperCase();
     const requestedCountry = String(body.country || url.searchParams.get("country") || "").trim().toUpperCase();
-    const userCountry = /^[A-Z]{2}$/.test(requestedCountry)
-      ? requestedCountry
-      : /^[A-Z]{2}$/.test(headerCountry)
+    const userCountry = /^[A-Z]{2}$/.test(headerCountry)
       ? headerCountry
+      : /^[A-Z]{2}$/.test(ipIntelCountry)
+      ? ipIntelCountry
+      : /^[A-Z]{2}$/.test(requestedCountry)
+      ? requestedCountry
       : null;
 
     const requestedDevice = String(body.device || url.searchParams.get("device") || "").toLowerCase();
@@ -372,6 +378,8 @@ serve(async (req: Request) => {
           totalCatalogOffers: sanitizedAll.length,
           availableCategories,
           partnerWalls,
+          vpnBlocked: vpnCheck.blocked,
+          vpnReason: vpnCheck.blocked ? (vpnCheck.reason || "VPN or Proxy detected") : null,
           detectedContext: {
             country: userCountry,
             device: userDevice,

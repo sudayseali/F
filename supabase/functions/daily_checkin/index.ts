@@ -8,6 +8,7 @@ import { errorResponse, successResponse, AppError } from "../_shared/errors.ts";
 import { verifyUserRequest } from "../_shared/auth.ts";
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
+import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -45,6 +46,8 @@ serve(async (req: Request) => {
     if (!userRate.allowed) {
       throw new AppError("Too many check-in attempts. Please wait a moment.", 429, "RATE_LIMIT_EXCEEDED");
     }
+
+    await enforceVpnPolicy(supabaseAdmin, req, clientIp, "daily_checkin", userId);
 
     // 2. Call Atomic Database Procedure with 24-hour cooldown check
     const { data: result, error: rpcError } = await supabaseAdmin.rpc("claim_daily_reward", {

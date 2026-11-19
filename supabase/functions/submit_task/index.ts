@@ -10,6 +10,7 @@ import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts
 import { sanitizeString, isValidUuid } from "../_shared/validation.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
+import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -47,6 +48,8 @@ serve(async (req: Request) => {
     if (!userRate.allowed) {
       throw new AppError("Please wait a moment before submitting another task.", 429, "RATE_LIMIT_EXCEEDED");
     }
+
+    await enforceVpnPolicy(supabaseAdmin, req, clientIp, "submit_task", userId);
 
     const body = await req.json().catch(() => ({}));
     const { task_id, proof_text, proof_data, proof, proof_url, telegram_username } = body;

@@ -893,6 +893,109 @@ async function runOffersEngineTests() {
   }
 
   // --------------------------------------------------------------------------
+  // TEST 10: VPN / Proxy / Tor / Datacenter Detection & Policy Enforcement
+  // --------------------------------------------------------------------------
+  {
+    const {
+      parseProxyCheckPayload,
+      parseIpApiIsPayload,
+      isPrivateOrUnknownIp,
+      enforceVpnPolicy,
+    } = await import("../supabase/functions/_shared/vpn-check.ts");
+
+    const pcVpn = parseProxyCheckPayload("45.83.220.14", {
+      status: "ok",
+      "45.83.220.14": {
+        proxy: "yes",
+        type: "VPN",
+        risk: 88,
+        isocode: "DE",
+        asn: "AS20473",
+      },
+    });
+
+    const ipapiTor = parseIpApiIsPayload({
+      is_vpn: false,
+      is_proxy: false,
+      is_tor: true,
+      is_datacenter: true,
+      is_abuser: false,
+      location: { country_code: "NL" },
+      asn: { asn: 12345 },
+    });
+
+    const mockVpnDb = {
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () =>
+              table === "app_settings"
+                ? {
+                    data: {
+                      value: {
+                        vpn_detection_enabled: true,
+                        block_vpn_on_offers: true,
+                        block_hosting_ips: true,
+                        vpn_risk_threshold: 66,
+                      },
+                    },
+                  }
+                : { data: null },
+            gt: () => ({ maybeSingle: async () => ({ data: null }) }),
+          }),
+        }),
+        upsert: async () => ({ error: null }),
+        insert: async () => ({ error: null }),
+      }),
+    };
+
+    const savedPcKey = TEST_ENV.PROXYCHECK_KEY;
+    TEST_ENV.PROXYCHECK_KEY = "test_proxycheck_key";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          status: "ok",
+          "185.220.101.4": { proxy: "yes", type: "VPN", risk: 95, isocode: "US" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )) as typeof fetch;
+
+    let blockedCode = "";
+    try {
+      await enforceVpnPolicy(
+        mockVpnDb as any,
+        new Request("https://x.test"),
+        "185.220.101.4",
+        "offer_click",
+        "user-1"
+      );
+    } catch (err: any) {
+      blockedCode = err?.code || "";
+    } finally {
+      globalThis.fetch = originalFetch;
+      TEST_ENV.PROXYCHECK_KEY = savedPcKey;
+    }
+
+    const passed =
+      Boolean(pcVpn?.isVpn && pcVpn.countryCode === "DE" && pcVpn.riskScore === 88) &&
+      Boolean(ipapiTor?.isTor && ipapiTor.isHosting && ipapiTor.countryCode === "NL") &&
+      isPrivateOrUnknownIp("127.0.0.1") &&
+      isPrivateOrUnknownIp("10.0.0.5") &&
+      !isPrivateOrUnknownIp("185.220.101.4") &&
+      blockedCode === "VPN_DETECTED";
+
+    recordTest(
+      "OFFER-10",
+      "Multi-provider VPN/Proxy/Tor detection, private IP bypass & VPN_DETECTED block",
+      "Anti-Fraud Security",
+      passed,
+      "pcVpn=true, ipapiTor=true, blockedCode=VPN_DETECTED",
+      `pcVpn=${pcVpn?.isVpn}, ipapiTor=${ipapiTor?.isTor}, blockedCode=${blockedCode}`
+    );
+  }
+
+  // --------------------------------------------------------------------------
   // Summary
   // --------------------------------------------------------------------------
   console.log("\n========================================================");

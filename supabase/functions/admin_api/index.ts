@@ -13,6 +13,7 @@ import { AdminRole } from "../_shared/permissions.ts";
 import { sendUserAlert, notifyReferrerOfCommission, broadcastNewTaskAlert } from "../_shared/alerts.ts";
 import { getAllProviderStatuses } from "../_shared/providers/registry.ts";
 import { syncAllEnabledProviders, syncProviderOffers } from "../_shared/offers/sync-engine.ts";
+import { getVpnSecretsStatus, loadAntiFraudConfig } from "../_shared/vpn-check.ts";
 
 function validateOptionalHttpUrl(raw: unknown): string {
   const clean = sanitizeString(raw || "", 300);
@@ -989,6 +990,90 @@ serve(async (req: Request) => {
           totalNetMargin: Math.round(totalNetMargin * 100) / 100,
           openDisputes: openDisputes || 0,
         },
+      }, 200, req);
+    }
+
+    // ========================================================================
+    // 8. ANTI-FRAUD & VPN DETECTION CONTROLS
+    // ========================================================================
+    if (action === "get_anti_fraud_config") {
+      await verifyAdminRequest(req, "manage_settings");
+      const [config, recentBlocksRes] = await Promise.all([
+        loadAntiFraudConfig(supabaseAdmin, true),
+        supabaseAdmin
+          .from("audit_logs")
+          .select("id, actor_id, target_type, details, ip_address, created_at")
+          .eq("action", "vpn_access_blocked")
+          .order("created_at", { ascending: false })
+          .limit(25),
+      ]);
+
+      return successResponse({
+        config,
+        secretsStatus: getVpnSecretsStatus(),
+        recentVpnBlocks: recentBlocksRes.data || [],
+      }, 200, req);
+    }
+
+    if (action === "update_anti_fraud_config") {
+      const admin = await verifyAdminRequest(req, "manage_settings");
+      const current = await loadAntiFraudConfig(supabaseAdmin, true);
+
+      const updated = {
+        vpn_detection_enabled:
+          typeof body.vpn_detection_enabled === "boolean"
+            ? body.vpn_detection_enabled
+            : current.vpn_detection_enabled,
+        max_daily_withdrawals:
+          body.max_daily_withdrawals !== undefined
+            ? Math.min(20, Math.max(1, parseInt(String(body.max_daily_withdrawals), 10) || 3))
+            : current.max_daily_withdrawals,
+        block_vpn_on_offers:
+          typeof body.block_vpn_on_offers === "boolean" ? body.block_vpn_on_offers : current.block_vpn_on_offers,
+        block_vpn_on_tasks:
+          typeof body.block_vpn_on_tasks === "boolean" ? body.block_vpn_on_tasks : current.block_vpn_on_tasks,
+        block_vpn_on_checkin:
+          typeof body.block_vpn_on_checkin === "boolean" ? body.block_vpn_on_checkin : current.block_vpn_on_checkin,
+        block_vpn_on_withdraw:
+          typeof body.block_vpn_on_withdraw === "boolean" ? body.block_vpn_on_withdraw : current.block_vpn_on_withdraw,
+        block_vpn_on_auth:
+          typeof body.block_vpn_on_auth === "boolean" ? body.block_vpn_on_auth : current.block_vpn_on_auth,
+        block_hosting_ips:
+          typeof body.block_hosting_ips === "boolean" ? body.block_hosting_ips : current.block_hosting_ips,
+        vpn_risk_threshold:
+          body.vpn_risk_threshold !== undefined
+            ? Math.min(100, Math.max(20, parseInt(String(body.vpn_risk_threshold), 10) || 66))
+            : current.vpn_risk_threshold,
+        strict_fail_closed:
+          typeof body.strict_fail_closed === "boolean" ? body.strict_fail_closed : current.strict_fail_closed,
+      };
+
+      const { error: cfgErr } = await supabaseAdmin
+        .from("app_settings")
+        .upsert(
+          {
+            key: "anti_fraud_config",
+            value: updated,
+            description: "Multi-layer VPN, Proxy, and anti-fraud controls",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" }
+        );
+      if (cfgErr) throw cfgErr;
+
+      await logAuditEvent({
+        actorId: admin.id,
+        actorType: "admin",
+        action: "anti_fraud_config_updated",
+        targetType: "app_settings",
+        targetId: "anti_fraud_config",
+        details: updated,
+        ipAddress: clientIp,
+      });
+
+      return successResponse({
+        config: updated,
+        secretsStatus: getVpnSecretsStatus(),
       }, 200, req);
     }
 

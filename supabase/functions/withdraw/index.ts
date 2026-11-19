@@ -10,6 +10,7 @@ import { validatePositiveAmount, validatePayoutAddress } from "../_shared/valida
 import { checkDistributedRateLimit, getClientIp } from "../_shared/rate-limit.ts";
 import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert } from "../_shared/alerts.ts";
+import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -48,6 +49,8 @@ serve(async (req: Request) => {
     if (!userRate.allowed) {
       throw new AppError("Please wait a minute before submitting another withdrawal.", 429, "RATE_LIMIT_EXCEEDED");
     }
+
+    await enforceVpnPolicy(supabaseAdmin, req, clientIp, "withdraw", authenticatedUserId);
 
     const body = await req.json().catch(() => ({}));
     const { amount, wallet_address, method, user_uuid, idempotency_key } = body;
