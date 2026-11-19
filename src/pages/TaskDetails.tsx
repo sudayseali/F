@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, X, ExternalLink } from "lucide-react";
+import { ArrowLeft, Clock, Users, ShieldAlert, Upload, CheckCircle, X, ExternalLink, Zap } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import { supabase, invokeEdgeFunction } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
@@ -19,6 +19,8 @@ interface TaskRecord {
   target_url?: string | null;
   job_length?: number | null;
   proof_instructions?: string | null;
+  verification_type?: "manual_screenshot" | "auto_telegram_join" | string;
+  verification_chat_id?: string | null;
   status: string;
 }
 
@@ -47,7 +49,7 @@ function isSafeHttpUrl(url: string | null | undefined): string | null {
 export function TaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useTelegram();
+  const { user, refreshUser } = useTelegram();
 
   const [task, setTask] = useState<TaskRecord | null>(null);
   const [existingSubmission, setExistingSubmission] = useState<ExistingSubmission | null>(null);
@@ -221,6 +223,49 @@ export function TaskDetails() {
     }
   };
 
+  const handleAutoVerify = async () => {
+    tgHaptics.impact("medium");
+
+    if (!user?.uuid) {
+      setError("Authentication required. Please reopen Payvora inside Telegram.");
+      return;
+    }
+    if (!task || task.status !== "active") {
+      setError("This task is no longer accepting completions.");
+      return;
+    }
+
+    setError(null);
+    setStatus("submitting");
+
+    try {
+      await invokeEdgeFunction("submit_task", {
+        task_id: task.id,
+      });
+
+      setTask((prev) => {
+        if (!prev) return prev;
+        const nextCompleted = (prev.current_completions || 0) + 1;
+        const maxC = prev.max_completions || 100;
+        const pendingC = prev.pending_submissions || 0;
+        return {
+          ...prev,
+          current_completions: nextCompleted,
+          remaining_slots: Math.max(0, maxC - nextCompleted - pendingC),
+        };
+      });
+
+      await refreshUser().catch(() => {});
+      tgHaptics.notification("success");
+      setStatus("success");
+    } catch (err: any) {
+      console.error(err);
+      tgHaptics.notification("error");
+      setError(err.message || "Verification failed. Make sure you have joined the channel and try again.");
+      setStatus("idle");
+    }
+  };
+
   if (loadingTask) {
     return (
       <div className="space-y-4 pb-6">
@@ -264,7 +309,12 @@ export function TaskDetails() {
     typeof task.remaining_slots === "number"
       ? Math.max(0, task.remaining_slots)
       : Math.max(0, maxSlots - approvedSlots - pendingSlots);
-  const safeTargetUrl = isSafeHttpUrl(task.target_url);
+  const isAutoTelegramJoin = task.verification_type === "auto_telegram_join";
+  const derivedChatUrl =
+    !task.target_url && task.verification_chat_id?.startsWith("@")
+      ? `https://t.me/${task.verification_chat_id.slice(1)}`
+      : null;
+  const safeTargetUrl = isSafeHttpUrl(task.target_url || derivedChatUrl);
 
   return (
     <div className="space-y-4 pb-6">
@@ -283,9 +333,17 @@ export function TaskDetails() {
       <div className="card-glass-dark p-4.5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <span className="text-[10px] font-bold text-[#38bdf8] bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
-              {task.category || "Task"}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-[#38bdf8] bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
+                {task.category || "Task"}
+              </span>
+              {isAutoTelegramJoin && (
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                  <Zap className="w-2.5 h-2.5" />
+                  <span>Instant Verify</span>
+                </span>
+              )}
+            </div>
             <h2 className="text-base font-bold text-white mt-1.5 leading-snug">
               {task.title}
             </h2>
@@ -332,6 +390,21 @@ export function TaskDetails() {
           <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
             {task.proof_instructions}
           </p>
+        ) : isAutoTelegramJoin ? (
+          <ol className="space-y-2 text-xs text-slate-200">
+            <li className="flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">1</span>
+              <span>Tap &quot;Open Channel / Group&quot; below and join using this Telegram account.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">2</span>
+              <span>Return here and tap &quot;Verify &amp; Claim&quot; for instant automatic verification.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">3</span>
+              <span>Your reward is credited to your wallet immediately — no screenshot required.</span>
+            </li>
+          </ol>
         ) : (
           <ol className="space-y-2 text-xs text-slate-200">
             <li className="flex items-start gap-2">
@@ -358,7 +431,7 @@ export function TaskDetails() {
             }}
             className="w-full py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-[#38bdf8] font-bold text-xs text-center border border-sky-500/30 transition active:scale-98 shadow-sm flex items-center justify-center gap-1.5"
           >
-            <span>Open Task Link</span>
+            <span>{isAutoTelegramJoin ? "Open Channel / Group" : "Open Task Link"}</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </button>
         )}
@@ -397,9 +470,13 @@ export function TaskDetails() {
         ) : status === "success" ? (
           <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 text-center">
             <CheckCircle className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
-            <h4 className="text-sm font-bold text-white mb-0.5">Proof Submitted!</h4>
+            <h4 className="text-sm font-bold text-white mb-0.5">
+              {isAutoTelegramJoin ? "Verified & Credited!" : "Proof Submitted!"}
+            </h4>
             <p className="text-xs text-slate-300">
-              Your proof has been received. Reward will be added to your balance once approved.
+              {isAutoTelegramJoin
+                ? `+$${Number(task.reward || 0).toFixed(2)} has been added directly to your wallet balance.`
+                : "Your proof has been received. Reward will be added to your balance once approved."}
             </p>
           </div>
         ) : task.status !== "active" || remainingSlots <= 0 ? (
@@ -407,6 +484,34 @@ export function TaskDetails() {
             {pendingSlots > 0 && remainingSlots <= 0
               ? `All remaining slots (${pendingSlots}) are currently reserved by submissions under review.`
               : "All available slots for this task have been filled."}
+          </div>
+        ) : isAutoTelegramJoin ? (
+          <div className="space-y-3 pt-2 border-t border-white/5">
+            {error && (
+              <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={status === "submitting"}
+              onClick={handleAutoVerify}
+              className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
+            >
+              {status === "submitting" ? (
+                <>
+                  <PayvoraSpinner size="sm" />
+                  <span>Verifying Membership...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  <span>Verify &amp; Claim +${Number(task.reward || 0).toFixed(2)}</span>
+                </>
+              )}
+            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-white/5">

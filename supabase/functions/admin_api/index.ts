@@ -14,6 +14,7 @@ import { sendUserAlert, notifyReferrerOfCommission, broadcastNewTaskAlert } from
 import { getAllProviderStatuses } from "../_shared/providers/registry.ts";
 import { syncAllEnabledProviders, syncProviderOffers } from "../_shared/offers/sync-engine.ts";
 import { getVpnSecretsStatus, loadAntiFraudConfig } from "../_shared/vpn-check.ts";
+import { normalizeTelegramChatId } from "../_shared/channel-check.ts";
 
 function validateOptionalHttpUrl(raw: unknown): string {
   const clean = sanitizeString(raw || "", 300);
@@ -324,23 +325,56 @@ serve(async (req: Request) => {
 
     if (action === "create_task") {
       const admin = await verifyAdminRequest(req, "manage_tasks");
-      const { title, description, category, reward, maxCompletions, targetUrl, jobLength, proofInstructions } = body;
+      const {
+        title,
+        description,
+        category,
+        reward,
+        maxCompletions,
+        targetUrl,
+        jobLength,
+        proofInstructions,
+        verificationType,
+        verification_type,
+        verificationChatId,
+        verification_chat_id,
+      } = body;
 
       if (!title || !description) throw new AppError("Task title and description are required.", 400, "MISSING_FIELDS");
       const cleanReward = validatePositiveAmount(reward, 0.01, 100.0);
       const safeTargetUrl = validateOptionalHttpUrl(targetUrl);
+
+      const rawVerType = String(verificationType || verification_type || "manual_screenshot").trim();
+      if (!["manual_screenshot", "auto_telegram_join"].includes(rawVerType)) {
+        throw new AppError("Invalid verificationType. Must be 'manual_screenshot' or 'auto_telegram_join'.", 400, "INVALID_VERIFICATION_TYPE");
+      }
+
+      const rawChatInput = verificationChatId ?? verification_chat_id ?? (rawVerType === "auto_telegram_join" ? safeTargetUrl : null);
+      const normalizedChatId = rawVerType === "auto_telegram_join"
+        ? normalizeTelegramChatId(String(rawChatInput || ""))
+        : null;
+
+      if (rawVerType === "auto_telegram_join" && !normalizedChatId) {
+        throw new AppError(
+          "Auto Telegram Join tasks require a valid @channel username, public t.me link, or -100... chat ID.",
+          400,
+          "INVALID_CHAT_ID"
+        );
+      }
 
       const { data: newTask, error } = await supabaseAdmin
         .from("tasks")
         .insert({
           title: sanitizeString(title, 120),
           description: sanitizeString(description, 1000),
-          category: sanitizeString(category || "Other", 40),
+          category: sanitizeString(category || (rawVerType === "auto_telegram_join" ? "Social" : "Other"), 40),
           reward: cleanReward,
           max_completions: Math.max(1, parseInt(maxCompletions) || 100),
           target_url: safeTargetUrl,
-          job_length: Math.max(1, parseInt(jobLength) || 5),
+          job_length: Math.max(1, parseInt(jobLength) || (rawVerType === "auto_telegram_join" ? 1 : 5)),
           proof_instructions: sanitizeString(proofInstructions || "", 500),
+          verification_type: rawVerType,
+          verification_chat_id: normalizedChatId,
           status: "active"
         })
         .select()
@@ -354,7 +388,7 @@ serve(async (req: Request) => {
         action: "task_created",
         targetType: "task",
         targetId: newTask.id,
-        details: { title, reward: cleanReward },
+        details: { title, reward: cleanReward, verificationType: rawVerType, chatId: normalizedChatId },
         ipAddress: clientIp,
       });
 

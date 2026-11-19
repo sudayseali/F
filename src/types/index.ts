@@ -50,6 +50,7 @@ export interface TaskItem {
   pendingCount?: number;
   total: number;
   status: string;
+  verificationType?: "manual_screenshot" | "auto_telegram_join";
 }
 
 export interface UserTaskSubmissionItem {

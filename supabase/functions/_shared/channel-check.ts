@@ -1,5 +1,5 @@
 // supabase/functions/_shared/channel-check.ts
-// Server-side Telegram channel membership verification via getChatMember
+// Server-side Telegram channel/group membership verification via getChatMember
 
 export interface ChannelCheckResult {
   ok: boolean;
@@ -16,17 +16,90 @@ const DEFAULT_CHANNEL_URL = "https://t.me/PayvoraCommunity";
 
 const ALLOWED_MEMBER_STATUSES = new Set(["creator", "administrator", "member"]);
 
-export function getRequiredChannelConfig() {
-  const rawChannelId = (Deno.env.get("REQUIRED_CHANNEL_ID") || DEFAULT_CHANNEL_ID).trim();
-  const channelUsername = rawChannelId.startsWith("@")
-    ? rawChannelId
-    : rawChannelId.startsWith("-100")
-    ? "@PayvoraCommunity"
-    : `@${rawChannelId}`;
-  const channelUrl = (Deno.env.get("REQUIRED_CHANNEL_URL") || DEFAULT_CHANNEL_URL).trim();
+/**
+ * Normalizes a Telegram chat identifier from `@username`, `-100...` numeric chat ID,
+ * `https://t.me/username` URL, or bare username into a valid Bot API `chat_id` string.
+ * Rejects private invite links (`t.me/+...` / `t.me/joinchat/...`) because Bot API
+ * `getChatMember` requires a numeric `-100...` ID or `@publicusername`.
+ */
+export function normalizeTelegramChatId(raw: string | null | undefined): string | null {
+  const val = String(raw || "").trim();
+  if (!val) return null;
+
+  // Numeric channel/supergroup/group ID (e.g. -1001234567890 or -987654321)
+  if (/^-100\d{5,}$/.test(val) || /^-\d{5,}$/.test(val)) {
+    return val;
+  }
+
+  // @username
+  if (/^@[A-Za-z][A-Za-z0-9_]{3,63}$/.test(val)) {
+    return val;
+  }
+
+  // https://t.me/username or t.me/username
+  if (/^(https?:\/\/)?(www\.)?(t\.me|telegram\.me)\//i.test(val)) {
+    try {
+      const withProto = /^https?:\/\//i.test(val) ? val : `https://${val}`;
+      const u = new URL(withProto);
+      const seg = u.pathname.replace(/^\/+/, "").split("/")[0] || "";
+      if (
+        seg &&
+        !seg.startsWith("+") &&
+        seg.toLowerCase() !== "joinchat" &&
+        /^[A-Za-z][A-Za-z0-9_]{3,63}$/.test(seg)
+      ) {
+        return `@${seg}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Bare username
+  if (/^[A-Za-z][A-Za-z0-9_]{3,63}$/.test(val)) {
+    return `@${val}`;
+  }
+
+  return null;
+}
+
+function readEnvVar(name: string): string | undefined {
+  if (typeof Deno !== "undefined" && Deno?.env?.get) {
+    return Deno.env.get(name);
+  }
+  if (typeof process !== "undefined" && process?.env) {
+    return process.env[name];
+  }
+  return undefined;
+}
+
+export function getRequiredChannelConfig(
+  overrideChatId?: string | null,
+  overrideChannelUrl?: string | null
+) {
+  const rawOverride = normalizeTelegramChatId(overrideChatId);
+  const rawEnvChannelId = (readEnvVar("REQUIRED_CHANNEL_ID") || DEFAULT_CHANNEL_ID).trim();
+  const channelId = rawOverride || rawEnvChannelId || DEFAULT_CHANNEL_ID;
+
+  const channelUsername = channelId.startsWith("@")
+    ? channelId
+    : channelId.startsWith("-")
+    ? (overrideChatId ? "the target Telegram channel" : "@PayvoraCommunity")
+    : `@${channelId}`;
+
+  const derivedUrl = channelId.startsWith("@")
+    ? `https://t.me/${channelId.slice(1)}`
+    : DEFAULT_CHANNEL_URL;
+
+  const channelUrl = overrideChannelUrl?.trim()
+    ? overrideChannelUrl.trim()
+    : rawOverride
+    ? derivedUrl
+    : (readEnvVar("REQUIRED_CHANNEL_URL") || DEFAULT_CHANNEL_URL).trim();
 
   return {
-    channelId: rawChannelId || DEFAULT_CHANNEL_ID,
+    channelId,
     channelUsername,
     channelUrl,
   };
@@ -34,9 +107,14 @@ export function getRequiredChannelConfig() {
 
 export async function checkTelegramChannelMembership(
   botToken: string,
-  telegramUserId: number
+  telegramUserId: number,
+  targetChatId?: string | null,
+  targetChannelUrl?: string | null
 ): Promise<ChannelCheckResult> {
-  const { channelId, channelUsername, channelUrl } = getRequiredChannelConfig();
+  const { channelId, channelUsername, channelUrl } = getRequiredChannelConfig(
+    targetChatId,
+    targetChannelUrl
+  );
 
   if (!botToken || !telegramUserId || telegramUserId <= 0) {
     return {
@@ -66,7 +144,7 @@ export async function checkTelegramChannelMembership(
       const description = String(data?.description || `HTTP ${res.status}`);
       const lower = description.toLowerCase();
 
-      // Common Telegram error if bot is not yet added as admin in the channel
+      // Common Telegram error if bot is not yet added as admin in the channel/group
       if (
         lower.includes("member list is inaccessible") ||
         lower.includes("chat not found") ||
@@ -78,7 +156,7 @@ export async function checkTelegramChannelMembership(
           ok: false,
           isMember: false,
           errorCode: "BOT_NOT_CHANNEL_ADMIN",
-          errorMessage: `Channel verification unavailable: ensure the bot is an Admin in ${channelUsername}.`,
+          errorMessage: `Verification unavailable: ensure the Payvora bot is an Admin in ${channelUsername}.`,
           channelUsername,
           channelUrl,
         };

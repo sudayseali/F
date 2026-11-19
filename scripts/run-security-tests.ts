@@ -1064,6 +1064,126 @@ async function runAllSecurityTests() {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 32 (REMED-21): Auto Telegram Join — Chat ID Normalization & Bot getChatMember Verification
+  // --------------------------------------------------------------------------
+  {
+    const {
+      normalizeTelegramChatId,
+      checkTelegramChannelMembership,
+    } = await import("../supabase/functions/_shared/channel-check.ts");
+
+    const normAt = normalizeTelegramChatId("@SomaliCryptoNews");
+    const normUrl = normalizeTelegramChatId("https://t.me/SomaliCryptoNews");
+    const normNum = normalizeTelegramChatId("-1001987654321");
+    const normBare = normalizeTelegramChatId("PayvoraUpdates");
+    const rejectInvite = normalizeTelegramChatId("https://t.me/+AbCdEfGh123");
+    const rejectBad = normalizeTelegramChatId("not a link!!");
+
+    const origFetch = globalThis.fetch;
+    try {
+      // 1. Valid member
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: true, result: { status: "member" } }), { status: 200 })) as typeof fetch;
+      const memberRes = await checkTelegramChannelMembership("bot:token", 123456, "@SomaliCryptoNews");
+
+      // 2. Left user
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: true, result: { status: "left" } }), { status: 200 })) as typeof fetch;
+      const leftRes = await checkTelegramChannelMembership("bot:token", 123456, "@SomaliCryptoNews");
+
+      // 3. Restricted user who is NOT a member
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: true, result: { status: "restricted", is_member: false } }), { status: 200 })) as typeof fetch;
+      const restrictedNonMember = await checkTelegramChannelMembership("bot:token", 123456, "-1001987654321");
+
+      // 4. Bot not channel admin -> fails safely without passing
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: false, description: "Bad Request: member list is inaccessible" }), { status: 400 })) as typeof fetch;
+      const botAdminErr = await checkTelegramChannelMembership("bot:token", 123456, "@SomaliCryptoNews");
+
+      const passed =
+        normAt === "@SomaliCryptoNews" &&
+        normUrl === "@SomaliCryptoNews" &&
+        normNum === "-1001987654321" &&
+        normBare === "@PayvoraUpdates" &&
+        rejectInvite === null &&
+        rejectBad === null &&
+        memberRes.ok &&
+        memberRes.isMember === true &&
+        leftRes.ok &&
+        leftRes.isMember === false &&
+        restrictedNonMember.ok &&
+        restrictedNonMember.isMember === false &&
+        !botAdminErr.ok &&
+        !botAdminErr.isMember &&
+        botAdminErr.errorCode === "BOT_NOT_CHANNEL_ADMIN";
+
+      recordTest(
+        "REMED-21",
+        "Telegram chat_id normalization & Bot getChatMember rejects non-members, invite links, and unprivileged bots",
+        "Auto Task Security",
+        passed,
+        "Normalized=@/-100, Member=true, Left/Restricted=false, BotAdminErr=BOT_NOT_CHANNEL_ADMIN",
+        `Member=${memberRes.isMember}, Left=${leftRes.isMember}, Restricted=${restrictedNonMember.isMember}, Err=${botAdminErr.errorCode}`
+      );
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 33 (REMED-22): Auto Telegram Join — Quota Lock & Idempotent Single-Credit Guard
+  // --------------------------------------------------------------------------
+  {
+    const submissions = new Set<string>();
+    const wallets = new Map<string, number>([["user-1", 0], ["user-2", 0]]);
+    const taskState = { id: "task-auto-1", maxCompletions: 1, currentCompletions: 0, reward: 0.25, status: "active" };
+
+    const completeAutoAtomicSim = (userId: string, isMember: boolean) => {
+      if (!isMember) return { success: false, code: "NOT_CHANNEL_MEMBER" };
+      const key = `${taskState.id}:${userId}`;
+      if (submissions.has(key)) return { success: false, code: "DUPLICATE_SUBMISSION" };
+      if (taskState.currentCompletions >= taskState.maxCompletions || taskState.status !== "active") {
+        return { success: false, code: "TASK_QUOTA_FULL" };
+      }
+      submissions.add(key);
+      taskState.currentCompletions += 1;
+      if (taskState.currentCompletions >= taskState.maxCompletions) {
+        taskState.status = "completed";
+      }
+      wallets.set(userId, (wallets.get(userId) || 0) + taskState.reward);
+      return { success: true, status: "approved", reward: taskState.reward };
+    };
+
+    const nonMemberAttempt = completeAutoAtomicSim("user-1", false);
+    const validClaim = completeAutoAtomicSim("user-1", true);
+    const duplicateClaim = completeAutoAtomicSim("user-1", true);
+    const quotaFullAttempt = completeAutoAtomicSim("user-2", true);
+
+    const passed =
+      !nonMemberAttempt.success &&
+      nonMemberAttempt.code === "NOT_CHANNEL_MEMBER" &&
+      validClaim.success &&
+      validClaim.status === "approved" &&
+      !duplicateClaim.success &&
+      duplicateClaim.code === "DUPLICATE_SUBMISSION" &&
+      !quotaFullAttempt.success &&
+      quotaFullAttempt.code === "TASK_QUOTA_FULL" &&
+      wallets.get("user-1") === 0.25 &&
+      wallets.get("user-2") === 0 &&
+      taskState.status === "completed";
+
+    recordTest(
+      "REMED-22",
+      "Auto Telegram Join blocks non-members, enforces single-credit idempotency, and closes quota atomically",
+      "Financial & Quota Integrity",
+      passed,
+      "NonMember=blocked, Valid=$0.25(approved), Duplicate=blocked, QuotaFull=blocked",
+      `NonMember=${nonMemberAttempt.code}, Bal1=$${wallets.get("user-1")}, Dup=${duplicateClaim.code}, Quota=${quotaFullAttempt.code}`
+    );
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

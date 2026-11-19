@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle } from "lucide-react";
+import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
@@ -67,7 +67,11 @@ export function Tasks() {
               available,
               pendingCount: pending,
               total,
-              status: task.status
+              status: task.status,
+              verificationType:
+                task.verification_type === "auto_telegram_join"
+                  ? ("auto_telegram_join" as const)
+                  : ("manual_screenshot" as const),
             };
           });
           setJobs(mapped);
@@ -408,6 +412,12 @@ export function Tasks() {
                       <span className="text-[10px] text-[#38bdf8] font-bold bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
                         {job.category}
                       </span>
+                      {job.verificationType === "auto_telegram_join" && (
+                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Zap className="w-2.5 h-2.5" />
+                          <span>Instant</span>
+                        </span>
+                      )}
                       <span className="text-[10px] text-slate-400 flex items-center gap-1">
                         <Clock className="w-3 h-3 text-sky-400" />
                         <span>~{job.timeToComplete}</span>
