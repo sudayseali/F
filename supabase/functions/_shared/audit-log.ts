@@ -21,7 +21,7 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    await supabase.from('audit_logs').insert({
+    const { error } = await supabase.from('audit_logs').insert({
       actor_id: entry.actorId || null,
       actor_type: entry.actorType,
       action: entry.action,
@@ -31,6 +31,13 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
       ip_address: entry.ipAddress || null,
       created_at: new Date().toISOString(),
     });
+    if (error) {
+      console.warn('[AUDIT_LOG_WARN]', {
+        action: entry.action,
+        code: error.code ?? null,
+        message: error.message ?? 'Audit insert error',
+      });
+    }
   } catch (err) {
     console.error('[AUDIT_LOG_FAILURE]', err);
   }

@@ -871,6 +871,199 @@ async function runAllSecurityTests() {
     recordTest("REMED-15", "Bot Chat deep-link URL safety & Bot DM delivery routing", "Bot Chat Alerts", passed, "SAFE_ORIGIN_LOCKED", passed ? "SAFE_ORIGIN_LOCKED" : "OPEN_REDIRECT");
   }
 
+  // REMED-16: Static regression guard: zero .catch() calls on Supabase PostgREST query builders across all Edge Functions
+  {
+    const fs = await import("fs");
+    const path = await import("path");
+    const functionsRoot = path.resolve(process.cwd(), "supabase/functions");
+    const offenders: string[] = [];
+
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.name.endsWith(".ts")) {
+          const src = fs.readFileSync(full, "utf8");
+          if (/\.(from|rpc)\([\s\S]{0,600}?\)\s*\.catch\s*\(/.test(src)) {
+            offenders.push(path.relative(process.cwd(), full));
+          }
+        }
+      }
+    };
+    walk(functionsRoot);
+
+    recordTest(
+      "REMED-16",
+      "Static scan: zero .catch() calls chained on Supabase .from()/.rpc() PostgREST builders",
+      "PostgREST Reliability",
+      offenders.length === 0,
+      "0 Offenders",
+      offenders.length === 0 ? "0 Offenders" : `Found: ${offenders.join(", ")}`
+    );
+  }
+
+  // REMED-17: Real _shared/telegram-verification.ts cryptographic & replay validation
+  {
+    const { verifyTelegramInitData } = await import("../supabase/functions/_shared/telegram-verification.ts");
+    const validInit = generateTelegramInitData({ id: 901234, first_name: "Amina", username: "amina_pv" }, now - 5, TEST_BOT_TOKEN);
+    const badSigInit = generateTelegramInitData({ id: 901234, first_name: "Amina" }, now - 5, TEST_BOT_TOKEN, true);
+    const expiredInit = generateTelegramInitData({ id: 901234, first_name: "Amina" }, now - 7200, TEST_BOT_TOKEN);
+
+    const resValid = await verifyTelegramInitData(validInit, TEST_BOT_TOKEN);
+    const resBadSig = await verifyTelegramInitData(badSigInit, TEST_BOT_TOKEN);
+    const resExpired = await verifyTelegramInitData(expiredInit, TEST_BOT_TOKEN);
+    const resMissing = await verifyTelegramInitData("", TEST_BOT_TOKEN);
+
+    const passed =
+      resValid.valid &&
+      resValid.user?.id === 901234 &&
+      !resBadSig.valid &&
+      resBadSig.errorCode === "INVALID_SIGNATURE" &&
+      !resExpired.valid &&
+      resExpired.errorCode === "AUTH_DATE_EXPIRED" &&
+      !resMissing.valid &&
+      resMissing.errorCode === "MISSING_INIT_DATA";
+
+    recordTest(
+      "REMED-17",
+      "Production verifyTelegramInitData validates HMAC, rejects bad signature, expired, and missing data",
+      "Telegram Auth",
+      passed,
+      "Valid=true, BadSig/Expired/Missing rejected",
+      `Valid=${resValid.valid}, BadSig=${resBadSig.errorCode}, Exp=${resExpired.errorCode}`
+    );
+  }
+
+  // REMED-18: Frontend Telegram auth classification handles VPN_DETECTED, channel gate, 401/403 non-retryable, and 5xx transient
+  {
+    const { classifyAuthResponse } = await import("../src/lib/telegramAuth.ts");
+
+    const okRes = classifyAuthResponse(200, { success: true, data: { access_token: "jwt", user: { id: "u1" } } });
+    const chanRes = classifyAuthResponse(200, { success: true, data: { requires_channel_join: true, channel_username: "PayvoraCommunity" } });
+    const vpnRes = classifyAuthResponse(403, { success: false, code: "VPN_DETECTED", error: "VPN not allowed" });
+    const badSigRes = classifyAuthResponse(401, { success: false, code: "INVALID_SIGNATURE", error: "Bad sig" });
+    const suspRes = classifyAuthResponse(403, { success: false, code: "ACCOUNT_SUSPENDED", error: "Suspended" });
+    const intErrRes = classifyAuthResponse(500, { success: false, code: "INTERNAL_ERROR", error: "An internal error" });
+    const netErrRes = classifyAuthResponse(undefined, null, "Failed to fetch");
+
+    const passed =
+      okRes.kind === "success" && !okRes.retryable &&
+      chanRes.kind === "channel_gate" && !chanRes.retryable &&
+      vpnRes.kind === "vpn_blocked" && !vpnRes.retryable &&
+      badSigRes.kind === "fatal" && !badSigRes.retryable &&
+      suspRes.kind === "fatal" && !suspRes.retryable &&
+      intErrRes.kind === "transient" && intErrRes.retryable &&
+      netErrRes.kind === "transient" && netErrRes.retryable;
+
+    recordTest(
+      "REMED-18",
+      "Frontend classifyAuthResponse distinguishes success, channel_gate, VPN_DETECTED, fatal 401/403, and transient 5xx",
+      "Auth Lifecycle",
+      passed,
+      "All 7 response classes accurate",
+      `vpn=${vpnRes.kind}, badSigRetry=${badSigRes.retryable}, intRetry=${intErrRes.retryable}`
+    );
+  }
+
+  // REMED-19: Bounded retry executes only for transient errors (recovers on 2nd try) and NEVER retries 401/403
+  {
+    const { classifyAuthResponse, runWithTransientRetry } = await import("../src/lib/telegramAuth.ts");
+
+    let transientAttempts = 0;
+    const recoveredOutcome = await runWithTransientRetry(
+      async () => {
+        transientAttempts++;
+        if (transientAttempts === 1) {
+          return classifyAuthResponse(500, { success: false, code: "INTERNAL_ERROR", error: "Transient 500" });
+        }
+        return classifyAuthResponse(200, { success: true, data: { access_token: "jwt_ok", user: { id: "u1" } } });
+      },
+      { maxRetries: 2, baseDelayMs: 1, sleepFn: async () => {} }
+    );
+
+    let invalidAttempts = 0;
+    const invalidOutcome = await runWithTransientRetry(
+      async () => {
+        invalidAttempts++;
+        return classifyAuthResponse(401, { success: false, code: "INVALID_SIGNATURE", error: "Invalid hash" });
+      },
+      { maxRetries: 2, baseDelayMs: 1, sleepFn: async () => {} }
+    );
+
+    let exhaustedAttempts = 0;
+    const exhaustedOutcome = await runWithTransientRetry(
+      async () => {
+        exhaustedAttempts++;
+        return classifyAuthResponse(503, { success: false, error: "Upstream unavailable" });
+      },
+      { maxRetries: 2, baseDelayMs: 1, sleepFn: async () => {} }
+    );
+
+    const passed =
+      transientAttempts === 2 &&
+      recoveredOutcome.kind === "success" &&
+      invalidAttempts === 1 &&
+      invalidOutcome.kind === "fatal" &&
+      exhaustedAttempts === 3 &&
+      exhaustedOutcome.kind === "transient";
+
+    recordTest(
+      "REMED-19",
+      "Bounded backoff retries transient 5xx/network errors cleanly and stops immediately on 401/403",
+      "Auth Resilience",
+      passed,
+      "Transient=2(success), Invalid401=1(fatal), Exhausted=3",
+      `Transient=${transientAttempts}(${recoveredOutcome.kind}), Invalid401=${invalidAttempts}, Exhausted=${exhaustedAttempts}`
+    );
+  }
+
+  // REMED-20: Single-flight auth runner deduplicates StrictMode/concurrent triggers & prevents duplicate referrals
+  {
+    const { createSingleFlightRunner } = await import("../src/lib/telegramAuth.ts");
+
+    let networkCalls = 0;
+    const usersTable = new Map<number, { id: string; balance: number }>();
+    const referralsSet = new Set<string>();
+
+    const singleFlightAuth = createSingleFlightRunner(async (tgId: number, referrerId?: string) => {
+      networkCalls++;
+      await new Promise((r) => setTimeout(r, 10));
+      let u = usersTable.get(tgId);
+      if (!u) {
+        u = { id: `uuid_${tgId}`, balance: 0 };
+        usersTable.set(tgId, u);
+      }
+      if (referrerId) {
+        referralsSet.add(`${referrerId}->${u.id}`);
+      }
+      return { token: `jwt_${tgId}`, user: u };
+    });
+
+    const [r1, r2, r3] = await Promise.all([
+      singleFlightAuth(5550001, "uuid_ref_9"),
+      singleFlightAuth(5550001, "uuid_ref_9"),
+      singleFlightAuth(5550001, "uuid_ref_9"),
+    ]);
+
+    const passed =
+      networkCalls === 1 &&
+      r1.token === r2.token &&
+      r2.token === r3.token &&
+      usersTable.size === 1 &&
+      usersTable.get(5550001)?.balance === 0 &&
+      referralsSet.size === 1;
+
+    recordTest(
+      "REMED-20",
+      "Single-flight runner coalesces concurrent auth calls with zero duplicate user/referral/wallet mutation",
+      "Concurrency Safety",
+      passed,
+      "networkCalls=1, users=1, referrals=1, balance=$0",
+      `networkCalls=${networkCalls}, users=${usersTable.size}, referrals=${referralsSet.size}`
+    );
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

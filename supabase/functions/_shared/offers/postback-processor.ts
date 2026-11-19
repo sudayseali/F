@@ -160,7 +160,7 @@ async function recordPostbackLog(
   }
 ) {
   try {
-    await supabaseAdmin.from("provider_postbacks").insert({
+    const { error } = await supabaseAdmin.from("provider_postbacks").insert({
       provider_id: entry.providerId,
       external_transaction_id: entry.externalTransactionId.slice(0, 180) || "missing",
       event_type: entry.eventType,
@@ -169,6 +169,12 @@ async function recordPostbackLog(
       payload_hash: entry.payloadHash,
       processed_at: new Date().toISOString(),
     });
+    if (error) {
+      console.warn("[POSTBACK_AUDIT_LOG_WARN]", {
+        code: error.code ?? null,
+        message: error.message ?? "Insert failed",
+      });
+    }
   } catch (err) {
     console.warn("[POSTBACK_AUDIT_LOG_WARN]", err);
   }

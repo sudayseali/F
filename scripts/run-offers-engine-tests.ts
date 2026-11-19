@@ -893,106 +893,378 @@ async function runOffersEngineTests() {
   }
 
   // --------------------------------------------------------------------------
-  // TEST 10: VPN / Proxy / Tor / Datacenter Detection & Policy Enforcement
+  // TEST 10..15: VPN / IP Risk Engine & PostgrestThenable (No-.catch) Regression Suite
   // --------------------------------------------------------------------------
   {
     const {
       parseProxyCheckPayload,
       parseIpApiIsPayload,
       isPrivateOrUnknownIp,
+      checkIpReputation,
       enforceVpnPolicy,
+      clearVpnCheckCaches,
     } = await import("../supabase/functions/_shared/vpn-check.ts");
 
-    const pcVpn = parseProxyCheckPayload("45.83.220.14", {
-      status: "ok",
-      "45.83.220.14": {
-        proxy: "yes",
-        type: "VPN",
-        risk: 88,
-        isocode: "DE",
-        asn: "AS20473",
-      },
-    });
-
-    const ipapiTor = parseIpApiIsPayload({
-      is_vpn: false,
-      is_proxy: false,
-      is_tor: true,
-      is_datacenter: true,
-      is_abuser: false,
-      location: { country_code: "NL" },
-      asn: { asn: 12345 },
-    });
-
-    const mockVpnDb = {
-      from: (table: string) => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () =>
-              table === "app_settings"
-                ? {
-                    data: {
-                      value: {
-                        vpn_detection_enabled: true,
-                        block_vpn_on_offers: true,
-                        block_hosting_ips: true,
-                        vpn_risk_threshold: 66,
-                      },
-                    },
-                  }
-                : { data: null },
-            gt: () => ({ maybeSingle: async () => ({ data: null }) }),
-          }),
-        }),
-        upsert: async () => ({ error: null }),
-        insert: async () => ({ error: null }),
-      }),
-    };
-
-    const savedPcKey = TEST_ENV.PROXYCHECK_KEY;
-    TEST_ENV.PROXYCHECK_KEY = "test_proxycheck_key";
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(
-        JSON.stringify({
-          status: "ok",
-          "185.220.101.4": { proxy: "yes", type: "VPN", risk: 95, isocode: "US" },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      )) as typeof fetch;
-
-    let blockedCode = "";
-    try {
-      await enforceVpnPolicy(
-        mockVpnDb as any,
-        new Request("https://x.test"),
-        "185.220.101.4",
-        "offer_click",
-        "user-1"
-      );
-    } catch (err: any) {
-      blockedCode = err?.code || "";
-    } finally {
-      globalThis.fetch = originalFetch;
-      TEST_ENV.PROXYCHECK_KEY = savedPcKey;
+    // Faithful Supabase PostgrestFilterBuilder thenable mock: has .then() ONLY, deliberately NO .catch()!
+    function createPostgrestThenable<T>(executor: () => Promise<T>): PromiseLike<T> {
+      return {
+        then<TResult1 = T, TResult2 = never>(
+          onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
+          onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null
+        ) {
+          return executor().then(onfulfilled, onrejected);
+        },
+      };
     }
 
-    const passed =
-      Boolean(pcVpn?.isVpn && pcVpn.countryCode === "DE" && pcVpn.riskScore === 88) &&
-      Boolean(ipapiTor?.isTor && ipapiTor.isHosting && ipapiTor.countryCode === "NL") &&
-      isPrivateOrUnknownIp("127.0.0.1") &&
-      isPrivateOrUnknownIp("10.0.0.5") &&
-      !isPrivateOrUnknownIp("185.220.101.4") &&
-      blockedCode === "VPN_DETECTED";
+    const buildVpnDb = (opts: {
+      cfg?: Record<string, unknown>;
+      cachedRow?: any;
+      readError?: any;
+      readThrows?: boolean;
+      upsertError?: any;
+      upsertThrows?: boolean;
+      upsertCounter?: () => void;
+    }) => ({
+      from: (table: string) => ({
+        select: () => ({
+          eq: (_col: string, _val: any) => ({
+            maybeSingle: () =>
+              createPostgrestThenable(async () =>
+                table === "app_settings"
+                  ? {
+                      data: {
+                        value: opts.cfg ?? {
+                          vpn_detection_enabled: true,
+                          block_vpn_on_offers: true,
+                          block_vpn_on_tasks: true,
+                          block_vpn_on_checkin: true,
+                          block_vpn_on_withdraw: true,
+                          block_vpn_on_auth: false,
+                          block_hosting_ips: true,
+                          vpn_risk_threshold: 66,
+                          strict_fail_closed: false,
+                        },
+                      },
+                      error: null,
+                    }
+                  : { data: null, error: null }
+              ),
+            gt: () => ({
+              maybeSingle: () =>
+                createPostgrestThenable(async () => {
+                  if (opts.readThrows) throw new Error("Simulated L2 read exception");
+                  if (opts.readError) return { data: null, error: opts.readError };
+                  return { data: opts.cachedRow ?? null, error: null };
+                }),
+            }),
+          }),
+        }),
+        upsert: (_row: any, _upsertOpts?: any) =>
+          createPostgrestThenable(async () => {
+            opts.upsertCounter?.();
+            if (opts.upsertThrows) throw new Error("Simulated DB upsert socket exception");
+            if (opts.upsertError) return { data: null, error: opts.upsertError };
+            return { data: null, error: null };
+          }),
+        insert: (_row: any) =>
+          createPostgrestThenable(async () => ({ data: null, error: null })),
+      }),
+    });
 
-    recordTest(
-      "OFFER-10",
-      "Multi-provider VPN/Proxy/Tor detection, private IP bypass & VPN_DETECTED block",
-      "Anti-Fraud Security",
-      passed,
-      "pcVpn=true, ipapiTor=true, blockedCode=VPN_DETECTED",
-      `pcVpn=${pcVpn?.isVpn}, ipapiTor=${ipapiTor?.isTor}, blockedCode=${blockedCode}`
-    );
+    const originalFetch = globalThis.fetch;
+    const savedPcKey = TEST_ENV.PROXYCHECK_KEY;
+    const savedIpApiKey = TEST_ENV.IPAPI_KEY;
+
+    // OFFER-10: Parser + Private IP + VPN block with PostgrestThenable (no .catch)
+    {
+      clearVpnCheckCaches();
+      TEST_ENV.PROXYCHECK_KEY = "test_proxycheck_key";
+      const pcVpn = parseProxyCheckPayload("45.83.220.14", {
+        status: "ok",
+        "45.83.220.14": {
+          proxy: "yes",
+          type: "VPN",
+          risk: 88,
+          isocode: "DE",
+          asn: "AS20473",
+        },
+      });
+      const ipapiTor = parseIpApiIsPayload({
+        is_vpn: false,
+        is_proxy: false,
+        is_tor: true,
+        is_datacenter: true,
+        is_abuser: false,
+        location: { country_code: "NL" },
+        asn: { asn: 12345 },
+      });
+
+      let upsertCalls = 0;
+      const db = buildVpnDb({ upsertCounter: () => { upsertCalls++; } });
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({
+            status: "ok",
+            "185.220.101.4": { proxy: "yes", type: "VPN", risk: 95, isocode: "US" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )) as typeof fetch;
+
+      let blockedCode = "";
+      try {
+        await enforceVpnPolicy(db as any, new Request("https://x.test"), "185.220.101.4", "offer_click", "user-1");
+      } catch (err: any) {
+        blockedCode = err?.code || "";
+      }
+
+      const passed =
+        Boolean(pcVpn?.isVpn && pcVpn.countryCode === "DE" && pcVpn.riskScore === 88) &&
+        Boolean(ipapiTor?.isTor && ipapiTor.isHosting && ipapiTor.countryCode === "NL") &&
+        isPrivateOrUnknownIp("127.0.0.1") &&
+        isPrivateOrUnknownIp("10.0.0.5") &&
+        !isPrivateOrUnknownIp("185.220.101.4") &&
+        upsertCalls === 1 &&
+        blockedCode === "VPN_DETECTED";
+
+      recordTest(
+        "OFFER-10",
+        "VPN/Proxy/Tor detection & PostgrestThenable (no .catch) upsert succeeds cleanly",
+        "Anti-Fraud Security",
+        passed,
+        "upsertCalls=1, blockedCode=VPN_DETECTED",
+        `upsertCalls=${upsertCalls}, blockedCode=${blockedCode}`
+      );
+    }
+
+    // OFFER-11: Cache Hit (L2 -> L1) skips external API; clean IP passes auth/offers_api/offer_click/daily_checkin
+    {
+      clearVpnCheckCaches();
+      let fetchCalls = 0;
+      let upsertCalls = 0;
+      const db = buildVpnDb({
+        cachedRow: {
+          is_vpn: false,
+          is_proxy: false,
+          is_tor: false,
+          is_hosting: false,
+          risk_score: 5,
+          country_code: "US",
+          asn: "AS7922",
+          reason: null,
+        },
+        upsertCounter: () => { upsertCalls++; },
+      });
+      globalThis.fetch = (async () => {
+        fetchCalls++;
+        return new Response("{}", { status: 200 });
+      }) as typeof fetch;
+
+      const rAuth = await enforceVpnPolicy(db as any, new Request("https://x.test"), "73.15.20.10", "auth", "u1");
+      const rOffers = await enforceVpnPolicy(db as any, new Request("https://x.test"), "73.15.20.10", "offers_api", "u1");
+      const rClick = await enforceVpnPolicy(db as any, new Request("https://x.test"), "73.15.20.10", "offer_click", "u1");
+      const rCheckin = await enforceVpnPolicy(db as any, new Request("https://x.test"), "73.15.20.10", "daily_checkin", "u1");
+
+      const passed =
+        fetchCalls === 0 &&
+        upsertCalls === 0 &&
+        !rAuth.blocked &&
+        rAuth.provider === "cache" &&
+        !rOffers.blocked &&
+        !rClick.blocked &&
+        !rCheckin.blocked;
+
+      recordTest(
+        "OFFER-11",
+        "VPN L2/L1 cache hit skips external HTTP & permits clean IP across auth, offers_api, offer_click, daily_checkin",
+        "Anti-Fraud Caching",
+        passed,
+        "fetchCalls=0, all 4 contexts allowed",
+        `fetchCalls=${fetchCalls}, provider=${rAuth.provider}`
+      );
+    }
+
+    // OFFER-12: Upsert returning { error } AND upsert throwing exception never crash or bypass blocking
+    {
+      clearVpnCheckCaches();
+      TEST_ENV.PROXYCHECK_KEY = "test_proxycheck_key";
+      const origWarn = console.warn;
+      const origErr = console.error;
+      const warnMsgs: string[] = [];
+      const errMsgs: string[] = [];
+      console.warn = (...args: any[]) => warnMsgs.push(String(args[0]));
+      console.error = (...args: any[]) => errMsgs.push(String(args[0]));
+
+      try {
+        // Case A: Clean IP on first auth with upsert returning { error }
+        const dbErr = buildVpnDb({
+          cfg: { vpn_detection_enabled: true, block_vpn_on_auth: false, block_vpn_on_checkin: true },
+          upsertError: { code: "42501", message: "permission denied for ip_risk_cache" },
+        });
+        globalThis.fetch = (async () =>
+          new Response(
+            JSON.stringify({ status: "ok", "198.51.100.77": { proxy: "no", type: "Residential", risk: 0, isocode: "US" } }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )) as typeof fetch;
+
+        const cleanAuthRes = await enforceVpnPolicy(dbErr as any, new Request("https://x.test"), "198.51.100.77", "auth", "u-clean");
+
+        // Case B: VPN IP with upsert throwing exception must STILL block with VPN_DETECTED!
+        clearVpnCheckCaches();
+        const dbThrow = buildVpnDb({
+          cfg: { vpn_detection_enabled: true, block_vpn_on_auth: true, block_vpn_on_offers: true },
+          upsertThrows: true,
+        });
+        globalThis.fetch = (async () =>
+          new Response(
+            JSON.stringify({ status: "ok", "203.0.113.99": { proxy: "yes", type: "VPN", risk: 95, isocode: "DE" } }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )) as typeof fetch;
+
+        let vpnBlockCode = "";
+        try {
+          await enforceVpnPolicy(dbThrow as any, new Request("https://x.test"), "203.0.113.99", "auth", "u-vpn");
+        } catch (err: any) {
+          vpnBlockCode = err?.code || "";
+        }
+
+        // Case C: L2 read error/exception falls back cleanly
+        clearVpnCheckCaches();
+        const dbReadFail = buildVpnDb({ readThrows: true });
+        globalThis.fetch = (async () =>
+          new Response(
+            JSON.stringify({ status: "ok", "198.51.100.88": { proxy: "no", type: "Residential", risk: 2, isocode: "CA" } }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          )) as typeof fetch;
+        const readFallbackRes = await enforceVpnPolicy(dbReadFail as any, new Request("https://x.test"), "198.51.100.88", "daily_checkin", "u-readfail");
+
+        const passed =
+          !cleanAuthRes.blocked &&
+          cleanAuthRes.provider === "proxycheck" &&
+          vpnBlockCode === "VPN_DETECTED" &&
+          !readFallbackRes.blocked &&
+          warnMsgs.includes("[VPN_CACHE_WRITE_WARN]") &&
+          warnMsgs.includes("[VPN_CACHE_READ_EXCEPTION]") &&
+          errMsgs.includes("[VPN_CACHE_WRITE_EXCEPTION]");
+
+        recordTest(
+          "OFFER-12",
+          "Cache read/write { error } and thrown exceptions are logged, never crash auth, and preserve VPN blocking",
+          "Cache Resilience",
+          passed,
+          "CleanAllowed=true, VpnBlocked=VPN_DETECTED, LogsEmitted=true",
+          `Clean=${!cleanAuthRes.blocked}, VpnCode=${vpnBlockCode}, Warns=${warnMsgs.length}, Errs=${errMsgs.length}`
+        );
+      } finally {
+        console.warn = origWarn;
+        console.error = origErr;
+      }
+    }
+
+    // OFFER-13: External API Timeout & Invalid Response Handling (fail-open vs strict_fail_closed)
+    {
+      clearVpnCheckCaches();
+      TEST_ENV.PROXYCHECK_KEY = "test_pc_secret_should_not_leak";
+      TEST_ENV.IPAPI_KEY = "test_ipapi_secret";
+      const origWarn = console.warn;
+      const warnPayloads: string[] = [];
+      console.warn = (...args: any[]) => warnPayloads.push(JSON.stringify(args));
+
+      try {
+        globalThis.fetch = (async () => {
+          const err = new Error("The signal has been aborted");
+          err.name = "AbortError";
+          throw err;
+        }) as typeof fetch;
+
+        const dbFailOpen = buildVpnDb({ cfg: { vpn_detection_enabled: true, block_vpn_on_offers: true, strict_fail_closed: false } });
+        const openRes = await enforceVpnPolicy(dbFailOpen as any, new Request("https://x.test"), "198.51.100.12", "offer_click", "u1");
+
+        clearVpnCheckCaches();
+        const dbFailClosed = buildVpnDb({ cfg: { vpn_detection_enabled: true, block_vpn_on_offers: true, strict_fail_closed: true } });
+        let closedCode = "";
+        try {
+          await enforceVpnPolicy(dbFailClosed as any, new Request("https://x.test"), "198.51.100.13", "offer_click", "u1");
+        } catch (e: any) {
+          closedCode = e?.code || "";
+        }
+
+        // Invalid provider JSON / denied response
+        clearVpnCheckCaches();
+        globalThis.fetch = (async () =>
+          new Response(JSON.stringify({ status: "denied", message: "Invalid key" }), { status: 200 })) as typeof fetch;
+        const badPayloadRes = await checkIpReputation(dbFailOpen as any, "198.51.100.14", "offers_api");
+
+        const noSecretLeakedInLogs = !warnPayloads.some((s) => s.includes("test_pc_secret") || s.includes("test_ipapi_secret"));
+        const passed =
+          !openRes.blocked &&
+          !openRes.configured &&
+          closedCode === "VPN_DETECTED" &&
+          !badPayloadRes.configured &&
+          noSecretLeakedInLogs;
+
+        recordTest(
+          "OFFER-13",
+          "External IP API timeout & invalid payload handle fail-open/fail-closed cleanly without leaking API keys",
+          "Anti-Fraud Resilience",
+          passed,
+          "FailOpen=allowed, FailClosed=VPN_DETECTED, NoSecretLeak=true",
+          `OpenBlocked=${openRes.blocked}, ClosedCode=${closedCode}, NoSecretLeak=${noSecretLeakedInLogs}`
+        );
+      } finally {
+        console.warn = origWarn;
+      }
+    }
+
+    // OFFER-14: High Risk Score / Hosting IP vs Disabled Toggle
+    {
+      clearVpnCheckCaches();
+      TEST_ENV.PROXYCHECK_KEY = "test_proxycheck_key";
+      TEST_ENV.IPAPI_KEY = "";
+
+      const dbEnabled = buildVpnDb({
+        cfg: {
+          vpn_detection_enabled: true,
+          block_vpn_on_offers: true,
+          block_hosting_ips: true,
+          vpn_risk_threshold: 66,
+        },
+      });
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({ status: "ok", "192.0.2.50": { proxy: "no", type: "Residential", risk: 75, isocode: "US" } }),
+          { status: 200 }
+        )) as typeof fetch;
+      const highRiskRes = await checkIpReputation(dbEnabled as any, "192.0.2.50", "offer_click");
+
+      clearVpnCheckCaches();
+      const dbDisabled = buildVpnDb({
+        cfg: {
+          vpn_detection_enabled: false,
+          block_vpn_on_offers: true,
+        },
+      });
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({ status: "ok", "192.0.2.51": { proxy: "yes", type: "VPN", risk: 100, isocode: "DE" } }),
+          { status: 200 }
+        )) as typeof fetch;
+      const disabledRes = await checkIpReputation(dbDisabled as any, "192.0.2.51", "offer_click");
+
+      const passed = highRiskRes.blocked === true && disabledRes.blocked === false && disabledRes.isVpn === true;
+      recordTest(
+        "OFFER-14",
+        "High-risk score (>=66) triggers block while vpn_detection_enabled=false bypasses blocking cleanly",
+        "Anti-Fraud Policy",
+        passed,
+        "HighRiskBlocked=true, DisabledBlocked=false",
+        `HighRiskBlocked=${highRiskRes.blocked}, DisabledBlocked=${disabledRes.blocked}`
+      );
+    }
+
+    globalThis.fetch = originalFetch;
+    TEST_ENV.PROXYCHECK_KEY = savedPcKey;
+    TEST_ENV.IPAPI_KEY = savedIpApiKey;
   }
 
   // --------------------------------------------------------------------------

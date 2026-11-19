@@ -137,14 +137,24 @@ serve(async (req) => {
       console.error("[CPA_LOG_INSERT_ERROR]", logErr);
     }
 
-    await supabaseAdmin.from("provider_postbacks").insert({
-      external_transaction_id: safeTxId,
-      event_type: "conversion",
-      signature_valid: true,
-      processing_status: "processed",
-      payload_hash: `${network}:${safeTxId}`,
-      processed_at: new Date().toISOString(),
-    }).catch(() => {});
+    try {
+      const { error: pbErr } = await supabaseAdmin.from("provider_postbacks").insert({
+        external_transaction_id: safeTxId,
+        event_type: "conversion",
+        signature_valid: true,
+        processing_status: "processed",
+        payload_hash: `${network}:${safeTxId}`,
+        processed_at: new Date().toISOString(),
+      });
+      if (pbErr) {
+        console.warn("[CPA_POSTBACK_LOG_WARN]", {
+          code: (pbErr as any).code ?? null,
+          message: pbErr.message,
+        });
+      }
+    } catch (pbEx: any) {
+      console.warn("[CPA_POSTBACK_LOG_EXCEPTION]", pbEx?.message || pbEx);
+    }
 
     await sendUserAlert(supabaseAdmin, {
       userId: targetUserId,

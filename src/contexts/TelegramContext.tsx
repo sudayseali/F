@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import {
   supabase,
   setSupabaseToken,
@@ -7,6 +7,11 @@ import {
   decodeJwtPayload,
   isTokenExpired,
 } from '../lib/supabase';
+import {
+  classifyAuthResponse,
+  runWithTransientRetry,
+  type AuthAttemptOutcome,
+} from '../lib/telegramAuth';
 import { SplashScreen } from '../components/SplashScreen';
 import { ChannelJoinGate } from '../components/ChannelJoinGate';
 import { APP_CONFIG } from '../config/appConfig';
@@ -54,16 +59,31 @@ export const useTelegram = () => useContext(TelegramContext);
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+async function waitForTelegramWebApp(maxWaitMs = 250): Promise<any> {
+  const existing = (window as any).Telegram?.WebApp;
+  if (existing) return existing;
+
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const ready = (window as any).Telegram?.WebApp;
+    if (ready) return ready;
+  }
+  return (window as any).Telegram?.WebApp;
+}
+
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null);
   const [location] = useState<LocationData | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [channelGate, setChannelGate] = useState<ChannelGateState | null>(null);
   const [isVerifyingChannel, setIsVerifyingChannel] = useState(false);
+  const [isRetryingAuth, setIsRetryingAuth] = useState(false);
   const [isVpnBlock, setIsVpnBlock] = useState(false);
   const [isTelegramInitDone, setIsTelegramInitDone] = useState(false);
   const [isSplashMinDone, setIsSplashMinDone] = useState(false);
   const [isInsideTelegram, setIsInsideTelegram] = useState(false);
+  const inFlightInitRef = useRef<Promise<void> | null>(null);
 
   // Secure user profile refresh using authenticated session (RLS enforces auth.uid() = id)
   const fetchUserData = useCallback(async (userUuid: string): Promise<TelegramUser | null> => {
@@ -98,174 +118,198 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.uuid, fetchUserData]);
 
-  const initTelegram = useCallback(async (options?: { isChannelRetry?: boolean }) => {
-    const isChannelRetry = Boolean(options?.isChannelRetry);
-    if (isChannelRetry) {
-      setIsVerifyingChannel(true);
-    }
-
-    const tg = (window as any).Telegram?.WebApp;
-
-    // Discard expired local token before attempting authentication or restoration
-    const existingToken = getSupabaseToken();
-    if (existingToken && isTokenExpired(existingToken)) {
-      clearSupabaseToken();
-    }
-
-    if (tg && tg.initData) {
-      setIsInsideTelegram(true);
-      tg.ready?.();
-      tg.expand?.();
-      tg.setHeaderColor?.('#030712');
-      tg.setBackgroundColor?.('#030712');
-      tg.enableClosingConfirmation?.();
-
-      // Always clear any stale local JWT before re-authenticating via fresh Telegram initData
-      clearSupabaseToken();
-
-      try {
-        // All Telegram authentication MUST pass through the trusted server-side Edge Function.
-        // Never trust tg.initDataUnsafe before server cryptographic verification completes.
-        const { data: authResponse, error: invokeErr } = await supabase.functions.invoke('auth', {
-          body: {
-            initData: tg.initData,
-            start_param: tg.initDataUnsafe?.start_param
-          }
-        });
-
-        let effectiveData = authResponse;
-
-        if (invokeErr || (!authResponse?.success && !authResponse?.data && !authResponse?.access_token)) {
-          // Try extracting structured error from SDK FunctionsHttpError first
-          const ctx = (invokeErr as any)?.context;
-          if (ctx && typeof ctx.clone === 'function') {
-            const ctxJson = await ctx.clone().json().catch(() => null);
-            if (ctxJson) {
-              effectiveData = ctxJson;
-            } else {
-              const ctxText = await ctx.clone().text().catch(() => '');
-              if (ctxText) effectiveData = { error: ctxText };
-            }
-          }
-
-          if (!effectiveData?.error && !effectiveData?.success) {
-            // Fallback direct fetch with explicit anon apikey header
-            const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
-            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            if (baseUrl && anonKey) {
-              const directRes = await fetch(`${baseUrl}/functions/v1/auth`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': anonKey,
-                  'Authorization': `Bearer ${anonKey}`
-                },
-                body: JSON.stringify({
-                  initData: tg.initData,
-                  start_param: tg.initDataUnsafe?.start_param
-                })
-              });
-              const directData = await directRes.json().catch(() => null);
-              if (directData) {
-                effectiveData = directData;
-              }
-            }
-          }
-        }
-
-        if (effectiveData?.error === "VPN Blocked" || effectiveData?.isVpnBlock) {
-          clearSupabaseToken();
-          setUser(null);
-          setChannelGate(null);
-          setIsVpnBlock(true);
-          setIsTelegramInitDone(true);
-          setIsVerifyingChannel(false);
-          return;
-        }
-
-        const payloadData = effectiveData?.data || effectiveData;
-
-        // Mandatory channel membership check BEFORE entering authenticated branch
-        if (payloadData?.requires_channel_join) {
-          clearSupabaseToken();
-          setUser(null);
-          setAuthError(null);
-
-          const cleanHandle = (payloadData.channel_username || 'PayvoraCommunity').replace(/^@/, '');
-          const gateError =
-            payloadData.verification_error ||
-            (isChannelRetry
-              ? `Membership in @${cleanHandle} is not confirmed yet. Tap Join @${cleanHandle}, subscribe to the channel, then tap Verify & Continue.`
-              : null);
-
-          setChannelGate({
-            url: payloadData.channel_url || 'https://t.me/PayvoraCommunity',
-            username: cleanHandle,
-            error: gateError,
-          });
-          setIsTelegramInitDone(true);
-          setIsVerifyingChannel(false);
-          return;
-        }
-
-        if (effectiveData && (effectiveData.success || effectiveData.data || effectiveData.access_token)) {
-          setChannelGate(null);
-          const token = effectiveData.data?.access_token || effectiveData.access_token;
-          const verifiedProfile = effectiveData.data?.user || effectiveData.user;
-          const verifiedUuid = effectiveData.data?.user_uuid || effectiveData.user_uuid;
-
-          if (token) {
-            setSupabaseToken(token);
-          }
-
-          if (verifiedProfile) {
-            setUser({
-              id: verifiedProfile.telegram_id,
-              uuid: verifiedProfile.id,
-              username: verifiedProfile.username,
-              first_name: verifiedProfile.first_name,
-              last_name: verifiedProfile.last_name,
-              balance: Number(verifiedProfile.wallet_balance || 0)
-            });
-          } else if (verifiedUuid) {
-            await fetchUserData(verifiedUuid);
-          }
-          setAuthError(null);
-        } else {
-          const errorMsg = effectiveData?.error || invokeErr?.message || "Failed to authenticate session with server.";
-          console.warn("Telegram authentication failed:", errorMsg);
-          clearSupabaseToken();
-          setUser(null);
-          setChannelGate(null);
-          setAuthError(errorMsg);
-        }
-      } catch (e: any) {
-        console.error("Server authentication failed:", e);
-        clearSupabaseToken();
-        setUser(null);
-        setAuthError(e?.message || "Authentication error");
+  const executeAuthOnce = useCallback(async (tg: any): Promise<AuthAttemptOutcome> => {
+    const { data: authResponse, error: invokeErr } = await supabase.functions.invoke('auth', {
+      body: {
+        initData: tg.initData,
+        start_param: tg.initDataUnsafe?.start_param
       }
-    } else {
-      setIsInsideTelegram(false);
-      // Outside Telegram WebApp: ONLY restore if a valid non-expired signed JWT exists for the owner.
-      // Never query arbitrary user rows anonymously.
-      const validToken = getSupabaseToken();
-      const payload = validToken && !isTokenExpired(validToken) ? decodeJwtPayload(validToken) : null;
-      if (payload?.sub && UUID_REGEX.test(payload.sub)) {
-        const restored = await fetchUserData(payload.sub);
-        if (!restored) {
+    });
+
+    let effectiveData = authResponse;
+    const ctx = (invokeErr as any)?.context;
+    let httpStatus: number | undefined = typeof ctx?.status === 'number' ? ctx.status : undefined;
+
+    if (invokeErr || (!authResponse?.success && !authResponse?.data && !authResponse?.access_token)) {
+      if (ctx && typeof ctx.clone === 'function') {
+        const ctxJson = await ctx.clone().json().catch(() => null);
+        if (ctxJson) {
+          effectiveData = ctxJson;
+        } else {
+          const ctxText = await ctx.clone().text().catch(() => '');
+          if (ctxText) effectiveData = { error: ctxText };
+        }
+      }
+
+      if (!effectiveData?.error && !effectiveData?.success) {
+        const baseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '');
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (baseUrl && anonKey) {
+          const directRes = await fetch(`${baseUrl}/functions/v1/auth`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': anonKey,
+              'Authorization': `Bearer ${anonKey}`
+            },
+            body: JSON.stringify({
+              initData: tg.initData,
+              start_param: tg.initDataUnsafe?.start_param
+            })
+          });
+          httpStatus = directRes.status;
+          const directData = await directRes.json().catch(() => null);
+          if (directData) {
+            effectiveData = directData;
+          }
+        }
+      }
+    }
+
+    return classifyAuthResponse(httpStatus, effectiveData, invokeErr?.message);
+  }, []);
+
+  const initTelegram = useCallback((options?: { isChannelRetry?: boolean }) => {
+    // Deduplicate concurrent init/retry calls (e.g., React StrictMode double-mount or rapid taps)
+    if (inFlightInitRef.current) {
+      return inFlightInitRef.current;
+    }
+
+    const promise = (async () => {
+      const isChannelRetry = Boolean(options?.isChannelRetry);
+      if (isChannelRetry) {
+        setIsVerifyingChannel(true);
+      } else {
+        setIsRetryingAuth(true);
+      }
+
+      const tg = await waitForTelegramWebApp();
+
+      // Discard expired local token before attempting authentication or restoration
+      const existingToken = getSupabaseToken();
+      if (existingToken && isTokenExpired(existingToken)) {
+        clearSupabaseToken();
+      }
+
+      if (tg && tg.initData) {
+        setIsInsideTelegram(true);
+        tg.ready?.();
+        tg.expand?.();
+        tg.setHeaderColor?.('#030712');
+        tg.setBackgroundColor?.('#030712');
+        tg.enableClosingConfirmation?.();
+
+        // Always clear any stale local JWT before re-authenticating via fresh Telegram initData
+        clearSupabaseToken();
+
+        try {
+          const outcome = await runWithTransientRetry(
+            () => executeAuthOnce(tg),
+            { maxRetries: 2, baseDelayMs: 400 }
+          );
+
+          if (outcome.kind === 'vpn_blocked') {
+            clearSupabaseToken();
+            setUser(null);
+            setChannelGate(null);
+            setIsVpnBlock(true);
+            return;
+          }
+
+          if (outcome.kind === 'channel_gate') {
+            const payloadData = outcome.data;
+            clearSupabaseToken();
+            setUser(null);
+            setAuthError(null);
+            setIsVpnBlock(false);
+
+            const cleanHandle = (payloadData.channel_username || 'PayvoraCommunity').replace(/^@/, '');
+            const gateError =
+              payloadData.verification_error ||
+              (isChannelRetry
+                ? `Membership in @${cleanHandle} is not confirmed yet. Tap Join @${cleanHandle}, subscribe to the channel, then tap Verify & Continue.`
+                : null);
+
+            setChannelGate({
+              url: payloadData.channel_url || 'https://t.me/PayvoraCommunity',
+              username: cleanHandle,
+              error: gateError,
+            });
+            return;
+          }
+
+          if (outcome.kind === 'success') {
+            setChannelGate(null);
+            setIsVpnBlock(false);
+            const payloadData = outcome.data;
+            const token = payloadData?.access_token;
+            const verifiedProfile = payloadData?.user;
+            const verifiedUuid = payloadData?.user_uuid;
+
+            if (token) {
+              setSupabaseToken(token);
+            }
+
+            if (verifiedProfile) {
+              setUser({
+                id: verifiedProfile.telegram_id,
+                uuid: verifiedProfile.id,
+                username: verifiedProfile.username,
+                first_name: verifiedProfile.first_name,
+                last_name: verifiedProfile.last_name,
+                balance: Number(verifiedProfile.wallet_balance || 0)
+              });
+            } else if (verifiedUuid) {
+              await fetchUserData(verifiedUuid);
+            }
+            setAuthError(null);
+          } else {
+            const errorMsg = outcome.error || "Failed to authenticate session with server.";
+            console.warn("Telegram authentication failed:", {
+              kind: outcome.kind,
+              code: outcome.code,
+              status: outcome.status,
+              error: errorMsg,
+            });
+            clearSupabaseToken();
+            setUser(null);
+            setChannelGate(null);
+            setIsVpnBlock(false);
+            setAuthError(errorMsg);
+          }
+        } catch (e: any) {
+          console.error("Server authentication failed:", e);
           clearSupabaseToken();
           setUser(null);
+          setChannelGate(null);
+          setAuthError(e?.message || "Authentication error");
         }
       } else {
-        clearSupabaseToken();
-        setUser(null);
+        setIsInsideTelegram(false);
+        // Outside Telegram WebApp: ONLY restore if a valid non-expired signed JWT exists for the owner.
+        const validToken = getSupabaseToken();
+        const payload = validToken && !isTokenExpired(validToken) ? decodeJwtPayload(validToken) : null;
+        if (payload?.sub && UUID_REGEX.test(payload.sub)) {
+          const restored = await fetchUserData(payload.sub);
+          if (!restored) {
+            clearSupabaseToken();
+            setUser(null);
+          }
+        } else {
+          clearSupabaseToken();
+          setUser(null);
+        }
       }
-    }
+    })().finally(() => {
+      inFlightInitRef.current = null;
+      setIsVerifyingChannel(false);
+      setIsRetryingAuth(false);
+      setIsTelegramInitDone(true);
+    });
 
-    setIsVerifyingChannel(false);
-    setIsTelegramInitDone(true);
-  }, [fetchUserData]);
+    inFlightInitRef.current = promise;
+    return promise;
+  }, [executeAuthOnce, fetchUserData]);
 
   useEffect(() => {
     initTelegram();
@@ -325,14 +369,15 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
         <div className="flex flex-col gap-2.5 w-full max-w-xs">
           {isInsideTelegram && (
             <button
+              disabled={isRetryingAuth}
               onClick={() => {
                 setAuthError(null);
                 setIsTelegramInitDone(false);
                 initTelegram();
               }}
-              className="w-full py-3 bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95"
+              className="w-full py-3 bg-[#0284c7] hover:bg-[#0369a1] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-lg transition active:scale-95"
             >
-              Retry Verification
+              {isRetryingAuth ? 'Verifying...' : 'Retry Verification'}
             </button>
           )}
 

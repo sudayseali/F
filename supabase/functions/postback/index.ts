@@ -83,24 +83,44 @@ serve(async (req) => {
       if (creditErr) throw creditErr;
 
       const payloadHash = await sha256Hex(JSON.stringify(ctx.params));
-      await supabaseAdmin.from("provider_postbacks").insert({
-        external_transaction_id: safeTxId,
-        event_type: "conversion",
-        signature_valid: true,
-        processing_status: creditData?.already_processed ? "duplicate" : "processed",
-        payload_hash: payloadHash,
-        processed_at: new Date().toISOString(),
-      });
+      try {
+        const { error: pbErr } = await supabaseAdmin.from("provider_postbacks").insert({
+          external_transaction_id: safeTxId,
+          event_type: "conversion",
+          signature_valid: true,
+          processing_status: creditData?.already_processed ? "duplicate" : "processed",
+          payload_hash: payloadHash,
+          processed_at: new Date().toISOString(),
+        });
+        if (pbErr) {
+          console.warn("[POSTBACK_FORENSIC_LOG_WARN]", {
+            code: (pbErr as any).code ?? null,
+            message: pbErr.message,
+          });
+        }
+      } catch (pbEx: any) {
+        console.warn("[POSTBACK_FORENSIC_LOG_EXCEPTION]", pbEx?.message || pbEx);
+      }
 
       if (!creditData?.already_processed) {
-        await supabaseAdmin.from("offerwall_logs").insert({
-          provider: "generic",
-          external_transaction_id: safeTxId,
-          user_id: targetUserId,
-          amount: rewardAmount,
-          status: "credited",
-          raw_payload: { tx_id: safeTxId },
-        }).catch(() => {});
+        try {
+          const { error: owErr } = await supabaseAdmin.from("offerwall_logs").insert({
+            provider: "generic",
+            external_transaction_id: safeTxId,
+            user_id: targetUserId,
+            amount: rewardAmount,
+            status: "credited",
+            raw_payload: { tx_id: safeTxId },
+          });
+          if (owErr && (owErr as any).code !== "23505") {
+            console.warn("[POSTBACK_OFFERWALL_LOG_WARN]", {
+              code: (owErr as any).code ?? null,
+              message: owErr.message,
+            });
+          }
+        } catch (owEx: any) {
+          console.warn("[POSTBACK_OFFERWALL_LOG_EXCEPTION]", owEx?.message || owEx);
+        }
 
         await sendUserAlert(supabaseAdmin, {
           userId: targetUserId,

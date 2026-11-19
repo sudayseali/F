@@ -55,8 +55,36 @@ export interface VpnReputationResult {
   ipHash: string;
 }
 
+const MAX_L1_CACHE_ENTRIES = 5000;
 const L1_CACHE = new Map<string, { res: Omit<VpnReputationResult, "blocked" | "enabled">; expiresAt: number }>();
 let CONFIG_CACHE: { value: AntiFraudConfig; expiresAt: number } | null = null;
+
+export function clearVpnCheckCaches(): void {
+  L1_CACHE.clear();
+  CONFIG_CACHE = null;
+}
+
+function setL1CacheEntry(
+  ipHash: string,
+  res: Omit<VpnReputationResult, "blocked" | "enabled">,
+  ttlMs: number
+): void {
+  if (L1_CACHE.size >= MAX_L1_CACHE_ENTRIES && !L1_CACHE.has(ipHash)) {
+    const now = Date.now();
+    for (const [k, v] of L1_CACHE.entries()) {
+      if (v.expiresAt <= now) {
+        L1_CACHE.delete(k);
+      }
+    }
+    if (L1_CACHE.size >= MAX_L1_CACHE_ENTRIES) {
+      const oldestKey = L1_CACHE.keys().next().value;
+      if (oldestKey !== undefined) {
+        L1_CACHE.delete(oldestKey);
+      }
+    }
+  }
+  L1_CACHE.set(ipHash, { res, expiresAt: Date.now() + ttlMs });
+}
 
 export function isPrivateOrUnknownIp(ip: string): boolean {
   const clean = (ip || "").trim().toLowerCase();
@@ -85,13 +113,22 @@ export async function loadAntiFraudConfig(supabaseAdmin: any, forceRefresh = fal
     return CONFIG_CACHE.value;
   }
   try {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("app_settings")
       .select("value")
       .eq("key", "anti_fraud_config")
       .maybeSingle();
 
+    if (error) {
+      console.warn("[VPN_CONFIG_LOAD_WARN]", {
+        code: error.code ?? null,
+        message: error.message ?? "Failed to read anti_fraud_config",
+      });
+      return DEFAULT_ANTI_FRAUD_CONFIG;
+    }
+
     const raw = (data?.value && typeof data.value === "object" ? data.value : {}) as Record<string, unknown>;
+    const rawThreshold = raw.vpn_risk_threshold !== undefined ? Number(raw.vpn_risk_threshold) : 66;
     const merged: AntiFraudConfig = {
       vpn_detection_enabled: raw.vpn_detection_enabled !== false,
       max_daily_withdrawals: Number.isFinite(Number(raw.max_daily_withdrawals)) ? Number(raw.max_daily_withdrawals) : 3,
@@ -101,12 +138,17 @@ export async function loadAntiFraudConfig(supabaseAdmin: any, forceRefresh = fal
       block_vpn_on_withdraw: raw.block_vpn_on_withdraw !== false,
       block_vpn_on_auth: raw.block_vpn_on_auth === true,
       block_hosting_ips: raw.block_hosting_ips !== false,
-      vpn_risk_threshold: Math.min(100, Math.max(20, Number(raw.vpn_risk_threshold || 66))),
+      vpn_risk_threshold: Math.min(100, Math.max(20, Number.isFinite(rawThreshold) ? rawThreshold : 66)),
       strict_fail_closed: raw.strict_fail_closed === true,
     };
     CONFIG_CACHE = { value: merged, expiresAt: Date.now() + 60_000 };
     return merged;
-  } catch {
+  } catch (err: unknown) {
+    const errObj = err instanceof Error ? err : null;
+    console.warn("[VPN_CONFIG_LOAD_EXCEPTION]", {
+      name: errObj?.name ?? "Error",
+      message: errObj?.message ?? String(err),
+    });
     return DEFAULT_ANTI_FRAUD_CONFIG;
   }
 }
@@ -155,6 +197,14 @@ export function parseIpApiIsPayload(
   payload: any
 ): Omit<VpnReputationResult, "blocked" | "enabled" | "ipHash"> | null {
   if (!payload || typeof payload !== "object" || payload.error) return null;
+  if (payload.status === "error" || payload.status === "denied") return null;
+  const hasIpApiFields =
+    "is_vpn" in payload ||
+    "is_proxy" in payload ||
+    "is_tor" in payload ||
+    "is_datacenter" in payload ||
+    "ip" in payload;
+  if (!hasIpApiFields) return null;
 
   const isVpn = Boolean(payload.is_vpn);
   const isProxy = Boolean(payload.is_proxy);
@@ -236,9 +286,16 @@ async function fetchExternalIpReputation(
         const json = await res.json().catch(() => null);
         const parsed = parseProxyCheckPayload(ip, json);
         if (parsed) return parsed;
+        console.warn("[VPN_PROXYCHECK_PARSE_WARN]", { status: res.status });
+      } else {
+        console.warn("[VPN_PROXYCHECK_HTTP_WARN]", { status: res.status });
       }
-    } catch (err: any) {
-      console.warn("[VPN_PROXYCHECK_ERROR]", err?.message || err);
+    } catch (err: unknown) {
+      const errObj = err instanceof Error ? err : null;
+      console.warn("[VPN_PROXYCHECK_ERROR]", {
+        name: errObj?.name ?? "Error",
+        message: errObj?.message ?? "Request failed",
+      });
     } finally {
       clearTimeout(timer);
     }
@@ -254,9 +311,16 @@ async function fetchExternalIpReputation(
         const json = await res.json().catch(() => null);
         const parsed = parseIpApiIsPayload(json);
         if (parsed) return parsed;
+        console.warn("[VPN_IPAPI_PARSE_WARN]", { status: res.status });
+      } else {
+        console.warn("[VPN_IPAPI_HTTP_WARN]", { status: res.status });
       }
-    } catch (err: any) {
-      console.warn("[VPN_IPAPI_ERROR]", err?.message || err);
+    } catch (err: unknown) {
+      const errObj = err instanceof Error ? err : null;
+      console.warn("[VPN_IPAPI_ERROR]", {
+        name: errObj?.name ?? "Error",
+        message: errObj?.message ?? "Request failed",
+      });
     } finally {
       clearTimeout(timer);
     }
@@ -304,14 +368,20 @@ export async function checkIpReputation(
 
   // 2. Distributed L2 PostgreSQL Cache
   try {
-    const { data: cached } = await supabaseAdmin
+    const { data: cached, error: cacheReadErr } = await supabaseAdmin
       .from("ip_risk_cache")
       .select("*")
       .eq("ip_hash", ipHash)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 
-    if (cached) {
+    if (cacheReadErr) {
+      console.warn("[VPN_CACHE_READ_WARN]", {
+        ipHash: ipHash.slice(0, 12),
+        code: cacheReadErr.code ?? null,
+        message: cacheReadErr.message ?? "Cache lookup error",
+      });
+    } else if (cached) {
       const base: Omit<VpnReputationResult, "blocked" | "enabled"> = {
         configured: true,
         isVpn: Boolean(cached.is_vpn),
@@ -325,15 +395,20 @@ export async function checkIpReputation(
         reason: cached.reason || null,
         ipHash,
       };
-      L1_CACHE.set(ipHash, { res: base, expiresAt: Date.now() + 10 * 60_000 });
+      setL1CacheEntry(ipHash, base, 10 * 60_000);
       return {
         ...base,
         enabled: cfg.vpn_detection_enabled,
         blocked: evaluateBlocked(base, cfg, context),
       };
     }
-  } catch {
-    // Graceful continue if migration is pending
+  } catch (cacheReadEx: unknown) {
+    const errObj = cacheReadEx instanceof Error ? cacheReadEx : null;
+    console.warn("[VPN_CACHE_READ_EXCEPTION]", {
+      ipHash: ipHash.slice(0, 12),
+      name: errObj?.name ?? "Error",
+      message: errObj?.message ?? String(cacheReadEx),
+    });
   }
 
   if (!secrets.anyConfigured) {
@@ -384,25 +459,45 @@ export async function checkIpReputation(
   const isFlagged = live.isVpn || live.isProxy || live.isTor || live.isHosting || live.riskScore >= cfg.vpn_risk_threshold;
   const ttlHours = isFlagged ? 12 : 6;
 
-  L1_CACHE.set(ipHash, { res: fullBase, expiresAt: Date.now() + 10 * 60_000 });
+  setL1CacheEntry(ipHash, fullBase, 10 * 60_000);
 
-  await supabaseAdmin
-    .from("ip_risk_cache")
-    .upsert({
-      ip_hash: ipHash,
-      is_vpn: live.isVpn,
-      is_proxy: live.isProxy,
-      is_tor: live.isTor,
-      is_hosting: live.isHosting,
-      risk_score: live.riskScore,
-      country_code: live.countryCode,
-      asn: live.asn,
-      provider: live.provider,
-      reason: live.reason,
-      checked_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + ttlHours * 3600 * 1000).toISOString(),
-    })
-    .catch(() => {});
+  // Best-effort L2 cache write: NEVER call .catch() on Supabase PostgREST builders
+  try {
+    const { error: cacheWriteErr } = await supabaseAdmin
+      .from("ip_risk_cache")
+      .upsert(
+        {
+          ip_hash: ipHash,
+          is_vpn: live.isVpn,
+          is_proxy: live.isProxy,
+          is_tor: live.isTor,
+          is_hosting: live.isHosting,
+          risk_score: live.riskScore,
+          country_code: live.countryCode,
+          asn: live.asn,
+          provider: live.provider,
+          reason: live.reason,
+          checked_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + ttlHours * 3600 * 1000).toISOString(),
+        },
+        { onConflict: "ip_hash" }
+      );
+
+    if (cacheWriteErr) {
+      console.warn("[VPN_CACHE_WRITE_WARN]", {
+        ipHash: ipHash.slice(0, 12),
+        code: cacheWriteErr.code ?? null,
+        message: cacheWriteErr.message ?? "Cache upsert failed",
+      });
+    }
+  } catch (cacheWriteEx: unknown) {
+    const errObj = cacheWriteEx instanceof Error ? cacheWriteEx : null;
+    console.error("[VPN_CACHE_WRITE_EXCEPTION]", {
+      ipHash: ipHash.slice(0, 12),
+      name: errObj?.name ?? "Error",
+      message: errObj?.message ?? String(cacheWriteEx),
+    });
+  }
 
   return {
     ...fullBase,
@@ -425,7 +520,7 @@ export async function enforceVpnPolicy(
 
   if (result.blocked) {
     try {
-      await supabaseAdmin.from("audit_logs").insert({
+      const { error: auditErr } = await supabaseAdmin.from("audit_logs").insert({
         actor_id: userId || null,
         actor_type: userId ? "user" : "system",
         action: "vpn_access_blocked",
@@ -444,8 +539,19 @@ export async function enforceVpnPolicy(
         ip_address: clientIp || null,
         created_at: new Date().toISOString(),
       });
-    } catch (logErr) {
-      console.error("[VPN_AUDIT_LOG_ERROR]", logErr);
+      if (auditErr) {
+        console.warn("[VPN_AUDIT_LOG_WARN]", {
+          context,
+          code: auditErr.code ?? null,
+          message: auditErr.message ?? "Audit log insert failed",
+        });
+      }
+    } catch (logErr: unknown) {
+      const errObj = logErr instanceof Error ? logErr : null;
+      console.error("[VPN_AUDIT_LOG_ERROR]", {
+        context,
+        message: errObj?.message ?? String(logErr),
+      });
     }
 
     throw new AppError(

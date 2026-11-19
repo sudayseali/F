@@ -77,7 +77,7 @@ serve(async (req: Request) => {
       await logAuditEvent({
         actorType: "system",
         action: "auth_failed_invalid_signature",
-        details: { error: verification.error, errorCode: verification.errorCode, clientIp },
+        details: { error: verification.error, errorCode: verification.errorCode },
         ipAddress: clientIp,
       });
       throw new AppError(
@@ -217,7 +217,14 @@ serve(async (req: Request) => {
               referrer_id: referrer.id,
               referred_user_id: userRow.id,
             });
-            if (!refInsertErr) {
+            if (refInsertErr) {
+              if ((refInsertErr as any).code !== "23505") {
+                console.warn("[REFERRAL_INSERT_WARN]", {
+                  code: (refInsertErr as any).code ?? null,
+                  message: refInsertErr.message,
+                });
+              }
+            } else {
               await logAuditEvent({
                 actorId: userRow.id,
                 actorType: "user",
@@ -257,13 +264,19 @@ serve(async (req: Request) => {
 
       if (membership.ok && membership.isMember) {
         if (hasChannelJoinedCol) {
-          await supabaseAdmin
+          const { error: chUpdErr } = await supabaseAdmin
             .from("users")
             .update({
               channel_joined: true,
               channel_verified_at: new Date().toISOString(),
             })
             .eq("id", userRow.id);
+          if (chUpdErr) {
+            console.warn("[CHANNEL_VERIFY_UPDATE_WARN]", {
+              code: (chUpdErr as any).code ?? null,
+              message: chUpdErr.message,
+            });
+          }
         }
 
         await logAuditEvent({
