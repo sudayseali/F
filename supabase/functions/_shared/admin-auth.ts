@@ -15,6 +15,19 @@ export interface VerifiedAdmin {
   fullName?: string;
 }
 
+const ASYMMETRIC_ALGS = new Set(['ES256', 'RS256', 'EdDSA']);
+let cachedJwksUrl = '';
+let cachedJwks: ReturnType<typeof jose.createRemoteJWKSet> | null = null;
+
+function getSupabaseJwks(supabaseUrl: string) {
+  const jwksUrl = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`;
+  if (!cachedJwks || cachedJwksUrl !== jwksUrl) {
+    cachedJwksUrl = jwksUrl;
+    cachedJwks = jose.createRemoteJWKSet(new URL(jwksUrl));
+  }
+  return cachedJwks;
+}
+
 /**
  * Validates request Bearer JWT and checks administrator database authorization
  * @param req Incoming HTTP Request
@@ -31,41 +44,110 @@ export async function verifyAdminRequest(
   }
 
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  const JWT_SECRET = Deno.env.get('JWT_SECRET') || Deno.env.get('SUPABASE_JWT_SECRET') || Deno.env.get('CUSTOM_JWT_SECRET');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const hsSecrets = Array.from(
+    new Set(
+      [
+        Deno.env.get('SUPABASE_JWT_SECRET'),
+        Deno.env.get('JWT_SECRET'),
+        Deno.env.get('CUSTOM_JWT_SECRET'),
+      ]
+        .map((s) => (s || '').trim())
+        .filter(Boolean)
+    )
+  );
 
-  if (!JWT_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new AppError('Server configuration missing for authentication.', 500, 'CONFIG_ERROR');
   }
 
-  // 1. Verify Cryptographic JWT Signature (pinned to HS256 & authenticated audience)
-  let payload: jose.JWTPayload;
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // 1. Inspect JWT algorithm safely (reject 'none' and algorithm confusion)
+  let alg = '';
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload: verifiedPayload } = await jose.jwtVerify(token, secret, {
-      algorithms: ['HS256'],
-      audience: 'authenticated',
-    });
-    payload = verifiedPayload;
-  } catch (err: any) {
-    throw new AppError(`Invalid or expired administrator session: ${err.message}`, 401, 'INVALID_TOKEN');
+    const header = jose.decodeProtectedHeader(token);
+    alg = String(header.alg || '').trim();
+  } catch {
+    throw new AppError('Invalid or expired administrator session: Malformed token header.', 401, 'INVALID_TOKEN');
   }
 
-  const authUserId = payload.sub;
+  if (alg !== 'HS256' && !ASYMMETRIC_ALGS.has(alg)) {
+    throw new AppError(`Invalid or expired administrator session: Unsupported algorithm '${alg || 'unknown'}'.`, 401, 'INVALID_TOKEN');
+  }
+
+  // 2. Cryptographic JWT Verification (Asymmetric JWKS for ES256/RS256/EdDSA, Secret for HS256, GoTrue fallback for managed keys)
+  let authUserId: string | undefined;
+  let tokenEmail = '';
+
+  if (ASYMMETRIC_ALGS.has(alg)) {
+    try {
+      const jwks = getSupabaseJwks(SUPABASE_URL);
+      const { payload } = await jose.jwtVerify(token, jwks, {
+        algorithms: [alg],
+        audience: 'authenticated',
+      });
+      authUserId = payload.sub;
+      tokenEmail = String(payload.email || '');
+    } catch (jwksErr: any) {
+      // Fallback to authoritative GoTrue verification (handles key rotation / custom auth domains)
+      const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+      if (userErr || !userData?.user) {
+        throw new AppError(
+          `Invalid or expired administrator session: ${jwksErr?.message || userErr?.message || 'Verification failed'}`,
+          401,
+          'INVALID_TOKEN'
+        );
+      }
+      authUserId = userData.user.id;
+      tokenEmail = String(userData.user.email || '');
+    }
+  } else {
+    let verified = false;
+    let lastErr: any = null;
+    for (const rawSecret of hsSecrets) {
+      try {
+        const secret = new TextEncoder().encode(rawSecret);
+        const { payload } = await jose.jwtVerify(token, secret, {
+          algorithms: ['HS256'],
+          audience: 'authenticated',
+        });
+        authUserId = payload.sub;
+        tokenEmail = String(payload.email || '');
+        verified = true;
+        break;
+      } catch (err: any) {
+        lastErr = err;
+      }
+    }
+
+    if (!verified) {
+      // If JWT_SECRET was customized for Telegram tokens while Supabase Auth uses its managed HS256 key, verify via GoTrue
+      const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+      if (userErr || !userData?.user) {
+        throw new AppError(
+          `Invalid or expired administrator session: ${lastErr?.message || userErr?.message || 'Verification failed'}`,
+          401,
+          'INVALID_TOKEN'
+        );
+      }
+      authUserId = userData.user.id;
+      tokenEmail = String(userData.user.email || '');
+    }
+  }
+
   if (!authUserId || !isValidUuid(authUserId)) {
     throw new AppError('Token subject identifier is missing or invalid.', 401, 'INVALID_TOKEN');
   }
 
   // Explicitly reject standard Telegram user tokens from accessing admin routes
-  const tokenEmail = String(payload.email || '');
   if (tokenEmail.endsWith('@telegram.local')) {
     throw new AppError('Forbidden: Standard Telegram user credentials cannot access administrator endpoints.', 403, 'FORBIDDEN_USER_TOKEN');
   }
 
-  // 2. Query Database for Administrator Record by verified Auth User ID
+  // 3. Query Database for Administrator Record by verified Auth User ID
   // Security rule: NEVER fallback to unverified email lookups
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const { data: adminRecord, error: dbError } = await supabaseAdmin
     .from('admin_users')
