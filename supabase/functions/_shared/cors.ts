@@ -26,10 +26,15 @@ export function isOriginAllowed(origin: string | null): boolean {
     .split(',')
     .map((value) => value.trim().replace(/\/$/, '').toLowerCase())
     .filter(Boolean);
+  const adminOrigins = (Deno.env.get('ADMIN_ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, '').toLowerCase())
+    .filter(Boolean);
 
   if (
     DEFAULT_ALLOWED_ORIGINS.includes(normalized) ||
     envOrigins.includes(normalized) ||
+    adminOrigins.includes(normalized) ||
     (frontendUrl && normalized === frontendUrl)
   ) {
     return true;
