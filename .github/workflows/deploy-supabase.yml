@@ -100,6 +100,10 @@ jobs:
           [ -n "${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" ] && echo "TELEGRAM_WEBHOOK_SECRET=${{ secrets.TELEGRAM_WEBHOOK_SECRET }}" >> .env.func
           [ -n "${{ secrets.REQUIRED_CHANNEL_ID }}" ] && echo "REQUIRED_CHANNEL_ID=${{ secrets.REQUIRED_CHANNEL_ID }}" >> .env.func
           [ -n "${{ secrets.REQUIRED_CHANNEL_URL }}" ] && echo "REQUIRED_CHANNEL_URL=${{ secrets.REQUIRED_CHANNEL_URL }}" >> .env.func
+          [ -n "${{ secrets.ADMIN_ALLOWED_ORIGINS }}" ] && echo "ADMIN_ALLOWED_ORIGINS=${{ secrets.ADMIN_ALLOWED_ORIGINS }}" >> .env.func
+          [ -n "${{ secrets.PROXYCHECK_KEY }}" ] && echo "PROXYCHECK_KEY=${{ secrets.PROXYCHECK_KEY }}" >> .env.func
+          [ -n "${{ secrets.IPAPI_KEY }}" ] && echo "IPAPI_KEY=${{ secrets.IPAPI_KEY }}" >> .env.func
+          [ -n "${{ secrets.CUSTOM_JWT_SECRET }}" ] && echo "CUSTOM_JWT_SECRET=${{ secrets.CUSTOM_JWT_SECRET }}" >> .env.func
           if [ -s .env.func ]; then
             supabase secrets set --env-file .env.func --project-ref "$PROJECT_ID"
           fi
@@ -204,10 +208,12 @@ jobs:
       - name: Deploy Edge Functions
         run: |
           echo "Deploying all Edge Functions to Supabase..."
-          for func in auth withdraw daily_checkin submit_task get_cpx_url cpx_postback cpa_postback postback tapjoy_webhook telegram-webhook verify_task_submission admin_api admin_action alerts offers_api offer_click sync_offers; do
-            if [ -d "supabase/functions/$func" ]; then
-              echo "Deploying Edge Function: $func"
-              supabase functions deploy "$func" --yes --no-verify-jwt
+          for dir in supabase/functions/*/; do
+            func=$(basename "$dir")
+            if [ "$func" = "_shared" ]; then
+              continue
             fi
+            echo "Deploying Edge Function: $func"
+            supabase functions deploy "$func" --yes --no-verify-jwt
           done
           echo "✅ Edge Function deployment step completed."
