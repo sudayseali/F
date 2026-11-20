@@ -14,6 +14,7 @@ import { logAuditEvent } from "../_shared/audit-log.ts";
 import { sendUserAlert, notifyReferrerOfCommission } from "../_shared/alerts.ts";
 import { enforceVpnPolicy } from "../_shared/vpn-check.ts";
 import { checkTelegramChannelMembership, normalizeTelegramChatId } from "../_shared/channel-check.ts";
+import { verifyAndHashUploadedProof, isValidSha256Hex, isValidUserProofPath } from "../_shared/proof-hash.ts";
 
 function getSupabaseAdmin() {
   const url = Deno.env.get("SUPABASE_URL") || "";
@@ -22,6 +23,18 @@ function getSupabaseAdmin() {
     throw new AppError("Server configuration missing database credentials", 500, "CONFIG_ERROR");
   }
   return createClient(url, key);
+}
+
+async function bestEffortRemoveProofFile(supabaseAdmin: any, userId: string, path: string) {
+  if (!isValidUserProofPath(userId, path)) return;
+  try {
+    const { error } = await supabaseAdmin.storage.from("proofs").remove([path]);
+    if (error) {
+      console.warn("[PROOF_CLEANUP_WARN]", { message: error.message });
+    }
+  } catch (err) {
+    console.warn("[PROOF_CLEANUP_EXCEPTION]", { message: String(err) });
+  }
 }
 
 serve(async (req: Request) => {
@@ -55,7 +68,7 @@ serve(async (req: Request) => {
     await enforceVpnPolicy(supabaseAdmin, req, clientIp, "submit_task", userId);
 
     const body = await req.json().catch(() => ({}));
-    const { task_id, proof_text, proof_data, proof, proof_url, telegram_username } = body;
+    const { task_id, proof_text, proof_data, proof, proof_url, proof_hash, telegram_username } = body;
 
     // 2. Validate Task ID
     if (!task_id || !isValidUuid(task_id)) {
@@ -221,7 +234,7 @@ serve(async (req: Request) => {
     const proofContent = String(proof_text || proof_data || proof || proof_url || "").trim();
 
     if (!proofContent || proofContent.length < 3) {
-      throw new AppError("Task proof is required (text or URL).", 400, "MISSING_PROOF");
+      throw new AppError("Task proof screenshot is required.", 400, "MISSING_PROOF");
     }
 
     if (proofContent.length > 2000) {
@@ -231,32 +244,77 @@ serve(async (req: Request) => {
     const cleanProof = sanitizeString(proofContent, 2000);
     const cleanTgUsername = sanitizeString(telegram_username || "", 64);
 
-    // 4. Atomic task slot check, duplicate prevention & submission creation under FOR UPDATE lock
-    const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc("submit_task_atomic", {
+    // 4. Authoritative server-side file verification & SHA-256 fingerprint calculation
+    let verifiedProof;
+    try {
+      verifiedProof = await verifyAndHashUploadedProof(supabaseAdmin, userId, cleanProof);
+    } catch (proofErr) {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, cleanProof);
+      throw proofErr;
+    }
+
+    const clientHashNorm = isValidSha256Hex(proof_hash) ? String(proof_hash).trim().toLowerCase() : null;
+    const hashTamperDetected = Boolean(clientHashNorm && clientHashNorm !== verifiedProof.sha256Hex);
+
+    // 5. Atomic task slot check, duplicate user/hash prevention & submission creation under FOR UPDATE lock
+    let rpcRes: any = null;
+    const rpcWithHash = await supabaseAdmin.rpc("submit_task_atomic", {
       p_user_id: userId,
       p_task_id: task_id,
-      p_proof_text: cleanProof,
+      p_proof_text: verifiedProof.proofPath,
+      p_proof_hash: verifiedProof.sha256Hex,
     });
 
-    if (rpcErr) throw rpcErr;
+    if (rpcWithHash.error) {
+      const errMsg = String(rpcWithHash.error.message || "").toLowerCase();
+      if ((rpcWithHash.error as any).code === "PGRST202" || (rpcWithHash.error as any).code === "42883" || errMsg.includes("p_proof_hash")) {
+        console.warn("[SUBMIT_TASK_LEGACY_RPC_WARN]", { message: "Falling back to 3-arg submit_task_atomic while migration is pending" });
+        const legacyRpc = await supabaseAdmin.rpc("submit_task_atomic", {
+          p_user_id: userId,
+          p_task_id: task_id,
+          p_proof_text: verifiedProof.proofPath,
+        });
+        if (legacyRpc.error) throw legacyRpc.error;
+        rpcRes = legacyRpc.data;
+      } else {
+        throw rpcWithHash.error;
+      }
+    } else {
+      rpcRes = rpcWithHash.data;
+    }
 
     if (!rpcRes?.success) {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, verifiedProof.proofPath);
       const errCode = rpcRes?.code || "SUBMISSION_FAILED";
-      const statusCode = errCode === "TASK_NOT_FOUND" ? 404 : errCode === "ACCOUNT_SUSPENDED" ? 403 : 400;
+      const statusCode =
+        errCode === "TASK_NOT_FOUND"
+          ? 404
+          : errCode === "ACCOUNT_SUSPENDED"
+          ? 403
+          : errCode === "DUPLICATE_SCREENSHOT_PROOF"
+          ? 409
+          : 400;
       throw new AppError(rpcRes?.error || "Failed to submit task proof.", statusCode, errCode);
     }
 
     const submissionId = rpcRes.submission_id;
     const taskTitle = rpcRes.task_title || "Task";
 
-    // 5. Audit Log & In-App Task Alert
+    // 6. Audit Log & In-App Task Alert
     await logAuditEvent({
       actorId: userId,
       actorType: "user",
       action: "task_submitted",
       targetType: "task",
       targetId: task_id,
-      details: { submissionId, taskTitle, telegramUsername: cleanTgUsername || undefined },
+      details: {
+        submissionId,
+        taskTitle,
+        telegramUsername: cleanTgUsername || undefined,
+        proofHashPrefix: verifiedProof.sha256Hex.slice(0, 16),
+        crossTaskFlagged: Boolean(rpcRes.cross_task_flagged),
+        clientHashMismatch: hashTamperDetected || undefined,
+      },
       ipAddress: clientIp,
     });
 

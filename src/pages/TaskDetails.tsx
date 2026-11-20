@@ -183,7 +183,21 @@ export function TaskDetails() {
     setError(null);
     setStatus("submitting");
 
+    let uploadedObjectPath: string | null = null;
     try {
+      let proofHash: string | undefined;
+      try {
+        if (typeof window !== "undefined" && window.crypto?.subtle) {
+          const buf = await file.arrayBuffer();
+          const digest = await window.crypto.subtle.digest("SHA-256", buf);
+          proofHash = Array.from(new Uint8Array(digest))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+        }
+      } catch {
+        proofHash = undefined;
+      }
+
       const rawExt = (file.name.split(".").pop() || "png").toLowerCase();
       const fileExt = ALLOWED_IMAGE_EXTS.has(rawExt) ? rawExt : "png";
       // Store inside user's authenticated UUID folder in private bucket (admin views via signed URLs)
@@ -194,12 +208,16 @@ export function TaskDetails() {
         .upload(objectPath, file);
 
       if (uploadError) throw uploadError;
+      uploadedObjectPath = objectPath;
 
       await invokeEdgeFunction("submit_task", {
         task_id: task.id,
         proof_text: objectPath,
+        proof_hash: proofHash,
         telegram_username: username.trim()
       });
+
+      uploadedObjectPath = null; // Persisted by submission; keep file in storage
 
       setTask((prev) => {
         if (!prev) return prev;
@@ -216,6 +234,13 @@ export function TaskDetails() {
       tgHaptics.notification("success");
       setStatus("success");
     } catch (err: any) {
+      if (uploadedObjectPath) {
+        try {
+          await supabase.storage.from("proofs").remove([uploadedObjectPath]);
+        } catch {
+          // Best-effort cleanup so rejected/duplicate screenshots do not bloat Storage
+        }
+      }
       console.error(err);
       tgHaptics.notification("error");
       setError(err.message || "Submission failed. Please try again.");

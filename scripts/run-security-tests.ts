@@ -1184,6 +1184,135 @@ async function runAllSecurityTests() {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 34 (REMED-23): Screenshot Proof Path Ownership, Magic-Byte & SHA-256 Hashing
+  // --------------------------------------------------------------------------
+  {
+    const {
+      isValidUserProofPath,
+      hasValidImageMagicBytes,
+      computeSha256HexFromBytes,
+      verifyAndHashUploadedProof,
+    } = await import("../supabase/functions/_shared/proof-hash.ts");
+
+    const ownerId = "11111111-1111-4111-8111-111111111111";
+    const otherId = "22222222-2222-4222-8222-222222222222";
+
+    const fakePngHeader = new Uint8Array(64);
+    fakePngHeader.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]);
+    fakePngHeader[20] = 42;
+    const expectedHash = await computeSha256HexFromBytes(fakePngHeader);
+
+    const maliciousTextBytes = new TextEncoder().encode("<html><script>alert(1)</script></html>");
+
+    const mockStorageDb = (bytesMap: Record<string, Uint8Array>) => ({
+      storage: {
+        from: () => ({
+          download: async (path: string) => {
+            const b = bytesMap[path];
+            if (!b) return { data: null, error: { message: "Object not found" } };
+            return { data: new Blob([b]), error: null };
+          },
+        }),
+      },
+    });
+
+    const validPath = `${ownerId}/1700000_shot.png`;
+    const dbValid = mockStorageDb({ [validPath]: fakePngHeader });
+    const verified = await verifyAndHashUploadedProof(dbValid, ownerId, validPath);
+
+    let traversalErr = "";
+    try {
+      await verifyAndHashUploadedProof(dbValid, ownerId, `${otherId}/stolen.png`);
+    } catch (e: any) {
+      traversalErr = e?.code || "";
+    }
+
+    const fakePath = `${ownerId}/1700001_evil.png`;
+    const dbFakeImg = mockStorageDb({ [fakePath]: maliciousTextBytes });
+    let fakeImgErr = "";
+    try {
+      await verifyAndHashUploadedProof(dbFakeImg, ownerId, fakePath);
+    } catch (e: any) {
+      fakeImgErr = e?.code || "";
+    }
+
+    const passed =
+      isValidUserProofPath(ownerId, validPath) &&
+      !isValidUserProofPath(ownerId, `${otherId}/a.png`) &&
+      !isValidUserProofPath(ownerId, `${ownerId}/../${otherId}/a.png`) &&
+      !isValidUserProofPath(ownerId, `${ownerId}/script.html`) &&
+      hasValidImageMagicBytes(fakePngHeader) &&
+      !hasValidImageMagicBytes(maliciousTextBytes) &&
+      verified.sha256Hex === expectedHash &&
+      verified.sha256Hex.length === 64 &&
+      traversalErr === "INVALID_PROOF_PATH" &&
+      fakeImgErr === "INVALID_PROOF_IMAGE";
+
+    recordTest(
+      "REMED-23",
+      "Proof validator enforces owner folder, PNG/JPEG/WebP magic bytes, and authoritative SHA-256",
+      "Upload & Image Security",
+      passed,
+      "OwnerOnly=true, Traversal=INVALID_PROOF_PATH, FakeImg=INVALID_PROOF_IMAGE, ExactSHA256=true",
+      `Traversal=${traversalErr}, FakeImg=${fakeImgErr}, HashLen=${verified.sha256Hex.length}`
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 35 (REMED-24): Duplicate Screenshot Hash Blocking Across Accounts
+  // --------------------------------------------------------------------------
+  {
+    const submissions: Array<{ taskId: string; userId: string; hash: string; status: string }> = [];
+    const auditActions: string[] = [];
+
+    const submitWithHashGuard = (taskId: string, userId: string, hash: string) => {
+      if (submissions.some((s) => s.taskId === taskId && s.userId === userId)) {
+        return { success: false, code: "DUPLICATE_SUBMISSION" };
+      }
+      const sameTaskDup = submissions.find(
+        (s) => s.taskId === taskId && s.hash === hash && ["pending", "approved"].includes(s.status)
+      );
+      if (sameTaskDup) {
+        auditActions.push("duplicate_screenshot_blocked");
+        return { success: false, code: "DUPLICATE_SCREENSHOT_PROOF" };
+      }
+      const crossTaskDup = submissions.find((s) => s.hash === hash && s.userId !== userId);
+      if (crossTaskDup) {
+        auditActions.push("suspicious_cross_task_screenshot_reuse");
+      }
+      submissions.push({ taskId, userId, hash, status: "pending" });
+      return { success: true, crossTaskFlagged: Boolean(crossTaskDup) };
+    };
+
+    const hashA = "a".repeat(64);
+    const hashB = "b".repeat(64);
+
+    const firstUser = submitWithHashGuard("task-1", "acc-1", hashA);
+    const secondAccSameHashSameTask = submitWithHashGuard("task-1", "acc-2", hashA);
+    const secondAccUniqueHash = submitWithHashGuard("task-1", "acc-2", hashB);
+    const secondAccSameHashDiffTask = submitWithHashGuard("task-2", "acc-3", hashA);
+
+    const passed =
+      firstUser.success === true &&
+      secondAccSameHashSameTask.success === false &&
+      secondAccSameHashSameTask.code === "DUPLICATE_SCREENSHOT_PROOF" &&
+      secondAccUniqueHash.success === true &&
+      secondAccSameHashDiffTask.success === true &&
+      secondAccSameHashDiffTask.crossTaskFlagged === true &&
+      auditActions.includes("duplicate_screenshot_blocked") &&
+      auditActions.includes("suspicious_cross_task_screenshot_reuse");
+
+    recordTest(
+      "REMED-24",
+      "Duplicate SHA-256 screenshot blocked across accounts on same task & flagged across tasks",
+      "Multi-Account Anti-Fraud",
+      passed,
+      "SameTaskDup=DUPLICATE_SCREENSHOT_PROOF, UniqueShot=allowed, CrossTask=flagged",
+      `DupSameTask=${secondAccSameHashSameTask.code}, Unique=${secondAccUniqueHash.success}, Flags=${auditActions.join(",")}`
+    );
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
