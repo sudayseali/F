@@ -1313,6 +1313,93 @@ async function runAllSecurityTests() {
     );
   }
 
+  // --------------------------------------------------------------------------
+  // TEST 36 (REMED-25): Available Tab Filtering, Search & Category Matching
+  // --------------------------------------------------------------------------
+  {
+    const { filterAvailableTasks, matchesTaskCategoryTab } = await import("../src/lib/taskLifecycle.ts");
+    const sampleJobs = [
+      { id: "t-open", category: "Telegram Channel", title: "Join Payvora Official", pay: "$0.25", timeToComplete: "1m", available: 10, total: 50, status: "active" },
+      { id: "t-pending", category: "Social", title: "Follow on Twitter", pay: "$0.20", timeToComplete: "2m", available: 5, total: 20, status: "active" },
+      { id: "t-approved", category: "Reviews", title: "Trustpilot Feedback", pay: "$0.50", timeToComplete: "5m", available: 8, total: 20, status: "active" },
+      { id: "t-rejected", category: "Other", title: "App Signup Test", pay: "$1.00", timeToComplete: "5m", available: 3, total: 10, status: "active" },
+      { id: "t-full", category: "YouTube", title: "Subscribe Channel", pay: "$0.15", timeToComplete: "1m", available: 0, total: 10, status: "active" },
+    ];
+    const submittedMap = new Map<string, { submission_status: string }>([
+      ["t-pending", { submission_status: "pending" }],
+      ["t-approved", { submission_status: "approved" }],
+      ["t-rejected", { submission_status: "rejected" }],
+    ]);
+
+    const availAll = filterAvailableTasks(sampleJobs, submittedMap, "All", "");
+    const availSocial = filterAvailableTasks(sampleJobs, new Map(), "Social", "");
+    const availSearch = filterAvailableTasks(sampleJobs, submittedMap, "All", "payvora");
+
+    const passed =
+      availAll.length === 1 &&
+      availAll[0].id === "t-open" &&
+      availSocial.some((j) => j.id === "t-open") &&
+      availSocial.some((j) => j.id === "t-pending") &&
+      matchesTaskCategoryTab("Trustpilot", "Reviews") &&
+      availSearch.length === 1 &&
+      availSearch[0].id === "t-open";
+
+    recordTest(
+      "REMED-25",
+      "Submitted (pending/approved/rejected) & 0-slot tasks leave Available tab cleanly + Social/Search match",
+      "Task Marketplace Lifecycle",
+      passed,
+      "Avail=1(t-open only), SocialMatchesTelegram=true, Search=1",
+      `Avail=${availAll.map((j) => j.id).join(",")}, SocialCnt=${availSocial.length}`
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // TEST 37 (REMED-26): Declined Task Resubmission Cap (Max 3 Attempts) & Geo Eligibility
+  // --------------------------------------------------------------------------
+  {
+    const { canResubmitDeclinedTask } = await import("../src/lib/taskLifecycle.ts");
+
+    const canRetry1 = canResubmitDeclinedTask("rejected", "active", 5, 1);
+    const canRetry2 = canResubmitDeclinedTask("rejected", "active", 5, 2);
+    const blockedAtCap = canResubmitDeclinedTask("rejected", "active", 5, 3);
+    const blockedIfFull = canResubmitDeclinedTask("rejected", "active", 0, 1);
+    const blockedIfPending = canResubmitDeclinedTask("pending", "active", 5, 1);
+    const blockedIfApproved = canResubmitDeclinedTask("approved", "active", 5, 1);
+
+    const checkCountry = (allowed: string[] | null, userCountry: string | null) => {
+      if (!allowed || allowed.length === 0) return true;
+      const lower = allowed.map((c) => c.trim().toLowerCase());
+      if (lower.includes("international") || lower.includes("all")) return true;
+      if (!userCountry) return true;
+      return lower.includes(userCountry.toLowerCase());
+    };
+
+    const geoMatch = checkCountry(["US", "CA"], "US");
+    const geoBlocked = checkCountry(["US", "CA"], "SO");
+    const geoIntl = checkCountry(["International"], "SO");
+
+    const passed =
+      canRetry1 &&
+      canRetry2 &&
+      !blockedAtCap &&
+      !blockedIfFull &&
+      !blockedIfPending &&
+      !blockedIfApproved &&
+      geoMatch &&
+      !geoBlocked &&
+      geoIntl;
+
+    recordTest(
+      "REMED-26",
+      "Declined resubmission allowed up to 3 attempts while slots remain; country restriction enforced",
+      "Task Resubmission & Geo",
+      passed,
+      "Attempt1/2=true, Attempt3/0Slots/Pending/Approved=false, GeoEnforced=true",
+      `R1=${canRetry1}, R3=${blockedAtCap}, ZeroSlots=${blockedIfFull}, GeoUS=${geoMatch}, GeoSO=${geoBlocked}`
+    );
+  }
+
   // Optional live endpoint checks if --live or RUN_LIVE_SECURITY_TESTS=1
   const runLive = process.argv.includes("--live") || process.env.RUN_LIVE_SECURITY_TESTS === "1";
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");

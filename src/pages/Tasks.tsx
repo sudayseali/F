@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle, Zap } from "lucide-react";
+import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle, Zap, Search, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
@@ -7,6 +7,7 @@ import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics } from "../lib/telegram";
 import { ASSETS_3D } from "../lib/assets";
 import { PayvoraLoadingState } from "../components";
+import { filterAvailableTasks } from "../lib/taskLifecycle";
 import type { TaskItem, UserTaskSubmissionItem } from "../types";
 
 type TaskViewMode = "available" | "pending" | "completed" | "rejected";
@@ -16,7 +17,7 @@ export function Tasks() {
   const { location, user } = useTelegram();
   const [viewMode, setViewMode] = useState<TaskViewMode>("available");
   const [activeTab, setActiveTab] = useState("All");
-  const [searchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [jobs, setJobs] = useState<TaskItem[]>([]);
   const [mySubmissions, setMySubmissions] = useState<UserTaskSubmissionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,21 +176,15 @@ export function Tasks() {
     };
   }, [completedSubmissions, pendingSubmissions, rejectedSubmissions]);
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
-      if (activeTab !== "All") {
-        if (activeTab === "Social" && !job.category.toLowerCase().includes("social")) return false;
-        if (activeTab === "Reviews" && !job.category.toLowerCase().includes("review")) return false;
-        if (activeTab === "Other" && (job.category.toLowerCase().includes("social") || job.category.toLowerCase().includes("review"))) return false;
-      }
+  const totalAvailableCount = useMemo(
+    () => filterAvailableTasks(jobs, submissionByTaskId, "All", "").length,
+    [jobs, submissionByTaskId]
+  );
 
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return job.title.toLowerCase().includes(query) || job.category.toLowerCase().includes(query);
-      }
-      return true;
-    });
-  }, [jobs, activeTab, searchQuery]);
+  const filteredJobs = useMemo(
+    () => filterAvailableTasks(jobs, submissionByTaskId, activeTab, searchQuery),
+    [jobs, submissionByTaskId, activeTab, searchQuery]
+  );
 
   const selectViewMode = (mode: TaskViewMode, scrollToList = false) => {
     tgHaptics.selection();
@@ -202,28 +197,52 @@ export function Tasks() {
 
   return (
     <div className="space-y-4 pb-6">
-      {/* Category Pills at top (for Available Tasks) */}
+      {/* Category Pills & Search at top (for Available Tasks) */}
       {viewMode === "available" && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {["All", "Social", "Reviews", "Other"].map((tab) => {
-            const isActive = activeTab === tab;
-            return (
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {["All", "Social", "Reviews", "Other"].map((tab) => {
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    tgHaptics.selection();
+                    setActiveTab(tab);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${
+                    isActive
+                      ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
+                      : "bg-[#0c162e] text-slate-400 hover:text-white border border-white/5"
+                  }`}
+                >
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks by title or category..."
+              aria-label="Search available tasks"
+              className="w-full pl-9 pr-9 py-2 rounded-xl bg-[#0c162e] border border-white/10 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-400/70"
+            />
+            {searchQuery && (
               <button
-                key={tab}
-                onClick={() => {
-                  tgHaptics.selection();
-                  setActiveTab(tab);
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${
-                  isActive
-                    ? "bg-[#0284c7] text-white shadow-md shadow-sky-500/30"
-                    : "bg-[#0c162e] text-slate-400 hover:text-white border border-white/5"
-                }`}
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
               >
-                {tab}
+                <X className="w-3.5 h-3.5" />
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
       )}
 
@@ -340,7 +359,7 @@ export function Tasks() {
               : "bg-[#0c162e] text-slate-400 border border-white/5 hover:text-white"
           }`}
         >
-          Available ({filteredJobs.length})
+          Available ({totalAvailableCount})
         </button>
 
         <button
@@ -391,84 +410,95 @@ export function Tasks() {
           <PayvoraLoadingState message="Loading tasks..." size="md" className="py-12" />
         ) : viewMode === "available" ? (
           filteredJobs.length === 0 ? (
-            <div className="card-glass-dark p-8 text-center text-xs text-slate-400">
-              No tasks found matching your filter.
+            <div className="card-glass-dark p-7 text-center space-y-2.5">
+              {searchQuery || activeTab !== "All" ? (
+                <>
+                  <p className="text-xs font-semibold text-white">No available tasks match your filter.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("All");
+                      setSearchQuery("");
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-500/20 text-[#38bdf8] border border-sky-500/30 text-xs font-bold"
+                  >
+                    Reset Filters
+                  </button>
+                </>
+              ) : taskStats.pending > 0 || taskStats.completed > 0 || taskStats.rejected > 0 ? (
+                <>
+                  <CheckCircle2 className="w-7 h-7 text-sky-400 mx-auto" />
+                  <p className="text-xs font-semibold text-white">You&apos;re All Caught Up!</p>
+                  <p className="text-[11px] text-slate-400">
+                    All currently available tasks have already been submitted. Track your progress in Pending or Completed.
+                  </p>
+                  {taskStats.pending > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => selectViewMode("pending")}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold"
+                    >
+                      View {taskStats.pending} Pending {taskStats.pending === 1 ? "Task" : "Tasks"}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-slate-400">No active tasks available right now. Check back soon!</p>
+              )}
             </div>
           ) : (
-            filteredJobs.map((job) => {
-              const userSub = submissionByTaskId.get(job.id);
-              return (
-                <motion.div
-                  key={job.id}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    tgHaptics.impact("light");
-                    navigate(`/tasks/${job.id}`);
-                  }}
-                  className="card-glass-dark p-3.5 flex items-center justify-between cursor-pointer hover:border-sky-400/40 transition-all duration-200 group active:bg-[#0f1d3d]"
-                >
-                  <div className="flex-1 min-w-0 pr-3">
-                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                      <span className="text-[10px] text-[#38bdf8] font-bold bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
-                        {job.category}
+            filteredJobs.map((job) => (
+              <motion.div
+                key={job.id}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  tgHaptics.impact("light");
+                  navigate(`/tasks/${job.id}`);
+                }}
+                className="card-glass-dark p-3.5 flex items-center justify-between cursor-pointer hover:border-sky-400/40 transition-all duration-200 group active:bg-[#0f1d3d]"
+              >
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                    <span className="text-[10px] text-[#38bdf8] font-bold bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
+                      {job.category}
+                    </span>
+                    {job.verificationType === "auto_telegram_join" && (
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <Zap className="w-2.5 h-2.5" />
+                        <span>Instant</span>
                       </span>
-                      {job.verificationType === "auto_telegram_join" && (
-                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                          <Zap className="w-2.5 h-2.5" />
-                          <span>Instant</span>
-                        </span>
-                      )}
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-sky-400" />
-                        <span>~{job.timeToComplete}</span>
-                      </span>
-                      {userSub && (
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            userSub.submission_status === "approved"
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                              : userSub.submission_status === "pending"
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                              : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                          }`}
-                        >
-                          {userSub.submission_status === "approved"
-                            ? "Completed"
-                            : userSub.submission_status === "pending"
-                            ? "In Review"
-                            : "Declined"}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="text-xs font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
-                      {job.title}
-                    </h3>
-
-                    <div className="flex items-center gap-2 text-[10px] mt-1">
-                      <span className={job.available > 0 ? "text-slate-400" : "text-amber-400 font-semibold"}>
-                        {job.available > 0
-                          ? `${job.available}/${job.total} slots left`
-                          : "0 slots left (All reserved)"}
-                      </span>
-                      {(job.pendingCount ?? 0) > 0 && (
-                        <span className="text-amber-300/90">
-                          · {job.pendingCount} in review
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Reward & Arrow */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="badge-green-pill text-xs font-extrabold px-2.5 py-1 rounded-full tabular-nums flex items-center gap-0.5">
-                      <span>{job.pay}</span>
-                      <ChevronRight className="w-3 h-3" />
+                    )}
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-sky-400" />
+                      <span>~{job.timeToComplete}</span>
                     </span>
                   </div>
-                </motion.div>
-              );
-            })
+
+                  <h3 className="text-xs font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
+                    {job.title}
+                  </h3>
+
+                  <div className="flex items-center gap-2 text-[10px] mt-1">
+                    <span className="text-slate-400">
+                      {job.available}/{job.total} slots left
+                    </span>
+                    {(job.pendingCount ?? 0) > 0 && (
+                      <span className="text-amber-300/90">
+                        · {job.pendingCount} in review
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reward & Arrow */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="badge-green-pill text-xs font-extrabold px-2.5 py-1 rounded-full tabular-nums flex items-center gap-0.5">
+                    <span>{job.pay}</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </motion.div>
+            ))
           )
         ) : viewMode === "pending" ? (
           <>
@@ -608,6 +638,9 @@ export function Tasks() {
                 <h3 className="text-xs font-bold text-white truncate">{sub.task_title}</h3>
                 <div className="text-[10px] text-rose-300/90 mt-1 truncate">
                   {sub.admin_comment || `Reviewed ${new Date(sub.reviewed_at || sub.submitted_at).toLocaleDateString()}`}
+                </div>
+                <div className="text-[10px] text-sky-300 font-semibold mt-1">
+                  Tap to fix &amp; resubmit proof
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />

@@ -37,6 +37,69 @@ async function bestEffortRemoveProofFile(supabaseAdmin: any, userId: string, pat
   }
 }
 
+const REGION_DISPLAY =
+  typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+const CONTINENT_KEYWORDS = new Set([
+  "africa",
+  "asia",
+  "europe",
+  "north america",
+  "south america",
+  "oceania",
+  "australia",
+]);
+
+function isCountryEligibleForTask(
+  allowedCountries: unknown,
+  userCountryCode: string | null | undefined
+): boolean {
+  if (!Array.isArray(allowedCountries) || allowedCountries.length === 0) return true;
+  const cleaned = allowedCountries
+    .map((c) => String(c || "").trim())
+    .filter(Boolean);
+  if (cleaned.length === 0) return true;
+
+  const lowerList = cleaned.map((c) => c.toLowerCase());
+  if (lowerList.some((c) => c === "international" || c === "all" || c === "global" || c === "worldwide")) {
+    return true;
+  }
+
+  // If country cannot be resolved from IP reputation, fail open to avoid locking out legitimate users
+  if (!userCountryCode || !/^[A-Z]{2}$/i.test(userCountryCode)) {
+    return true;
+  }
+
+  const codeUpper = userCountryCode.toUpperCase();
+  const codeLower = codeUpper.toLowerCase();
+  let fullCountryNameLower = "";
+  try {
+    fullCountryNameLower = (REGION_DISPLAY?.of(codeUpper) || "").toLowerCase();
+  } catch {
+    fullCountryNameLower = "";
+  }
+
+  // If the admin entered only continent names (e.g. "Africa"), avoid false blocking without continent lookup
+  const hasExplicitCountryRestriction = lowerList.some((c) => !CONTINENT_KEYWORDS.has(c));
+  if (!hasExplicitCountryRestriction) return true;
+
+  const aliasMap: Record<string, string> = {
+    uk: "gb",
+    usa: "us",
+    "united states of america": "us",
+  };
+
+  for (const item of lowerList) {
+    const normalized = aliasMap[item] || item;
+    if (normalized === codeLower) return true;
+    if (fullCountryNameLower && normalized === fullCountryNameLower) return true;
+  }
+
+  return false;
+}
+
 serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -65,10 +128,11 @@ serve(async (req: Request) => {
       throw new AppError("Please wait a moment before submitting another task.", 429, "RATE_LIMIT_EXCEEDED");
     }
 
-    await enforceVpnPolicy(supabaseAdmin, req, clientIp, "submit_task", userId);
+    const vpnResult = await enforceVpnPolicy(supabaseAdmin, req, clientIp, "submit_task", userId);
 
     const body = await req.json().catch(() => ({}));
     const { task_id, proof_text, proof_data, proof, proof_url, proof_hash, telegram_username } = body;
+    const candidateProofPath = String(proof_text || proof_data || proof || proof_url || "").trim();
 
     // 2. Validate Task ID
     if (!task_id || !isValidUuid(task_id)) {
@@ -79,13 +143,13 @@ serve(async (req: Request) => {
     let taskMeta: any = null;
     const taskQuery = await supabaseAdmin
       .from("tasks")
-      .select("id, title, reward, status, verification_type, verification_chat_id, target_url")
+      .select("id, title, reward, status, verification_type, verification_chat_id, target_url, allowed_countries")
       .eq("id", task_id)
       .maybeSingle();
 
     if (taskQuery.error) {
       const msg = String(taskQuery.error.message || "").toLowerCase();
-      if ((taskQuery.error as any).code === "42703" || msg.includes("verification_type")) {
+      if ((taskQuery.error as any).code === "42703" || msg.includes("verification_type") || msg.includes("allowed_countries")) {
         const legacyTaskQuery = await supabaseAdmin
           .from("tasks")
           .select("id, title, reward, status, target_url")
@@ -101,11 +165,18 @@ serve(async (req: Request) => {
     }
 
     if (!taskMeta) {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, candidateProofPath);
       throw new AppError("Task not found.", 404, "TASK_NOT_FOUND");
     }
 
     if (taskMeta.status !== "active") {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, candidateProofPath);
       throw new AppError("This task is currently paused or completed.", 400, "TASK_NOT_ACTIVE");
+    }
+
+    if (!isCountryEligibleForTask(taskMeta.allowed_countries, vpnResult.countryCode)) {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, candidateProofPath);
+      throw new AppError("This task is not available in your country.", 403, "COUNTRY_NOT_ELIGIBLE");
     }
 
     const verificationType = taskMeta.verification_type === "auto_telegram_join"
@@ -130,7 +201,7 @@ serve(async (req: Request) => {
         );
       }
 
-      // Fast pre-check so duplicate clicks never spam Telegram Bot API
+      // Fast pre-check so duplicate clicks never spam Telegram Bot API (rejected rows may re-try)
       const { data: existingSub } = await supabaseAdmin
         .from("submissions")
         .select("id, status")
@@ -138,7 +209,7 @@ serve(async (req: Request) => {
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (existingSub) {
+      if (existingSub && existingSub.status !== "rejected") {
         throw new AppError(
           `You have already completed or submitted this task (Status: ${existingSub.status}).`,
           400,
@@ -256,31 +327,49 @@ serve(async (req: Request) => {
     const clientHashNorm = isValidSha256Hex(proof_hash) ? String(proof_hash).trim().toLowerCase() : null;
     const hashTamperDetected = Boolean(clientHashNorm && clientHashNorm !== verifiedProof.sha256Hex);
 
-    // 5. Atomic task slot check, duplicate user/hash prevention & submission creation under FOR UPDATE lock
+    // 5. Atomic task slot check, duplicate user/hash prevention & submission creation/resubmission under FOR UPDATE lock
     let rpcRes: any = null;
-    const rpcWithHash = await supabaseAdmin.rpc("submit_task_atomic", {
+    const rpcLatest = await supabaseAdmin.rpc("submit_task_atomic", {
       p_user_id: userId,
       p_task_id: task_id,
       p_proof_text: verifiedProof.proofPath,
       p_proof_hash: verifiedProof.sha256Hex,
+      p_submitted_username: cleanTgUsername || null,
     });
 
-    if (rpcWithHash.error) {
-      const errMsg = String(rpcWithHash.error.message || "").toLowerCase();
-      if ((rpcWithHash.error as any).code === "PGRST202" || (rpcWithHash.error as any).code === "42883" || errMsg.includes("p_proof_hash")) {
-        console.warn("[SUBMIT_TASK_LEGACY_RPC_WARN]", { message: "Falling back to 3-arg submit_task_atomic while migration is pending" });
-        const legacyRpc = await supabaseAdmin.rpc("submit_task_atomic", {
+    if (rpcLatest.error) {
+      const errMsg = String(rpcLatest.error.message || "").toLowerCase();
+      const errCode = (rpcLatest.error as any).code;
+      if (errCode === "PGRST202" || errCode === "42883" || errMsg.includes("p_submitted_username") || errMsg.includes("p_proof_hash")) {
+        console.warn("[SUBMIT_TASK_LEGACY_RPC_WARN]", { message: "Falling back to prior submit_task_atomic signature while migration is pending" });
+        const rpc4Arg = await supabaseAdmin.rpc("submit_task_atomic", {
           p_user_id: userId,
           p_task_id: task_id,
           p_proof_text: verifiedProof.proofPath,
+          p_proof_hash: verifiedProof.sha256Hex,
         });
-        if (legacyRpc.error) throw legacyRpc.error;
-        rpcRes = legacyRpc.data;
+        if (rpc4Arg.error) {
+          const msg4 = String(rpc4Arg.error.message || "").toLowerCase();
+          const code4 = (rpc4Arg.error as any).code;
+          if (code4 === "PGRST202" || code4 === "42883" || msg4.includes("p_proof_hash")) {
+            const legacyRpc = await supabaseAdmin.rpc("submit_task_atomic", {
+              p_user_id: userId,
+              p_task_id: task_id,
+              p_proof_text: verifiedProof.proofPath,
+            });
+            if (legacyRpc.error) throw legacyRpc.error;
+            rpcRes = legacyRpc.data;
+          } else {
+            throw rpc4Arg.error;
+          }
+        } else {
+          rpcRes = rpc4Arg.data;
+        }
       } else {
-        throw rpcWithHash.error;
+        throw rpcLatest.error;
       }
     } else {
-      rpcRes = rpcWithHash.data;
+      rpcRes = rpcLatest.data;
     }
 
     if (!rpcRes?.success) {
@@ -297,19 +386,25 @@ serve(async (req: Request) => {
       throw new AppError(rpcRes?.error || "Failed to submit task proof.", statusCode, errCode);
     }
 
+    if (rpcRes.replaced_proof_text && rpcRes.replaced_proof_text !== verifiedProof.proofPath) {
+      await bestEffortRemoveProofFile(supabaseAdmin, userId, String(rpcRes.replaced_proof_text));
+    }
+
     const submissionId = rpcRes.submission_id;
     const taskTitle = rpcRes.task_title || "Task";
+    const attemptCount = Number(rpcRes.attempt_count || 1);
 
     // 6. Audit Log & In-App Task Alert
     await logAuditEvent({
       actorId: userId,
       actorType: "user",
-      action: "task_submitted",
+      action: attemptCount > 1 ? "task_resubmitted" : "task_submitted",
       targetType: "task",
       targetId: task_id,
       details: {
         submissionId,
         taskTitle,
+        attemptCount,
         telegramUsername: cleanTgUsername || undefined,
         proofHashPrefix: verifiedProof.sha256Hex.slice(0, 16),
         crossTaskFlagged: Boolean(rpcRes.cross_task_flagged),
@@ -322,11 +417,11 @@ serve(async (req: Request) => {
       userId,
       category: "task",
       eventKey: "task_submitted",
-      title: "Task Proof Under Review",
+      title: attemptCount > 1 ? "Updated Proof Under Review" : "Task Proof Under Review",
       message: `Your proof for "${taskTitle}" was submitted and is awaiting verification.`,
       actionUrl: `/tasks/${task_id}`,
       ctaLabel: "📋 View Task",
-      metadata: { task_id, submission_id: submissionId },
+      metadata: { task_id, submission_id: submissionId, attempt_count: attemptCount },
     });
 
     return successResponse(
@@ -334,6 +429,7 @@ serve(async (req: Request) => {
         message: "Proof submitted successfully and queued for review.",
         submission_id: submissionId,
         status: "pending",
+        attempt_count: attemptCount,
         auto_verified: false,
       },
       200,

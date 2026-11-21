@@ -5,6 +5,7 @@ import { supabase, invokeEdgeFunction } from "../lib/supabase";
 import { useTelegram } from "../contexts/TelegramContext";
 import { tgHaptics, tgBackButton, openTgLink } from "../lib/telegram";
 import { PayvoraSpinner, PayvoraLoadingState } from "../components";
+import { canResubmitDeclinedTask, MAX_TASK_RESUBMISSION_ATTEMPTS } from "../lib/taskLifecycle";
 
 interface TaskRecord {
   id: string;
@@ -29,6 +30,7 @@ interface ExistingSubmission {
   status: string;
   submitted_at: string;
   admin_comment?: string | null;
+  attempt_count?: number;
 }
 
 const ALLOWED_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp"]);
@@ -112,12 +114,26 @@ export function TaskDetails() {
         setTask(taskData);
 
         if (user?.uuid && taskData) {
-          const { data: subData } = await supabase
+          let subData: any = null;
+          const { data: fullSub, error: fullSubErr } = await supabase
             .from("submissions")
-            .select("id, status, submitted_at, admin_comment")
+            .select("id, status, submitted_at, admin_comment, attempt_count")
             .eq("task_id", id)
             .eq("user_id", user.uuid)
             .maybeSingle();
+
+          if (!fullSubErr) {
+            subData = fullSub;
+          } else {
+            const { data: legacySub } = await supabase
+              .from("submissions")
+              .select("id, status, submitted_at, admin_comment")
+              .eq("task_id", id)
+              .eq("user_id", user.uuid)
+              .maybeSingle();
+            subData = legacySub;
+          }
+
           if (active && subData) {
             setExistingSubmission(subData as ExistingSubmission);
           }
@@ -175,6 +191,23 @@ export function TaskDetails() {
       setError("This task is no longer accepting submissions.");
       return;
     }
+    if (
+      existingSubmission &&
+      !canResubmitDeclinedTask(
+        existingSubmission.status,
+        task.status,
+        remainingSlots,
+        existingSubmission.attempt_count
+      )
+    ) {
+      setError("This submission cannot be resubmitted.");
+      return;
+    }
+    const cleanUsername = username.trim();
+    if (!cleanUsername) {
+      setError("Please enter your Telegram username.");
+      return;
+    }
     if (!file) {
       setError("Please attach a screenshot proof.");
       return;
@@ -210,11 +243,14 @@ export function TaskDetails() {
       if (uploadError) throw uploadError;
       uploadedObjectPath = objectPath;
 
-      await invokeEdgeFunction("submit_task", {
+      const submitRes = await invokeEdgeFunction<{
+        submission_id?: string;
+        attempt_count?: number;
+      }>("submit_task", {
         task_id: task.id,
         proof_text: objectPath,
         proof_hash: proofHash,
-        telegram_username: username.trim()
+        telegram_username: cleanUsername
       });
 
       uploadedObjectPath = null; // Persisted by submission; keep file in storage
@@ -231,6 +267,15 @@ export function TaskDetails() {
         };
       });
 
+      setExistingSubmission((prev) => ({
+        id: submitRes?.submission_id || prev?.id || "submitted",
+        status: "pending",
+        submitted_at: new Date().toISOString(),
+        admin_comment: null,
+        attempt_count: submitRes?.attempt_count ?? (prev ? (prev.attempt_count || 1) + 1 : 1),
+      }));
+
+      removeImage();
       tgHaptics.notification("success");
       setStatus("success");
     } catch (err: any) {
@@ -264,7 +309,10 @@ export function TaskDetails() {
     setStatus("submitting");
 
     try {
-      await invokeEdgeFunction("submit_task", {
+      const autoRes = await invokeEdgeFunction<{
+        submission_id?: string;
+        attempt_count?: number;
+      }>("submit_task", {
         task_id: task.id,
       });
 
@@ -279,6 +327,14 @@ export function TaskDetails() {
           remaining_slots: Math.max(0, maxC - nextCompleted - pendingC),
         };
       });
+
+      setExistingSubmission((prev) => ({
+        id: autoRes?.submission_id || prev?.id || "approved",
+        status: "approved",
+        submitted_at: new Date().toISOString(),
+        admin_comment: "Auto-verified via Telegram Bot getChatMember",
+        attempt_count: autoRes?.attempt_count ?? (prev ? (prev.attempt_count || 1) + 1 : 1),
+      }));
 
       await refreshUser().catch(() => {});
       tgHaptics.notification("success");
@@ -461,158 +517,245 @@ export function TaskDetails() {
           </button>
         )}
 
-        {existingSubmission ? (
-          <div
-            className={`rounded-2xl p-4 text-center space-y-1.5 border ${
-              existingSubmission.status === "approved"
-                ? "bg-emerald-500/10 border-emerald-500/30"
-                : existingSubmission.status === "pending"
-                ? "bg-amber-500/10 border-amber-500/30"
-                : "bg-rose-500/10 border-rose-500/30"
-            }`}
-          >
-            <CheckCircle
-              className={`w-7 h-7 mx-auto ${
-                existingSubmission.status === "approved"
-                  ? "text-emerald-400"
-                  : existingSubmission.status === "pending"
-                  ? "text-amber-400"
-                  : "text-rose-400"
-              }`}
-            />
-            <h4 className="text-sm font-bold text-white capitalize">
-              {existingSubmission.status === "approved"
-                ? `Completed · +$${Number(task.reward || 0).toFixed(2)} Earned`
-                : existingSubmission.status === "pending"
-                ? `Pending Review · +$${Number(task.reward || 0).toFixed(2)}`
-                : "Submission Declined"}
-            </h4>
-            <p className="text-xs text-slate-300">
-              Submitted on {new Date(existingSubmission.submitted_at).toLocaleDateString()}.
-              {existingSubmission.admin_comment ? ` Note: ${existingSubmission.admin_comment}` : ""}
-            </p>
-          </div>
-        ) : status === "success" ? (
-          <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 text-center">
-            <CheckCircle className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
-            <h4 className="text-sm font-bold text-white mb-0.5">
-              {isAutoTelegramJoin ? "Verified & Credited!" : "Proof Submitted!"}
-            </h4>
-            <p className="text-xs text-slate-300">
-              {isAutoTelegramJoin
-                ? `+$${Number(task.reward || 0).toFixed(2)} has been added directly to your wallet balance.`
-                : "Your proof has been received. Reward will be added to your balance once approved."}
-            </p>
-          </div>
-        ) : task.status !== "active" || remainingSlots <= 0 ? (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-center text-xs text-amber-200">
-            {pendingSlots > 0 && remainingSlots <= 0
-              ? `All remaining slots (${pendingSlots}) are currently reserved by submissions under review.`
-              : "All available slots for this task have been filled."}
-          </div>
-        ) : isAutoTelegramJoin ? (
-          <div className="space-y-3 pt-2 border-t border-white/5">
-            {error && (
-              <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+        {(() => {
+          const allowResubmit = existingSubmission
+            ? canResubmitDeclinedTask(
+                existingSubmission.status,
+                task.status,
+                remainingSlots,
+                existingSubmission.attempt_count
+              )
+            : false;
 
-            <button
-              type="button"
-              disabled={status === "submitting"}
-              onClick={handleAutoVerify}
-              className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
-            >
-              {status === "submitting" ? (
-                <>
-                  <PayvoraSpinner size="sm" />
-                  <span>Verifying Membership...</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  <span>Verify &amp; Claim +${Number(task.reward || 0).toFixed(2)}</span>
-                </>
+          if (status === "success") {
+            return (
+              <div className="bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 text-center space-y-2.5">
+                <CheckCircle className="w-8 h-8 mx-auto text-emerald-400" />
+                <h4 className="text-sm font-bold text-white">
+                  {isAutoTelegramJoin ? "Verified & Credited!" : "Proof Submitted!"}
+                </h4>
+                <p className="text-xs text-slate-300">
+                  {isAutoTelegramJoin
+                    ? `+$${Number(task.reward || 0).toFixed(2)} has been added directly to your wallet balance.`
+                    : "Your proof has been received and moved to Pending Review."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate("/tasks")}
+                  className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition active:scale-95"
+                >
+                  Back to Tasks
+                </button>
+              </div>
+            );
+          }
+
+          if (existingSubmission && !allowResubmit) {
+            const attemptsUsed = existingSubmission.attempt_count || 1;
+            const maxReached =
+              existingSubmission.status === "rejected" &&
+              attemptsUsed >= MAX_TASK_RESUBMISSION_ATTEMPTS;
+
+            return (
+              <div
+                className={`rounded-2xl p-4 text-center space-y-2 border ${
+                  existingSubmission.status === "approved"
+                    ? "bg-emerald-500/10 border-emerald-500/30"
+                    : existingSubmission.status === "pending"
+                    ? "bg-amber-500/10 border-amber-500/30"
+                    : "bg-rose-500/10 border-rose-500/30"
+                }`}
+              >
+                <CheckCircle
+                  className={`w-7 h-7 mx-auto ${
+                    existingSubmission.status === "approved"
+                      ? "text-emerald-400"
+                      : existingSubmission.status === "pending"
+                      ? "text-amber-400"
+                      : "text-rose-400"
+                  }`}
+                />
+                <h4 className="text-sm font-bold text-white capitalize">
+                  {existingSubmission.status === "approved"
+                    ? `Completed · +$${Number(task.reward || 0).toFixed(2)} Earned`
+                    : existingSubmission.status === "pending"
+                    ? `Pending Review · +$${Number(task.reward || 0).toFixed(2)}`
+                    : "Submission Declined"}
+                </h4>
+                <p className="text-xs text-slate-300">
+                  Submitted on {new Date(existingSubmission.submitted_at).toLocaleDateString()}.
+                  {existingSubmission.admin_comment ? ` Note: ${existingSubmission.admin_comment}` : ""}
+                </p>
+                {existingSubmission.status === "rejected" && (
+                  <p className="text-[11px] text-rose-300">
+                    {maxReached
+                      ? `Maximum resubmission attempts (${MAX_TASK_RESUBMISSION_ATTEMPTS}) reached for this task.`
+                      : "Resubmission is unavailable because this task has no remaining open slots."}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate("/tasks")}
+                  className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition active:scale-95"
+                >
+                  Back to Tasks
+                </button>
+              </div>
+            );
+          }
+
+          if (task.status !== "active" || remainingSlots <= 0) {
+            return (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-center space-y-2 text-xs text-amber-200">
+                <p>
+                  {pendingSlots > 0 && remainingSlots <= 0
+                    ? `All remaining slots (${pendingSlots}) are currently reserved by submissions under review.`
+                    : "All available slots for this task have been filled."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate("/tasks")}
+                  className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition active:scale-95"
+                >
+                  Browse Available Tasks
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <>
+              {existingSubmission?.status === "rejected" && (
+                <div className="rounded-2xl p-3.5 bg-rose-500/10 border border-rose-500/30 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-rose-300">
+                      Previous Submission Declined
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-200 bg-rose-500/20 px-2 py-0.5 rounded-full">
+                      Attempt {existingSubmission.attempt_count || 1} of {MAX_TASK_RESUBMISSION_ATTEMPTS}
+                    </span>
+                  </div>
+                  {existingSubmission.admin_comment && (
+                    <p className="text-xs text-slate-200">
+                      Reason: {existingSubmission.admin_comment}
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-400">
+                    Fix the issue noted above and submit updated proof below.
+                  </p>
+                </div>
               )}
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-white/5">
-            {error && (
-              <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">
-                Your Telegram Username
-              </label>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="@username"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#0c162e] text-xs text-white focus:outline-none focus:border-sky-400"
-              />
-            </div>
+              {isAutoTelegramJoin ? (
+                <div className="space-y-3 pt-2 border-t border-white/5">
+                  {error && (
+                    <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">
-                Screenshot Proof
-              </label>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                id="screenshot-upload"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-              />
-
-              {previewUrl ? (
-                <div className="relative border border-white/10 rounded-2xl overflow-hidden bg-[#0c162e] aspect-video flex items-center justify-center">
-                  <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
                   <button
                     type="button"
-                    onClick={removeImage}
-                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full active:scale-95"
+                    disabled={status === "submitting"}
+                    onClick={handleAutoVerify}
+                    className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    {status === "submitting" ? (
+                      <>
+                        <PayvoraSpinner size="sm" />
+                        <span>Verifying Membership...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4" />
+                        <span>Verify &amp; Claim +${Number(task.reward || 0).toFixed(2)}</span>
+                      </>
+                    )}
                   </button>
                 </div>
               ) : (
-                <label
-                  htmlFor="screenshot-upload"
-                  className="border border-dashed border-white/15 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-300 transition cursor-pointer active:scale-98 bg-[#0c162e]/50"
-                >
-                  <Upload className="w-6 h-6 mb-1.5 text-sky-400" />
-                  <span className="text-xs font-semibold text-white">Tap to select screenshot</span>
-                  <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, WebP up to 5MB</span>
-                </label>
-              )}
-            </div>
+                <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-white/5">
+                  {error && (
+                    <div className="bg-rose-500/15 text-rose-300 px-3 py-2 text-xs rounded-xl border border-rose-500/30 flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
 
-            <button
-              type="submit"
-              disabled={status === "submitting"}
-              className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5 mt-2"
-            >
-              {status === "submitting" ? (
-                <>
-                  <PayvoraSpinner size="sm" />
-                  <span>Submitting...</span>
-                </>
-              ) : (
-                <span>Submit Verification</span>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">
+                      Your Telegram Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="@username"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-[#0c162e] text-xs text-white focus:outline-none focus:border-sky-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">
+                      Screenshot Proof
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      id="screenshot-upload"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                    />
+
+                    {previewUrl ? (
+                      <div className="relative border border-white/10 rounded-2xl overflow-hidden bg-[#0c162e] aspect-video flex items-center justify-center">
+                        <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full active:scale-95"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="screenshot-upload"
+                        className="border border-dashed border-white/15 rounded-2xl p-5 flex flex-col items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-300 transition cursor-pointer active:scale-98 bg-[#0c162e]/50"
+                      >
+                        <Upload className="w-6 h-6 mb-1.5 text-sky-400" />
+                        <span className="text-xs font-semibold text-white">Tap to select screenshot</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, WebP up to 5MB</span>
+                      </label>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={status === "submitting"}
+                    className="w-full py-3 btn-cyan-glow text-white text-center rounded-xl font-extrabold text-xs transition active:scale-98 disabled:opacity-50 shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5 mt-2"
+                  >
+                    {status === "submitting" ? (
+                      <>
+                        <PayvoraSpinner size="sm" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <span>
+                        {existingSubmission?.status === "rejected"
+                          ? "Resubmit Verification"
+                          : "Submit Verification"}
+                      </span>
+                    )}
+                  </button>
+                </form>
               )}
-            </button>
-          </form>
-        )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
