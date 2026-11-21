@@ -34,7 +34,7 @@ fi
 echo "1/3 Linking Supabase project $PROJECT_ID..."
 echo "$SUPABASE_DB_PASSWORD" | "${SUPA_CMD[@]}" link --project-ref "$PROJECT_ID"
 
-echo "2/3 Pushing SQL migrations (including 20260519, 20260520, 20260521)..."
+echo "2/3 Pushing SQL migrations (including 20260519 - 20260522)..."
 "${SUPA_CMD[@]}" db push --remote --password "$SUPABASE_DB_PASSWORD" --include-all --yes
 
 echo "3/3 Deploying all Edge Functions (including submit_task, auth, admin_api)..."

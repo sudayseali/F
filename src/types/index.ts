@@ -65,6 +65,7 @@ export interface UserTaskSubmissionItem {
   admin_comment?: string | null;
   submitted_at: string;
   reviewed_at?: string | null;
+  attempt_count?: number;
 }
 
 export interface TransactionItem {

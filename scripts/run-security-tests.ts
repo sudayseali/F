@@ -1314,7 +1314,7 @@ async function runAllSecurityTests() {
   }
 
   // --------------------------------------------------------------------------
-  // TEST 36 (REMED-25): Available Tab Filtering, Search & Category Matching
+  // TEST 36 (REMED-25): Available Tab Filtering, 0-Slot Removal, & Rejected Resubmission Surfacing
   // --------------------------------------------------------------------------
   {
     const { filterAvailableTasks, matchesTaskCategoryTab } = await import("../src/lib/taskLifecycle.ts");
@@ -1322,22 +1322,35 @@ async function runAllSecurityTests() {
       { id: "t-open", category: "Telegram Channel", title: "Join Payvora Official", pay: "$0.25", timeToComplete: "1m", available: 10, total: 50, status: "active" },
       { id: "t-pending", category: "Social", title: "Follow on Twitter", pay: "$0.20", timeToComplete: "2m", available: 5, total: 20, status: "active" },
       { id: "t-approved", category: "Reviews", title: "Trustpilot Feedback", pay: "$0.50", timeToComplete: "5m", available: 8, total: 20, status: "active" },
-      { id: "t-rejected", category: "Other", title: "App Signup Test", pay: "$1.00", timeToComplete: "5m", available: 3, total: 10, status: "active" },
+      { id: "t-rejected-retry", category: "Other", title: "App Signup Test", pay: "$1.00", timeToComplete: "5m", available: 3, total: 10, status: "active" },
+      { id: "t-rejected-maxed", category: "Other", title: "Maxed Out Attempts", pay: "$1.00", timeToComplete: "5m", available: 3, total: 10, status: "active" },
+      { id: "t-rejected-full", category: "Other", title: "Full After Reject", pay: "$1.00", timeToComplete: "5m", available: 0, total: 10, status: "active" },
       { id: "t-full", category: "YouTube", title: "Subscribe Channel", pay: "$0.15", timeToComplete: "1m", available: 0, total: 10, status: "active" },
+      { id: "t-completed-status", category: "Social", title: "Completed Task", pay: "$0.15", timeToComplete: "1m", available: 2, total: 10, status: "completed" },
     ];
-    const submittedMap = new Map<string, { submission_status: string }>([
-      ["t-pending", { submission_status: "pending" }],
-      ["t-approved", { submission_status: "approved" }],
-      ["t-rejected", { submission_status: "rejected" }],
+    const submittedMap = new Map<string, { submission_status: string; attempt_count?: number }>([
+      ["t-pending", { submission_status: "pending", attempt_count: 1 }],
+      ["t-approved", { submission_status: "approved", attempt_count: 1 }],
+      ["t-rejected-retry", { submission_status: "rejected", attempt_count: 1 }],
+      ["t-rejected-maxed", { submission_status: "rejected", attempt_count: 3 }],
+      ["t-rejected-full", { submission_status: "rejected", attempt_count: 1 }],
     ]);
 
     const availAll = filterAvailableTasks(sampleJobs, submittedMap, "All", "");
     const availSocial = filterAvailableTasks(sampleJobs, new Map(), "Social", "");
     const availSearch = filterAvailableTasks(sampleJobs, submittedMap, "All", "payvora");
 
+    const ids = availAll.map((j) => j.id);
     const passed =
-      availAll.length === 1 &&
-      availAll[0].id === "t-open" &&
+      ids.length === 2 &&
+      ids.includes("t-open") &&
+      ids.includes("t-rejected-retry") &&
+      !ids.includes("t-pending") &&
+      !ids.includes("t-approved") &&
+      !ids.includes("t-rejected-maxed") &&
+      !ids.includes("t-rejected-full") &&
+      !ids.includes("t-full") &&
+      !ids.includes("t-completed-status") &&
       availSocial.some((j) => j.id === "t-open") &&
       availSocial.some((j) => j.id === "t-pending") &&
       matchesTaskCategoryTab("Trustpilot", "Reviews") &&
@@ -1346,11 +1359,11 @@ async function runAllSecurityTests() {
 
     recordTest(
       "REMED-25",
-      "Submitted (pending/approved/rejected) & 0-slot tasks leave Available tab cleanly + Social/Search match",
+      "0-slot/completed/pending/approved tasks auto-hide while rejected (<3 attempts) tasks resurface in Available",
       "Task Marketplace Lifecycle",
       passed,
-      "Avail=1(t-open only), SocialMatchesTelegram=true, Search=1",
-      `Avail=${availAll.map((j) => j.id).join(",")}, SocialCnt=${availSocial.length}`
+      "Avail=[t-open,t-rejected-retry], Hidden=[pending,approved,0-slots,maxed]",
+      `Avail=[${ids.join(",")}], SocialCnt=${availSocial.length}`
     );
   }
 

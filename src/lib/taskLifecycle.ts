@@ -40,26 +40,44 @@ export function matchesTaskCategoryTab(category: string, tab: string): boolean {
   return true;
 }
 
+export interface SubmittedTaskLookupEntry {
+  submission_status?: string;
+  attempt_count?: number;
+}
+
 /**
  * Filters the "Available" task feed according to standard micro-task marketplace rules:
- *   1. Exclude any task the current user has already submitted (`pending`, `approved`, or `rejected`)
- *      so submitted tasks move cleanly to Pending / Completed / Declined tabs instead of lingering in Available.
- *   2. Exclude tasks with 0 remaining slots (`available <= 0`).
- *   3. Exclude non-active tasks (`paused` / `completed` / `archived`).
+ *   1. Automatically remove any task with 0 remaining slots (`available <= 0`) or non-active status.
+ *   2. Exclude tasks where the user already has a `pending` or `approved` submission.
+ *   3. Surface `rejected` tasks back into Available so the user can fix & resubmit them
+ *      as long as `attempt_count < 3`, the task is `active`, and slots remain (`available > 0`).
  *   4. Apply category tab & search query filters.
  */
 export function filterAvailableTasks(
   jobs: TaskItem[],
-  submittedTaskIds: Set<string> | Map<string, unknown>,
+  submittedTasks: Set<string> | Map<string, SubmittedTaskLookupEntry>,
   activeCategoryTab: string,
   searchQuery = ""
 ): TaskItem[] {
   const q = searchQuery.trim().toLowerCase();
 
   return jobs.filter((job) => {
-    if (submittedTaskIds.has(job.id)) return false;
     if (job.status && job.status !== "active") return false;
-    if (Number(job.available || 0) <= 0) return false;
+    const remainingSlots = Number(job.available || 0);
+    if (remainingSlots <= 0) return false;
+
+    if (submittedTasks instanceof Map) {
+      const existing = submittedTasks.get(job.id);
+      if (existing) {
+        if (existing.submission_status !== "rejected") return false;
+        if (!canResubmitDeclinedTask("rejected", job.status || "active", remainingSlots, existing.attempt_count)) {
+          return false;
+        }
+      }
+    } else if (submittedTasks.has(job.id)) {
+      return false;
+    }
+
     if (!matchesTaskCategoryTab(job.category, activeCategoryTab)) return false;
 
     if (q) {

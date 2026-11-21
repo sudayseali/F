@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle, Zap, Search, X } from "lucide-react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronRight, CheckCircle2, Clock, Sparkles, XCircle, Zap, Search, X, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
@@ -22,124 +22,173 @@ export function Tasks() {
   const [mySubmissions, setMySubmissions] = useState<UserTaskSubmissionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
+  const fetchTasksAndHistory = useCallback(async (isMountedCheck?: () => boolean) => {
+    const isActive = () => (isMountedCheck ? isMountedCheck() : true);
+    try {
+      let rawTasks: any[] | null = null;
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('get_active_tasks_with_slots');
 
-    async function fetchTasksAndHistory() {
-      try {
-        let rawTasks: any[] | null = null;
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('get_active_tasks_with_slots');
+      if (!rpcErr && Array.isArray(rpcData)) {
+        rawTasks = rpcData;
+      } else {
+        const { data: fallbackData } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
+        rawTasks = fallbackData;
+      }
 
-        if (!rpcErr && Array.isArray(rpcData)) {
-          rawTasks = rpcData;
-        } else {
-          const { data: fallbackData } = await supabase
-            .from('tasks')
-            .select('*')
-            .eq('status', 'active')
-            .order('created_at', { ascending: false });
-          rawTasks = fallbackData;
-        }
-
-        if (active && rawTasks) {
-          const mapped = rawTasks.filter(task => {
-             if (task.allowed_countries && Array.isArray(task.allowed_countries) && task.allowed_countries.length > 0) {
-                 if (!task.allowed_countries.includes('International')) {
-                     if (!location) return true;
-                     return task.allowed_countries.includes(location.country) || task.allowed_countries.includes(location.continent);
-                 }
-             }
-             return true;
-          }).map(task => {
-            const total = task.max_completions || 100;
-            const approved = task.current_completions || 0;
-            const pending = Number(task.pending_submissions || 0);
-            const available =
-              typeof task.remaining_slots === 'number'
-                ? Math.max(0, task.remaining_slots)
-                : Math.max(0, total - approved - pending);
-
-            return {
-              id: task.id,
-              category: task.category || "Other",
-              title: task.title,
-              pay: `$${Number(task.reward).toFixed(2)}`,
-              timeToComplete: task.job_length ? `${task.job_length}m` : "5m",
-              available,
-              pendingCount: pending,
-              total,
-              status: task.status,
-              verificationType:
-                task.verification_type === "auto_telegram_join"
-                  ? ("auto_telegram_join" as const)
-                  : ("manual_screenshot" as const),
-            };
-          });
-          setJobs(mapped);
-        }
-
-        if (user?.uuid) {
-          const { data: mySubsRpc, error: mySubsErr } = await supabase.rpc('get_my_task_submissions');
-
-          if (!mySubsErr && Array.isArray(mySubsRpc)) {
-            if (active) {
-              setMySubmissions(
-                mySubsRpc.map((row: any) => ({
-                  submission_id: row.submission_id,
-                  task_id: row.task_id,
-                  task_title: row.task_title || "Micro-Task",
-                  task_category: row.task_category || "Other",
-                  task_reward: Number(row.task_reward || 0),
-                  task_status: row.task_status || "active",
-                  submission_status: row.submission_status,
-                  earned_amount: Number(row.earned_amount || 0),
-                  admin_comment: row.admin_comment,
-                  submitted_at: row.submitted_at,
-                  reviewed_at: row.reviewed_at,
-                }))
-              );
+      if (isActive() && rawTasks) {
+        const mapped = rawTasks.filter(task => {
+          if (task.allowed_countries && Array.isArray(task.allowed_countries) && task.allowed_countries.length > 0) {
+            if (!task.allowed_countries.includes('International')) {
+              if (!location) return true;
+              return task.allowed_countries.includes(location.country) || task.allowed_countries.includes(location.continent);
             }
+          }
+          return true;
+        }).map(task => {
+          const total = task.max_completions || 100;
+          const approved = task.current_completions || 0;
+          const pending = Number(task.pending_submissions || 0);
+          const available =
+            typeof task.remaining_slots === 'number'
+              ? Math.max(0, task.remaining_slots)
+              : Math.max(0, total - approved - pending);
+
+          return {
+            id: task.id,
+            category: task.category || "Other",
+            title: task.title,
+            pay: `$${Number(task.reward).toFixed(2)}`,
+            timeToComplete: task.job_length ? `${task.job_length}m` : "5m",
+            available,
+            pendingCount: pending,
+            total,
+            status: task.status,
+            verificationType:
+              task.verification_type === "auto_telegram_join"
+                ? ("auto_telegram_join" as const)
+                : ("manual_screenshot" as const),
+          };
+        });
+        setJobs(mapped);
+      }
+
+      if (user?.uuid) {
+        const { data: mySubsRpc, error: mySubsErr } = await supabase.rpc('get_my_task_submissions');
+
+        if (!mySubsErr && Array.isArray(mySubsRpc)) {
+          if (isActive()) {
+            setMySubmissions(
+              mySubsRpc.map((row: any) => ({
+                submission_id: row.submission_id,
+                task_id: row.task_id,
+                task_title: row.task_title || "Micro-Task",
+                task_category: row.task_category || "Other",
+                task_reward: Number(row.task_reward || 0),
+                task_status: row.task_status || "active",
+                submission_status: row.submission_status,
+                earned_amount: Number(row.earned_amount || 0),
+                admin_comment: row.admin_comment,
+                submitted_at: row.submitted_at,
+                reviewed_at: row.reviewed_at,
+                attempt_count: Number(row.attempt_count || 1),
+              }))
+            );
+          }
+        } else {
+          let subsData: any[] | null = null;
+          const { data: subsWithAttempts, error: subsErr } = await supabase
+            .from('submissions')
+            .select('id, task_id, status, admin_comment, submitted_at, reviewed_at, attempt_count, task:tasks(title, category, reward, status)')
+            .eq('user_id', user.uuid)
+            .order('submitted_at', { ascending: false });
+
+          if (!subsErr) {
+            subsData = subsWithAttempts;
           } else {
-            const { data: subs } = await supabase
+            const { data: legacySubs } = await supabase
               .from('submissions')
               .select('id, task_id, status, admin_comment, submitted_at, reviewed_at, task:tasks(title, category, reward, status)')
               .eq('user_id', user.uuid)
               .order('submitted_at', { ascending: false });
+            subsData = legacySubs;
+          }
 
-            if (active && subs) {
-              setMySubmissions(
-                subs.map((s: any) => {
-                  const tObj = Array.isArray(s.task) ? s.task[0] : s.task;
-                  const rewardVal = Number(tObj?.reward || 0);
-                  return {
-                    submission_id: s.id,
-                    task_id: s.task_id,
-                    task_title: tObj?.title || "Micro-Task",
-                    task_category: tObj?.category || "Other",
-                    task_reward: rewardVal,
-                    task_status: tObj?.status || "active",
-                    submission_status: s.status,
-                    earned_amount: s.status === "approved" ? rewardVal : 0,
-                    admin_comment: s.admin_comment,
-                    submitted_at: s.submitted_at,
-                    reviewed_at: s.reviewed_at,
-                  };
-                })
-              );
-            }
+          if (isActive() && subsData) {
+            setMySubmissions(
+              subsData.map((s: any) => {
+                const tObj = Array.isArray(s.task) ? s.task[0] : s.task;
+                const rewardVal = Number(tObj?.reward || 0);
+                return {
+                  submission_id: s.id,
+                  task_id: s.task_id,
+                  task_title: tObj?.title || "Micro-Task",
+                  task_category: tObj?.category || "Other",
+                  task_reward: rewardVal,
+                  task_status: tObj?.status || "active",
+                  submission_status: s.status,
+                  earned_amount: s.status === "approved" ? rewardVal : 0,
+                  admin_comment: s.admin_comment,
+                  submitted_at: s.submitted_at,
+                  reviewed_at: s.reviewed_at,
+                  attempt_count: Number(s.attempt_count || 1),
+                };
+              })
+            );
           }
         }
-      } catch (err) {
-        console.error("Error fetching tasks:", err);
-      } finally {
-        if (active) setLoading(false);
       }
+    } catch (err) {
+      console.error("Error fetching tasks:", err);
+    } finally {
+      if (isActive()) setLoading(false);
     }
-    fetchTasksAndHistory();
+  }, [location, user?.uuid]);
+
+  useEffect(() => {
+    let active = true;
+    const isMounted = () => active;
+
+    fetchTasksAndHistory(isMounted);
+
+    // Keep Available & submission status synced automatically when slots fill up or admin reviews
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchTasksAndHistory(isMounted);
+      }
+    };
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    const channel = supabase
+      .channel(`tasks-lifecycle-${user?.uuid || "anon"}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        fetchTasksAndHistory(isMounted);
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "submissions",
+          ...(user?.uuid ? { filter: `user_id=eq.${user.uuid}` } : {}),
+        },
+        () => {
+          fetchTasksAndHistory(isMounted);
+        }
+      )
+      .subscribe();
+
     return () => {
       active = false;
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      supabase.removeChannel(channel);
     };
-  }, [location, user?.uuid]);
+  }, [fetchTasksAndHistory, user?.uuid]);
 
   const submissionByTaskId = useMemo(() => {
     const map = new Map<string, UserTaskSubmissionItem>();
@@ -447,58 +496,80 @@ export function Tasks() {
               )}
             </div>
           ) : (
-            filteredJobs.map((job) => (
-              <motion.div
-                key={job.id}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  tgHaptics.impact("light");
-                  navigate(`/tasks/${job.id}`);
-                }}
-                className="card-glass-dark p-3.5 flex items-center justify-between cursor-pointer hover:border-sky-400/40 transition-all duration-200 group active:bg-[#0f1d3d]"
-              >
-                <div className="flex-1 min-w-0 pr-3">
-                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                    <span className="text-[10px] text-[#38bdf8] font-bold bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
-                      {job.category}
-                    </span>
-                    {job.verificationType === "auto_telegram_join" && (
-                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                        <Zap className="w-2.5 h-2.5" />
-                        <span>Instant</span>
+            filteredJobs.map((job) => {
+              const userSub = submissionByTaskId.get(job.id);
+              const isDeclinedResubmit = userSub?.submission_status === "rejected";
+              return (
+                <motion.div
+                  key={job.id}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    tgHaptics.impact("light");
+                    navigate(`/tasks/${job.id}`);
+                  }}
+                  className={`card-glass-dark p-3.5 flex items-center justify-between cursor-pointer transition-all duration-200 group active:bg-[#0f1d3d] ${
+                    isDeclinedResubmit
+                      ? "border-rose-500/35 hover:border-rose-400/60"
+                      : "hover:border-sky-400/40"
+                  }`}
+                >
+                  <div className="flex-1 min-w-0 pr-3">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      <span className="text-[10px] text-[#38bdf8] font-bold bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded-full">
+                        {job.category}
                       </span>
+                      {job.verificationType === "auto_telegram_join" && (
+                        <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Zap className="w-2.5 h-2.5" />
+                          <span>Instant</span>
+                        </span>
+                      )}
+                      {isDeclinedResubmit && (
+                        <span className="text-[10px] font-bold text-rose-300 bg-rose-500/20 border border-rose-500/35 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <RotateCcw className="w-2.5 h-2.5" />
+                          <span>Declined · Resubmit</span>
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-sky-400" />
+                        <span>~{job.timeToComplete}</span>
+                      </span>
+                    </div>
+
+                    <h3 className="text-xs font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
+                      {job.title}
+                    </h3>
+
+                    {isDeclinedResubmit ? (
+                      <div className="text-[10px] text-rose-300/90 mt-1 truncate">
+                        {userSub?.admin_comment
+                          ? `Reason: ${userSub.admin_comment}`
+                          : "Tap to upload updated proof"}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[10px] mt-1">
+                        <span className="text-slate-400">
+                          {job.available}/{job.total} slots left
+                        </span>
+                        {(job.pendingCount ?? 0) > 0 && (
+                          <span className="text-amber-300/90">
+                            · {job.pendingCount} in review
+                          </span>
+                        )}
+                      </div>
                     )}
-                    <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-sky-400" />
-                      <span>~{job.timeToComplete}</span>
-                    </span>
                   </div>
 
-                  <h3 className="text-xs font-bold text-white truncate group-hover:text-[#38bdf8] transition-colors">
-                    {job.title}
-                  </h3>
-
-                  <div className="flex items-center gap-2 text-[10px] mt-1">
-                    <span className="text-slate-400">
-                      {job.available}/{job.total} slots left
+                  {/* Reward & Arrow */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="badge-green-pill text-xs font-extrabold px-2.5 py-1 rounded-full tabular-nums flex items-center gap-0.5">
+                      <span>{job.pay}</span>
+                      <ChevronRight className="w-3 h-3" />
                     </span>
-                    {(job.pendingCount ?? 0) > 0 && (
-                      <span className="text-amber-300/90">
-                        · {job.pendingCount} in review
-                      </span>
-                    )}
                   </div>
-                </div>
-
-                {/* Reward & Arrow */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="badge-green-pill text-xs font-extrabold px-2.5 py-1 rounded-full tabular-nums flex items-center gap-0.5">
-                    <span>{job.pay}</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </span>
-                </div>
-              </motion.div>
-            ))
+                </motion.div>
+              );
+            })
           )
         ) : viewMode === "pending" ? (
           <>

@@ -12,14 +12,20 @@
 --   4. Allows `complete_auto_telegram_task_atomic()` to re-claim if prior auto check failed/rejected
 -- ============================================================================
 
--- 1. Extend public.submissions cleanly
+-- 1. Extend public.submissions cleanly + auto-close any legacy tasks whose quota is already met
 ALTER TABLE public.submissions
   ADD COLUMN IF NOT EXISTS submitted_username TEXT;
 
 ALTER TABLE public.submissions
   ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 1;
 
--- 2. Exclude already-submitted and 0-slot tasks from the user's Available Tasks RPC
+UPDATE public.tasks
+SET status = 'completed'
+WHERE status = 'active'
+  AND COALESCE(current_completions, 0) >= COALESCE(max_completions, 100);
+
+-- 2. Exclude 0-slot, pending, approved, and maxed-out rejected tasks;
+--    surface rejected (<3 attempts) tasks back so users can fix & resubmit while slots remain
 DROP FUNCTION IF EXISTS public.get_active_tasks_with_slots();
 CREATE FUNCTION public.get_active_tasks_with_slots()
 RETURNS TABLE (
@@ -103,6 +109,10 @@ BEGIN
               FROM public.submissions us
               WHERE us.task_id = t.id
                 AND us.user_id = v_uid
+                AND (
+                    us.status IN ('pending', 'approved')
+                    OR (us.status = 'rejected' AND COALESCE(us.attempt_count, 1) >= 3)
+                )
           )
       )
     ORDER BY t.created_at DESC;
@@ -112,8 +122,86 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.get_active_tasks_with_slots() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_active_tasks_with_slots() TO authenticated, service_role;
 
--- 3. Include attempt_count in get_my_task_submissions? Keep exact return signature backwards compatible,
---    and update submit_task_atomic to support safe resubmission on 'rejected' + submitted_username.
+-- 2b. Include attempt_count in get_my_task_submissions() so UI enforces 3-attempt cap accurately
+DROP FUNCTION IF EXISTS public.get_my_task_submissions();
+CREATE FUNCTION public.get_my_task_submissions()
+RETURNS TABLE (
+    submission_id UUID,
+    task_id UUID,
+    task_title TEXT,
+    task_category TEXT,
+    task_reward NUMERIC(10, 2),
+    task_status TEXT,
+    submission_status TEXT,
+    earned_amount NUMERIC(12, 2),
+    admin_comment TEXT,
+    submitted_at TIMESTAMPTZ,
+    reviewed_at TIMESTAMPTZ,
+    attempt_count INTEGER
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_uid UUID := auth.uid();
+BEGIN
+    IF v_uid IS NULL THEN
+        RETURN;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM public.users u
+        WHERE u.id = v_uid AND u.status != 'suspended'
+    ) THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        s.id AS submission_id,
+        s.task_id,
+        COALESCE(t.title, 'Micro-Task') AS task_title,
+        COALESCE(t.category, 'Other') AS task_category,
+        COALESCE(t.reward, 0.00)::NUMERIC(10, 2) AS task_reward,
+        COALESCE(t.status, 'completed') AS task_status,
+        s.status AS submission_status,
+        CASE
+            WHEN s.status = 'approved' THEN
+                COALESCE(
+                    (
+                        SELECT tx.amount
+                        FROM public.transactions tx
+                        WHERE tx.user_id = v_uid
+                          AND tx.type = 'task_reward'
+                          AND (
+                              tx.idempotency_key = format('sub_%s', s.id)
+                              OR tx.reference_id = s.id::text
+                          )
+                        ORDER BY tx.created_at DESC
+                        LIMIT 1
+                    ),
+                    t.reward,
+                    0.00
+                )::NUMERIC(12, 2)
+            ELSE 0.00::NUMERIC(12, 2)
+        END AS earned_amount,
+        s.admin_comment,
+        s.submitted_at,
+        s.reviewed_at,
+        COALESCE(s.attempt_count, 1)::INTEGER AS attempt_count
+    FROM public.submissions s
+    LEFT JOIN public.tasks t ON t.id = s.task_id
+    WHERE s.user_id = v_uid
+    ORDER BY s.submitted_at DESC;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.get_my_task_submissions() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_my_task_submissions() TO authenticated, service_role;
+
+-- 3. Update submit_task_atomic to support safe resubmission on 'rejected' + submitted_username.
 DROP FUNCTION IF EXISTS public.submit_task_atomic(UUID, UUID, TEXT, TEXT);
 CREATE FUNCTION public.submit_task_atomic(
     p_user_id UUID,
